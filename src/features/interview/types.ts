@@ -289,12 +289,24 @@ export interface ReviewLogEntry {
   note?: string;
 }
 
+/**
+ * A customer correction recorded after submission. It sits beside the
+ * immutable snapshot; it never rewrites the original answer.
+ */
+export interface CorrectionRecord {
+  id: number;
+  detail: string;
+  recordedBy: string;
+  recordedAt: string;
+}
+
 export interface CaseRecord extends CaseDraft {
   reference: string;
   submittedAt: string;
   status: CaseStatus;
   notification: NotificationRecord;
   reviewLog: ReviewLogEntry[];
+  corrections: CorrectionRecord[];
   draftSummary: DraftSummary;
   /** True only for the clearly-labelled non-customer case used in previews. */
   sample?: boolean;

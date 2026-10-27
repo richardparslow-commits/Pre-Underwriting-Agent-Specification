@@ -4,7 +4,7 @@ import { ArrowRight, LockKeyhole } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label, Select } from "@/components/ui/form";
 import { Alert, Badge, Checkbox } from "@/components/ui/surface";
-import { SITE } from "@/config/site";
+import { MARKETING, MARKETING_ENABLED, SITE } from "@/config/site";
 import {
   CONTACT_PREFERENCES,
   MARKETING_CALL_LABEL,
@@ -35,9 +35,16 @@ const ASSISTANCE_OPTIONS = [
 
 export function LeadForm({ lead, consent, onField, onConsent, onContinue }: LeadFormProps) {
   const [errors, setErrors] = useState<LeadErrors>({});
+  const [consentError, setConsentError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   const needsPhone = lead.preferredContact === "phone" || lead.preferredContact === "text";
+  const marketingHeading =
+    MARKETING.calls && MARKETING.texts
+      ? "Marketing calls and texts are optional"
+      : MARKETING.calls
+        ? "Marketing calls are optional"
+        : "Marketing texts are optional";
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -53,6 +60,15 @@ export function LeadForm({ lead, consent, onField, onConsent, onContinue }: Lead
       return;
     }
 
+    // Acknowledging the privacy practices is a required, separate permission,
+    // not an optional box. The same rule is enforced by `submit-case`.
+    if (!consent.privacyAcknowledged) {
+      setConsentError("Acknowledge the privacy practices before continuing.");
+      formRef.current?.querySelector<HTMLElement>("#privacy-ack")?.focus();
+      return;
+    }
+
+    setConsentError(null);
     onContinue();
   }
 
@@ -115,7 +131,9 @@ export function LeadForm({ lead, consent, onField, onConsent, onContinue }: Lead
               </option>
             ))}
           </Select>
-          <p className="field-help">Used for licensing and jurisdiction checks.</p>
+          <p className="field-help">
+            Recorded so the reviewer knows which state&rsquo;s rules apply to your request.
+          </p>
           <FieldError>{errors.state}</FieldError>
         </div>
         <div>
@@ -131,7 +149,9 @@ export function LeadForm({ lead, consent, onField, onConsent, onContinue }: Lead
             aria-invalid={Boolean(errors.email)}
             className="mt-1.5"
           />
-          <p className="field-help">Your review confirmation is sent here.</p>
+          <p className="field-help">
+            Used to reply to you about this request. No automated confirmation email is sent.
+          </p>
           <FieldError>{errors.email}</FieldError>
         </div>
       </div>
@@ -307,73 +327,103 @@ export function LeadForm({ lead, consent, onField, onConsent, onContinue }: Lead
           <Badge tone="outline">Separate choices</Badge>
         </div>
 
-        <label className="flex gap-3 text-sm leading-relaxed">
-          <Checkbox
-            checked={consent.privacyAcknowledged}
-            onChange={(event) => onConsent("privacyAcknowledged", event.target.checked)}
-            aria-describedby="privacy-ack-text"
-          />
-          <span id="privacy-ack-text">
-            {PRIVACY_ACKNOWLEDGEMENT_TEXT}{" "}
-            <Link to="/privacy" className="link-quiet">
-              Read the privacy practices
-            </Link>
-            .
-          </span>
-        </label>
-
-        <div className="hairline pt-4">
-          <p className="text-sm font-medium">Marketing calls and texts are optional</p>
-          <p className="field-help">
-            Leaving both boxes unchecked does not stop your review and does not change how quickly
-            you hear back. You can submit with both off.
-          </p>
-
-          <div className="mt-3 space-y-2.5">
-            <label className="flex gap-3 text-sm leading-relaxed">
-              <Checkbox
-                checked={consent.marketingCall}
-                onChange={(event) => onConsent("marketingCall", event.target.checked)}
-                disabled={!needsPhone}
-              />
-              <span>
-                {MARKETING_CALL_LABEL}
-                {!needsPhone ? (
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
-                    Add a telephone number above to make this available.
-                  </span>
-                ) : null}
-              </span>
-            </label>
-            <label className="flex gap-3 text-sm leading-relaxed">
-              <Checkbox
-                checked={consent.marketingText}
-                onChange={(event) => onConsent("marketingText", event.target.checked)}
-                disabled={!needsPhone}
-              />
-              <span>
-                {MARKETING_TEXT_LABEL}
-                {!needsPhone ? (
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
-                    Add a telephone number above to make this available.
-                  </span>
-                ) : null}
-              </span>
-            </label>
-          </div>
-
-          <p
-            id="marketing-disclosure"
-            className="mt-4 text-xs leading-relaxed text-muted-foreground"
-          >
-            {MARKETING_DISCLOSURE_TEXT}
-          </p>
-          {SITE.legalReviewPending ? (
-            <p className="mt-2 text-[0.7rem] uppercase tracking-[0.12em] text-warn">
-              Draft wording — pending counsel review
-            </p>
-          ) : null}
+        <div>
+          <label className="flex gap-3 text-sm leading-relaxed">
+            <Checkbox
+              id="privacy-ack"
+              checked={consent.privacyAcknowledged}
+              onChange={(event) => {
+                onConsent("privacyAcknowledged", event.target.checked);
+                if (event.target.checked) setConsentError(null);
+              }}
+              aria-required="true"
+              aria-invalid={Boolean(consentError)}
+              aria-describedby={
+                consentError ? "privacy-ack-text privacy-ack-error" : "privacy-ack-text"
+              }
+            />
+            <span id="privacy-ack-text">
+              {PRIVACY_ACKNOWLEDGEMENT_TEXT}{" "}
+              <Link to="/privacy" className="link-quiet">
+                Read the privacy practices
+              </Link>
+              .
+            </span>
+          </label>
+          <FieldError id="privacy-ack-error">{consentError}</FieldError>
         </div>
+
+        {MARKETING_ENABLED ? (
+          <div className="hairline pt-4">
+            <p className="text-sm font-medium">{marketingHeading}</p>
+            <p className="field-help">
+              Leaving any box unchecked does not stop your review and does not change how quickly
+              you hear back. You can submit with every box off.
+            </p>
+
+            <div className="mt-3 space-y-2.5">
+              {MARKETING.calls ? (
+                <label className="flex gap-3 text-sm leading-relaxed">
+                  <Checkbox
+                    checked={consent.marketingCall}
+                    onChange={(event) => onConsent("marketingCall", event.target.checked)}
+                    disabled={!needsPhone}
+                  />
+                  <span>
+                    {MARKETING_CALL_LABEL}
+                    {!needsPhone ? (
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Add a telephone number above to make this available.
+                      </span>
+                    ) : null}
+                  </span>
+                </label>
+              ) : null}
+              {MARKETING.texts ? (
+                <label className="flex gap-3 text-sm leading-relaxed">
+                  <Checkbox
+                    checked={consent.marketingText}
+                    onChange={(event) => onConsent("marketingText", event.target.checked)}
+                    disabled={!needsPhone}
+                  />
+                  <span>
+                    {MARKETING_TEXT_LABEL}
+                    {!needsPhone ? (
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Add a telephone number above to make this available.
+                      </span>
+                    ) : null}
+                  </span>
+                </label>
+              ) : null}
+            </div>
+
+            <p
+              id="marketing-disclosure"
+              className="mt-4 text-xs leading-relaxed text-muted-foreground"
+            >
+              {MARKETING_DISCLOSURE_TEXT}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              <Link to="/privacy" className="link-quiet">
+                Privacy Policy
+              </Link>{" · "}
+              <Link to="/messaging-terms" className="link-quiet">
+                Messaging Terms
+              </Link>
+            </p>
+            {SITE.legalReviewPending ? (
+              <p className="mt-2 text-[0.7rem] uppercase tracking-[0.12em] text-warn">
+                Draft wording — pending counsel review
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <p className="hairline pt-4 text-sm leading-relaxed text-muted-foreground">
+            We do not currently make marketing calls or send marketing texts, so no marketing
+            consent is requested here. Submitting the interview never requires marketing consent.
+          </p>
+        )}
       </section>
 
       <Alert tone="neutral">

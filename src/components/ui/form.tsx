@@ -60,10 +60,10 @@ export function Label({
   );
 }
 
-export function FieldError({ children }: { children?: React.ReactNode }) {
+export function FieldError({ children, id }: { children?: React.ReactNode; id?: string }) {
   if (!children) return null;
   return (
-    <p role="alert" className="mt-1.5 text-xs font-medium text-danger">
+    <p id={id} role="alert" className="mt-1.5 text-xs font-medium text-danger">
       {children}
     </p>
   );

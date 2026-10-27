@@ -6,6 +6,7 @@ import {
   ChevronDown,
   Loader2,
   MessageSquarePlus,
+  PencilLine,
   Sparkles,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -21,7 +22,7 @@ import type {
   ReviewLogEntry,
   SubmittedAnswer,
 } from "@/features/interview/types";
-import { recordReview } from "@/lib/api";
+import { recordCorrection, recordReview } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { StatusTimeline } from "@/features/intake/StatusTimeline";
@@ -144,6 +145,10 @@ export function CaseReview({
   const [error, setError] = useState<string | null>(null);
   const [clarifyOpen, setClarifyOpen] = useState(false);
   const [note, setNote] = useState("");
+  const [correctionOpen, setCorrectionOpen] = useState(false);
+  const [correctionText, setCorrectionText] = useState("");
+  const [correctionBusy, setCorrectionBusy] = useState(false);
+  const [correctionError, setCorrectionError] = useState<string | null>(null);
 
   const counts = {
     all: record.answers.length,
@@ -178,6 +183,23 @@ export function CaseReview({
       );
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function saveCorrection() {
+    setCorrectionBusy(true);
+    setCorrectionError(null);
+    try {
+      await recordCorrection(record.reference, correctionText);
+      setCorrectionText("");
+      setCorrectionOpen(false);
+      await onRefresh();
+    } catch (saveError) {
+      setCorrectionError(
+        saveError instanceof Error ? saveError.message : "The correction was not recorded.",
+      );
+    } finally {
+      setCorrectionBusy(false);
     }
   }
 
@@ -464,6 +486,82 @@ export function CaseReview({
               Answers are the customer&rsquo;s own statements. They are not verified medical records,
               and no diagnosis has been inferred.
             </p>
+          </section>
+
+          <section className="panel p-5">
+            <h2 className="text-base font-medium">Recorded corrections</h2>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Corrections the customer supplies after submission. Each one is stored separately from
+              the submitted answers, with who recorded it and when. The original snapshot is never
+              edited.
+            </p>
+            <ul className="mt-3 space-y-3">
+              {record.corrections.length === 0 ? (
+                <li className="text-xs text-muted-foreground">No corrections recorded.</li>
+              ) : null}
+              {record.corrections.map((correction) => (
+                <li key={correction.id} className="text-xs">
+                  <p className="leading-relaxed text-foreground">{correction.detail}</p>
+                  <p className="mt-1 text-muted-foreground">
+                    {correction.recordedBy} · {formatDate(correction.recordedAt)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+
+            {correctionOpen ? (
+              <div className="mt-4 space-y-2 border-t border-border pt-4">
+                <label htmlFor="correction-detail" className="field-label">
+                  What did the customer correct?
+                </label>
+                <Textarea
+                  id="correction-detail"
+                  value={correctionText}
+                  maxLength={4000}
+                  onChange={(event) => setCorrectionText(event.target.value)}
+                  placeholder="For example: the customer confirmed the surgery was in February, not March."
+                />
+                {correctionError ? (
+                  <p className="text-xs font-medium text-danger" role="alert">
+                    {correctionError}
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => void saveCorrection()}
+                    disabled={correctionBusy || correctionText.trim().length === 0}
+                  >
+                    {correctionBusy ? <Loader2 className="animate-spin" aria-hidden /> : null}
+                    Save correction
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setCorrectionOpen(false);
+                      setCorrectionError(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+                <p className="text-[0.7rem] leading-relaxed text-muted-foreground">
+                  This adds an entry beside the case. It does not change the submitted answers or
+                  send the customer an email.
+                </p>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3"
+                onClick={() => setCorrectionOpen(true)}
+              >
+                <PencilLine aria-hidden />
+                Record a correction
+              </Button>
+            )}
           </section>
 
           <section className="panel p-5">

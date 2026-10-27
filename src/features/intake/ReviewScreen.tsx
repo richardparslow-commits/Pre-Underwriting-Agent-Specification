@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, ArrowLeft, Check, Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, Badge, Checkbox } from "@/components/ui/surface";
-import { SITE } from "@/config/site";
+import { MARKETING, MARKETING_ENABLED, SITE } from "@/config/site";
 import {
   answerTextFor,
   detailEntries,
@@ -66,6 +66,9 @@ export function ReviewScreen({
   );
   const held = QUESTION_BANK.filter((question) => question.reviewStatus === "human_review_required");
   const marketingGiven = consent.marketingCall || consent.marketingText;
+  const marketingWithdrawal = [MARKETING.texts ? "replying STOP" : null, "asking us"]
+    .filter(Boolean)
+    .join(" or ");
 
   return (
     <div className="space-y-8">
@@ -116,19 +119,23 @@ export function ReviewScreen({
               Contact permissions
             </p>
             <p className="mt-1 text-sm">
-              {marketingGiven
-                ? [
-                    consent.marketingCall ? "Marketing calls" : null,
-                    consent.marketingText ? "Marketing texts" : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" and ")
-                : "No marketing calls or texts"}
+              {!MARKETING_ENABLED
+                ? "Not offered in this version"
+                : marketingGiven
+                  ? [
+                      consent.marketingCall ? "Marketing calls" : null,
+                      consent.marketingText ? "Marketing texts" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" and ")
+                  : "No marketing permission given"}
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {marketingGiven
-                ? "You can withdraw this at any time by replying STOP or asking us."
-                : "Your questionnaire is submitted without marketing consent. This does not affect your review."}
+              {!MARKETING_ENABLED
+                ? "Your questionnaire is submitted without marketing consent. This does not affect your review."
+                : marketingGiven
+                  ? `You can withdraw this at any time by ${marketingWithdrawal}.`
+                  : "Your questionnaire is submitted without marketing consent. This does not affect your review."}
             </p>
           </div>
         </div>
@@ -299,7 +306,8 @@ export function ReviewScreen({
             <h2 className="text-base font-medium">Before you submit</h2>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
               A submitted case is an immutable record. If you need to correct it afterwards, contact{" "}
-              {SITE.owner} with your case reference and the correction will be recorded separately.
+              {SITE.owner} with your case reference. The correction is added to your case record as a
+              separate note and the submitted answers stay exactly as they are.
             </p>
           </div>
         </div>

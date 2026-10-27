@@ -118,6 +118,11 @@ export function SiteLayout() {
                 </Link>
               </li>
               <li>
+                <Link to="/messaging-terms" className="link-quiet">
+                  Messaging terms
+                </Link>
+              </li>
+              <li>
                 <a href={`mailto:${SITE.reviewerEmail}`} className="link-quiet">
                   Contact {SITE.owner}
                 </a>

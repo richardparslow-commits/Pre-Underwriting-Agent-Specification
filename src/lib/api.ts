@@ -8,6 +8,7 @@ import type {
   CaseDraft,
   CaseRecord,
   CaseStatus,
+  CorrectionRecord,
   NotificationRecord,
   NotificationState,
   ReviewLogEntry,
@@ -87,6 +88,7 @@ function fromRow(row: CaseRow): CaseRecord {
     crisisDisclosure: row.crisis_disclosure,
     notification: notificationFromRow(row),
     reviewLog: row.payload?.reviewLog ?? [],
+    corrections: row.payload?.corrections ?? [],
     draftSummary: buildDraftSummary(answers),
   };
 }
@@ -275,6 +277,15 @@ function buildSampleCase(): CaseRecord {
     reviewLog: [
       { action: "opened", actor: SITE.reviewerEmail, at: new Date(Date.parse(submittedAt) + 1000 * 60 * 30).toISOString() },
     ],
+    corrections: [
+      {
+        id: 1,
+        detail:
+          "Sample correction: the customer asked us to note the knee procedure was on the left knee.",
+        recordedBy: SITE.reviewerEmail,
+        recordedAt: new Date(Date.parse(submittedAt) + 1000 * 60 * 45).toISOString(),
+      },
+    ],
     draftSummary: buildDraftSummary(allAnswers),
     sample: true,
   };
@@ -344,6 +355,7 @@ export async function submitCase(draft: CaseDraft): Promise<SubmissionReceipt> {
     status: "submitted",
     notification,
     reviewLog: [],
+    corrections: [],
     draftSummary: buildDraftSummary(draft.answers),
   };
 
@@ -440,7 +452,53 @@ export async function getCase(reference: string): Promise<CaseRecord | null> {
       }))
     : [];
 
-  return { ...record, reviewLog };
+  const { data: correctionRows } = await supabase
+    .from("case_corrections")
+    .select("id, detail, recorded_by, created_at")
+    .eq("case_id", (data as CaseRow).id)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  const corrections: CorrectionRecord[] = Array.isArray(correctionRows)
+    ? correctionRows.map((entry) => ({
+        id: Number(entry.id),
+        detail: String(entry.detail ?? ""),
+        recordedBy: String(entry.recorded_by ?? ""),
+        recordedAt: String(entry.created_at ?? ""),
+      }))
+    : [];
+
+  return { ...record, reviewLog, corrections };
+}
+
+export async function recordCorrection(reference: string, detail: string): Promise<void> {
+  const trimmed = detail.trim();
+  if (!trimmed) throw new Error("Enter the correction before saving it.");
+
+  if (PREVIEW_MODE) {
+    ensurePreviewSeed();
+    const record = previewCases.get(reference);
+    if (!record) throw new Error("This case could not be found.");
+    record.corrections = [
+      {
+        id: record.corrections.length + 1,
+        detail: trimmed,
+        recordedBy: SITE.reviewerEmail,
+        recordedAt: new Date().toISOString(),
+      },
+      ...record.corrections,
+    ];
+    return;
+  }
+
+  if (!supabase) throw new Error("Sign-in is not configured.");
+
+  const { error } = await supabase.rpc("record_case_correction", {
+    p_reference: reference,
+    p_detail: trimmed,
+  });
+
+  if (error) throw new Error("The correction could not be recorded.");
 }
 
 export async function recordReview(
