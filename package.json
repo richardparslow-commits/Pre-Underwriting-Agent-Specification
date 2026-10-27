@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "check:bank": "tsx scripts/check-bank.ts",
+    "test:consent": "tsx --test src/features/consent/marketingConsent.test.ts",
     "report:reconciliation": "tsx scripts/report-reconciliation.ts"
   },
   "dependencies": {

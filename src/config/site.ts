@@ -6,16 +6,16 @@
  * legal conclusion.
  */
 
+import { resolveLegalEntity } from "./legalEntity";
+
 /**
  * The actual legal operating entity. Supplied at build time so no placeholder
  * can reach a customer. While it is empty, no marketing consent is requested:
  * a TCPA disclosure cannot name an authorised seller that has not been
- * confirmed.
+ * confirmed. Blank and bracket-wrapped values are both treated as unset.
  */
-const LEGAL_ENTITY = (import.meta.env.VITE_LEGAL_ENTITY ?? "").trim();
-/** A bracket-wrapped value is a placeholder, never a confirmed seller. */
-const LEGAL_ENTITY_CONFIGURED =
-  LEGAL_ENTITY.length > 0 && !/^\[.*\]$/.test(LEGAL_ENTITY);
+const LEGAL_ENTITY = resolveLegalEntity(import.meta.env.VITE_LEGAL_ENTITY);
+const LEGAL_ENTITY_CONFIGURED = LEGAL_ENTITY.length > 0;
 
 /**
  * Marketing channels the business actually operates. Every flag defaults to
@@ -40,7 +40,7 @@ export const SITE = {
   owner: "Richard Parslow",
   /** Server-side approved recipient; this constant is for display only. */
   reviewerEmail: "richardparslow@lifepolicypilot.blog",
-  legalEntity: LEGAL_ENTITY_CONFIGURED ? LEGAL_ENTITY : "",
+  legalEntity: LEGAL_ENTITY,
   /** Initial regulatory baseline named in the specification. */
   regulatoryBaseline: "Texas",
   /** Shown wherever draft legal language appears. */
