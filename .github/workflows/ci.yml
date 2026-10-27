@@ -33,6 +33,18 @@ jobs:
       - name: Question bank reconciliation
         run: npm run check:bank
 
+      # The review document is generated, so a bank change that was not followed
+      # by `npm run report:reconciliation` would leave reviewers reading stale
+      # decisions. Fail on any diff rather than letting the document drift.
+      - name: Reconciliation report is current
+        run: |
+          npm run report:reconciliation
+          if ! git diff --quiet -- docs/question-bank-reconciliation.md; then
+            echo "::error::docs/question-bank-reconciliation.md is out of date. Run `npm run report:reconciliation` and commit the result."
+            git diff --stat -- docs/question-bank-reconciliation.md
+            exit 1
+          fi
+
       - name: Typecheck
         run: npm run typecheck
 
