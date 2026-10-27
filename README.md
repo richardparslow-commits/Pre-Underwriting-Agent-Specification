@@ -22,7 +22,7 @@ service. The following are deliberate, visible gaps:
 | Item | State |
 | --- | --- |
 | Source questionnaire (`Detialed-Life-insurance-Questions.pdf`) | **In the repo** at `source/Detialed-Life-insurance-Questions.pdf` (7 pages, 113 questions) with a verbatim text extraction. All 92 bank rows are reconciled against it. Nicotine, criminal history, medical history, alcohol and drug use, aviation and driving are rebuilt as one question per source window (58 rows now follow their source wording and window); 29 rows still carry flags, no row collapses lookbacks, and every remaining source gap has a recorded decision (19 partly collected, 9 out of scope, 0 waiting on a new question). Every row is `sourceVerified: false` — a named reviewer must accept each decision before launch. See [docs/question-bank-reconciliation.md](docs/question-bank-reconciliation.md). |
-| Legal wording (intake acknowledgment, TCPA disclosure) | Draft. `SITE.legalEntity` is a placeholder and `SITE.legalReviewPending` is `true`. |
+| Legal wording (intake acknowledgment, TCPA disclosure) | Draft, pending counsel. `SITE.legalEntity` is supplied by `VITE_LEGAL_ENTITY`; marketing consent and the TCPA disclosure appear only when a seller and at least one channel are configured. `SITE.legalReviewPending` is `true`. |
 | Language-model explainer | **Not wired.** The interview engine is deterministic. `FEATURES.aiExplainerEnabled = false`, so the customer copy does not claim an AI assistant is active. |
 | Email notification | Implemented against Resend in a Supabase edge function; no provider key is configured here, so the UI reports `not_sent` honestly. |
 | Supabase deployment | Migration and functions are written but have not been run against a project from this workspace. |
@@ -52,8 +52,9 @@ Routes:
 | `/` | Product introduction and honest scope boundaries |
 | `/start` | Lead form → permission → interview → review → confirmation |
 | `/privacy` | Privacy practices (draft pending counsel) |
+| `/messaging-terms` | Optional marketing call/text program and its current channels |
 | `/portal` | Reviewer sign-in and case queue |
-| `/portal/:reference` | Complete case record, draft summary, consents, review actions |
+| `/portal/:reference` | Complete case record, draft summary, consents, review actions, recorded corrections |
 
 In preview mode, `/portal` has an explicit **“Open the portal preview”** button
 instead of a fake login, and ships one clearly-labelled non-customer sample case
@@ -75,7 +76,7 @@ instead of a fake login, and ships one clearly-labelled non-customer sample case
 ```
 src/
   App.tsx                        routes
-  config/site.ts                 brand, legal entity placeholder, feature flags, env
+  config/site.ts                 brand, legal entity, marketing channels, feature flags
   integrations/supabase/client.ts Lovable Cloud client (null when unconfigured)
   features/
     interview/
@@ -90,9 +91,10 @@ src/
                                  confirmation, crisis panel, status timeline
     portal/                      reviewer auth hook + case review UI
   components/ui/                 button, form, surface primitives
-  lib/api.ts                     submit / list / get / record review (live + preview)
+  lib/api.ts                     submit / list / get / record review + correction (live + preview)
 supabase/
   migrations/0001_pre_underwriting.sql
+  migrations/0002_case_corrections.sql
   functions/submit-case/         public intake, server-generated reference
   functions/_shared/case.ts      validation, CORS, rate limit, service client
   functions/_shared/email.ts     minimal notification, fixed recipient, Resend
@@ -134,16 +136,24 @@ LOVABLE.md                       import and wiring instructions for Lovable
 
 ## Consent separation (implemented)
 
-Four independent records, each with its own wording version and timestamp:
+Two required records, each with its own wording version and timestamp:
 
 1. preliminary intake and submission permission (required),
-2. privacy-practices acknowledgement (required),
-3. optional marketing calls (unchecked by default; disabled without a phone),
-4. optional marketing texts (unchecked by default; disabled without a phone).
+2. privacy-practices acknowledgement (required).
 
-A phone number, chat session or questionnaire submission never sets marketing
-consent. The exact displayed TCPA text is stored as evidence. Medical-record
-release is **not** collected in this intake.
+Optional marketing records are written only for channels the product actually
+operates. Every channel defaults to off in `src/config/site.ts`; with no channel
+enabled, the interview shows no marketing checkboxes and no TCPA disclosure,
+and a submitted case contains only the two required consents. Enabling a channel
+additionally requires `VITE_LEGAL_ENTITY`, so a disclosure can never name a
+placeholder seller.
+
+The two required permissions are enforced at both layers: the lead form will not
+advance without the privacy acknowledgement, and `submit-case` rejects a draft
+whose consent records omit or decline either the intake permission or that
+acknowledgement. A phone number, chat session or questionnaire submission never
+sets marketing consent. When a channel is enabled, the exact displayed TCPA text
+is stored as evidence. Medical-record release is **not** collected in this intake.
 
 ## Security decisions
 
@@ -154,7 +164,9 @@ release is **not** collected in this intake.
   distinct: `not_sent`, `queued`, `accepted`, `failed`, `delivered` (webhook only).
   Retries update a case, never create one.
 - The submitted payload is immutable at the database level (trigger), and the
-  case reference is generated server-side.
+  case reference is generated server-side. A post-submission correction is an
+  append-only row in `case_corrections`, tied to the case and stamped with the
+  reviewer and time; it never edits the snapshot.
 - `cases` has RLS enabled with `anon` fully revoked; reviewers authenticate with
   Supabase Auth and must exist in `public.reviewers`. Every read is checked.
 - Health answers are kept out of URLs, analytics, logs, error echoes and the
@@ -168,11 +180,13 @@ release is **not** collected in this intake.
 
 ### 1. Create the case store
 
-In Supabase (or Lovable Cloud) run
-[`supabase/migrations/0001_pre_underwriting.sql`](supabase/migrations/0001_pre_underwriting.sql)
-top to bottom. It creates `reviewers`, `cases`, `case_review_log`,
+In Supabase (or Lovable Cloud) run the migrations in order:
+[`0001_pre_underwriting.sql`](supabase/migrations/0001_pre_underwriting.sql), then
+[`0002_case_corrections.sql`](supabase/migrations/0002_case_corrections.sql). They
+create `reviewers`, `cases`, `case_review_log`, `case_corrections`,
 `contact_suppressions`, the reviewer RLS policies, the immutability trigger and
-the `record_case_review` RPC.
+the `record_case_review` and `record_case_correction` RPCs. Do not stop after
+0001: the portal's correction action needs the second migration.
 
 ### 2. Create the reviewer
 
@@ -317,6 +331,10 @@ is the reviewer's signature in the report.
   questions, driving its separate 24-month, 5-year and ever questions, and the
   newly added rows branched only where the source branches (solo climbing,
   salvage diving, bankruptcy discharge date, military mission type).
+- `deno test --allow-env --no-lock supabase/functions/tests/` — 5 consent-gate
+  tests that drive the real `submit-case` handler and require HTTP 422 for a
+  draft with no consent records, a missing or declined intake permission, or a
+  missing or declined privacy acknowledgement. This runs in CI with Deno 2.
 - `npm run report:reconciliation` — regenerates the review document from the
   data (92 rows, 28 gaps).
 - Browser walkthrough (preview mode): lead form with validation errors, consent
@@ -325,10 +343,13 @@ is the reviewer's signature in the report.
   questions), supplemental labelling, review with 31 unanswered items, review
   confirmation enabling submission, explicit “Submit for Richard’s Review”,
   case reference, honest `not_sent` timeline, reviewer sign-in gate, case review
-  with draft summary/flags/consent evidence, “mark as reviewed” logging, and the
-  current-crisis panel with 988/911 links.
-- **Not run:** the Deno edge functions (no Supabase project in this workspace),
-  real email delivery, RLS enforcement against a live database, and MFA.
+  with draft summary/flags/consent evidence, “mark as reviewed” logging,
+  recording a post-submission correction and confirming it appears separately
+  while the original answer is unchanged, and the current-crisis panel with
+  988/911 links.
+- **Not run:** the Deno edge functions against a live Supabase project, real
+  email delivery, RLS enforcement against a live database, and MFA. The
+  `submit-case` handler's consent gate is covered by the Deno test above.
 
 ## Regulatory note
 

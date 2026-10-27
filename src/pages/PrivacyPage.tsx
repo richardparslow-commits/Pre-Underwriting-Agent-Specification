@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Alert, Badge } from "@/components/ui/surface";
-import { SITE } from "@/config/site";
+import { MARKETING_ENABLED, SITE } from "@/config/site";
 import { PRIVACY_PRACTICES_VERSION } from "@/features/consent/consentTexts";
 
 const SECTIONS = [
@@ -10,7 +10,11 @@ const SECTIONS = [
   },
   {
     title: "Why it is collected",
-    body: `To prepare a preliminary pre-underwriting review for ${SITE.owner} at ${SITE.brand}, to let you correct your answers before submission, and to contact you in the way you asked us to. Marketing calls and texts are separate, optional permissions and are never required to submit.`,
+    body: `To prepare a preliminary pre-underwriting review for ${SITE.owner} at ${SITE.brand}, to let you correct your answers before submission, and to contact you in the way you asked us to. ${
+      MARKETING_ENABLED
+        ? "Marketing calls and texts are separate, optional permissions and are never required to submit."
+        : "No marketing calls or texts are offered in this version, so no marketing consent is requested."
+    }`,
   },
   {
     title: "Who reads it",
@@ -59,8 +63,8 @@ export default function PrivacyPage() {
 
       <Alert tone="warn" className="mt-8">
         This is draft product copy prepared for legal review. It is not a complete privacy notice or
-        a substitute for one, and it does not identify the final legal entity. Do not treat it as
-        legal advice or as a compliance certification.
+        a substitute for one, and it does not replace a counsel-approved authorization. Do not treat
+        it as legal advice or as a compliance certification.
       </Alert>
 
       <div className="mt-10 space-y-8">
@@ -83,7 +87,11 @@ export default function PrivacyPage() {
         </p>
         <p className="text-xs leading-relaxed text-muted-foreground">
           Not an insurer. Submitting this interview creates no coverage and no application to a
-          carrier.
+          carrier. Optional marketing is governed by the{" "}
+          <Link to="/messaging-terms" className="link-quiet">
+            Messaging Terms
+          </Link>
+          .
         </p>
       </section>
 

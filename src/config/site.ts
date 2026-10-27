@@ -6,16 +6,41 @@
  * legal conclusion.
  */
 
+/**
+ * The actual legal operating entity. Supplied at build time so no placeholder
+ * can reach a customer. While it is empty, no marketing consent is requested:
+ * a TCPA disclosure cannot name an authorised seller that has not been
+ * confirmed.
+ */
+const LEGAL_ENTITY = (import.meta.env.VITE_LEGAL_ENTITY ?? "").trim();
+/** A bracket-wrapped value is a placeholder, never a confirmed seller. */
+const LEGAL_ENTITY_CONFIGURED =
+  LEGAL_ENTITY.length > 0 && !/^\[.*\]$/.test(LEGAL_ENTITY);
+
+/**
+ * Marketing channels the business actually operates. Every flag defaults to
+ * false; the disclosure and consent controls are generated only from channels
+ * that are switched on here.
+ */
+export const MARKETING = {
+  calls: import.meta.env.VITE_MARKETING_CALLS === "true",
+  texts: import.meta.env.VITE_MARKETING_TEXTS === "true",
+  /** Only claim auto-dialing if the calls actually use it. */
+  autodialer: import.meta.env.VITE_MARKETING_AUTODIALER === "true",
+  /** Only mention AI voice if calls actually use it. */
+  aiVoice: import.meta.env.VITE_MARKETING_AI_VOICE === "true",
+} as const;
+
+/** Marketing consent is offered only for a named seller and a live channel. */
+export const MARKETING_ENABLED =
+  LEGAL_ENTITY_CONFIGURED && (MARKETING.calls || MARKETING.texts);
+
 export const SITE = {
   brand: "Life Policy Pilot",
   owner: "Richard Parslow",
   /** Server-side approved recipient; this constant is for display only. */
   reviewerEmail: "richardparslow@lifepolicypilot.blog",
-  /**
-   * The actual legal operating entity. Placeholder until counsel confirms it:
-   * the TCPA disclosure below is not valid with a placeholder in place.
-   */
-  legalEntity: "[Legal business name]",
+  legalEntity: LEGAL_ENTITY_CONFIGURED ? LEGAL_ENTITY : "",
   /** Initial regulatory baseline named in the specification. */
   regulatoryBaseline: "Texas",
   /** Shown wherever draft legal language appears. */

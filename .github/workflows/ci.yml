@@ -28,6 +28,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # The public intake is the security boundary: a draft that omits either
+      # required consent must be rejected before a case is written, even when
+      # the browser form is bypassed. This drives the real submit-case handler.
+      - name: Server consent regression test
+        run: deno test --allow-env --no-lock supabase/functions/tests/
+
       # Fails if a bank row loses its reconciliation record, a source question
       # stops being acknowledged, or the crisis question is gated again.
       - name: Question bank reconciliation

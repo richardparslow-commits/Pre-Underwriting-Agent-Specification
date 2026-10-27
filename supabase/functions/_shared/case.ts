@@ -313,6 +313,15 @@ export function validateDraft(body: unknown): ValidationResult {
     return { ok: false, reason: "Intake permission is required to submit" };
   }
 
+  // The privacy-practices acknowledgement is its own required permission, not
+  // a decoration on the lead form. A draft without it never reaches the store.
+  const privacyAcknowledgement = consents.find(
+    (consent) => consent.id === "privacy_acknowledgement",
+  );
+  if (!privacyAcknowledgement || !privacyAcknowledgement.granted) {
+    return { ok: false, reason: "Privacy practices acknowledgement is required to submit" };
+  }
+
   const marketingCall = consents.find((consent) => consent.id === "marketing_call");
   const marketingText = consents.find((consent) => consent.id === "marketing_text");
   if ((marketingCall?.granted || marketingText?.granted) && !phone) {
