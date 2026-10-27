@@ -39,6 +39,12 @@ jobs:
       - name: Server consent regression test
         run: deno test --allow-env --no-lock supabase/functions/tests/
 
+      # Consent evidence is generated from build-time channel flags. A
+      # placeholder seller or a disabled channel must never produce a
+      # marketing record the customer could not have seen.
+      - name: Marketing consent regression test
+        run: npm run test:consent
+
       # Fails if a bank row loses its reconciliation record, a source question
       # stops being acknowledged, or the crisis question is gated again.
       - name: Question bank reconciliation

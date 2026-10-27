@@ -335,6 +335,11 @@ is the reviewer's signature in the report.
   tests that drive the real `submit-case` handler and require HTTP 422 for a
   draft with no consent records, a missing or declined intake permission, or a
   missing or declined privacy acknowledgement. This runs in CI with Deno 2.
+- `npm run test:consent` — 6 tests over the pure consent builder: only enabled
+  marketing channels produce a record, each enabled channel appears once, an
+  unchecked box is stored as `granted: false` with no timestamp, and a blank or
+  bracketed placeholder seller produces no marketing record or disclosure. CI
+  runs it with Node's test runner through `tsx`.
 - `npm run report:reconciliation` — regenerates the review document from the
   data (92 rows, 28 gaps).
 - Browser walkthrough (preview mode): lead form with validation errors, consent
