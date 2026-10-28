@@ -54,13 +54,14 @@ function baseAnswer(
     };
   }
 
-  if (question.kind === "multi_choice") {
+  if (question.kind === "multi_choice" || question.kind === "single_choice") {
     const option = question.options.find((candidate) => candidate.value === "none") ??
       question.options[0];
+    const values = option ? [option.value] : [];
     return {
       questionId: question.id,
       disposition: "answered",
-      answerValues: option ? [option.value] : [],
+      answerValues: values,
       answerText: option?.label ?? "None",
     };
   }
@@ -72,6 +73,23 @@ function baseAnswer(
       disposition: "answered",
       answerText: "Details provided",
       fields: [{ id: field.id, label: field.label, value: "Test detail" }],
+    };
+  }
+
+  // Identity answers must agree with the lead default; tests that override the
+  // lead also override the matching answer when they mean to.
+  if (question.id === "ID-01") {
+    return {
+      questionId: question.id,
+      disposition: "answered",
+      answerText: "1980-01-01",
+    };
+  }
+  if (question.id === "ID-03") {
+    return {
+      questionId: question.id,
+      disposition: "answered",
+      answerText: "TX",
     };
   }
 

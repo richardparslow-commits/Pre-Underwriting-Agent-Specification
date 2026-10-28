@@ -1,0 +1,318 @@
+# Full verification — 2026-10-28T08:11:14Z
+
+## Environment
+pwd: /Users/richardparslow/.config/freebuff-desktop/local-projects/63e542bb-916b-480d-ae0c-3cf2709f03f7/threads/21116134370fef0acaacd3c35c93f2677f707f0dc911a97dd3065f3d4dc0d950
+branch: main
+head: 79e8af4f58ad74914241ef4660f765da105949c9
+node: v24.16.0
+npm: 11.13.0
+deno: deno 2.9.6 (stable, release, aarch64-apple-darwin) v8 15.0.245.2-rusty typescript 6.0.3 
+
+===== typecheck =====
+$ npm run typecheck
+
+> lifepolicypilot-pre-underwriting@0.1.0 typecheck
+> tsc --noEmit
+
+EXIT 0
+
+===== build =====
+$ npm run build
+
+> lifepolicypilot-pre-underwriting@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v8.3.5 building client environment for production...
+transforming...
+✓ 1655 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.07 kB │ gzip:   0.57 kB
+dist/assets/index-COduzQzM.css   23.10 kB │ gzip:   5.60 kB
+dist/assets/index-CRsCW4k3.js   615.65 kB │ gzip: 170.87 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 641ms
+EXIT 0
+
+===== bank =====
+$ npm run check:bank
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:bank
+> tsx scripts/check-bank.ts
+
+Question bank: 92 rows
+  approved for interview : 87
+  held for human review  : 5 (ID-04, MED-11, MH-06, RES-04, RES-05)
+  branching questions    : 14
+  supplemental           : 11
+  signed off by reviewer : 0
+
+Source questionnaire: 113 questions
+  traced to a bank row  : 85
+  gaps recorded         : 28 (19 partially collected, 9 out of scope, 0 collected nowhere)
+
+Reconciliation: 92 records, 29 with flags
+  matches_source    : 55
+  split_source_compound: 3
+  wording_changed   : 11
+  timeframe_changed : 7
+  added_by_lpp      : 9
+  not_in_source     : 2
+  held_for_review   : 5
+  flags: wording 16, timeframe 10, branching 12, attribution 10, omission 9
+
+Reconciliation is complete; 92 rows still need a named reviewer's sign-off.
+See docs/question-bank-reconciliation.md for each row's decision.
+
+Structural and reconciliation checks passed.
+EXIT 0
+
+===== docs =====
+$ npm run check:docs
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:docs
+> tsx scripts/check-docs.ts
+
+Documentation matches the data: 92 rows, 87 approved, 5 held, 0 signed off; 113 source items, 85 traced, 28 gaps (19 partial, 9 out of scope).
+EXIT 0
+
+===== server bank =====
+$ npm run check:server-bank
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:server-bank
+> tsx scripts/check-server-bank.ts
+
+Server bank matches the client bank: 92 rows.
+EXIT 0
+
+===== server policy =====
+$ npm run check:server-policy
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:server-policy
+> tsx scripts/check-server-policy.ts
+
+Server consent policy matches the client consent wording.
+EXIT 0
+
+===== bundle =====
+$ npm run check:bundle
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:bundle
+> tsx scripts/check-bundle.ts
+
+Bundle check passed: 1 JavaScript asset(s); 5 withheld source items, 5 reviewer notes and 5 held reconciliation records are absent.
+EXIT 0
+
+===== consent tests =====
+$ npm run test:consent
+
+> lifepolicypilot-pre-underwriting@0.1.0 test:consent
+> tsx --test src/features/consent/marketingConsent.test.ts
+
+✔ stamps the privacy acknowledgement with the privacy notice version (0.494292ms)
+✔ records no marketing consent when no channel is enabled (0.417291ms)
+✔ records only the text channel when calls are disabled (0.181916ms)
+✔ records only the call channel when texts are disabled (0.110083ms)
+✔ records each enabled channel exactly once when both are on (0.097625ms)
+✔ keeps marketing off while the seller is blank or a placeholder (0.091ms)
+✔ keeps an enabled channel record when its box was left unchecked (0.083958ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 81.5315
+EXIT 0
+
+===== engine tests =====
+$ npm run test:engine
+
+> lifepolicypilot-pre-underwriting@0.1.0 test:engine
+> tsx --test src/features/interview/engine.test.ts
+
+✔ closing a parent branch removes the descendant answer and its details (0.888084ms)
+✔ closing a nested branch removes descendants that are only visible through it (0.148542ms)
+✔ a branch-closed row never emits fields or supplemental detail (0.296417ms)
+✔ reviewer notes are not present on any public question row (0.083167ms)
+✔ a held row stays held and carries no answer content (0.157541ms)
+✔ a blank answer is unresolved, never No (0.05375ms)
+✔ current crisis is disclosed even when the history answer is No, Unknown or declined (0.083ms)
+✔ crisis is not disclosed when the current-safety answer is not Yes (0.062292ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 84.516334
+EXIT 0
+
+===== validation tests =====
+$ npm run test:validation
+
+> lifepolicypilot-pre-underwriting@0.1.0 test:validation
+> tsx --test src/features/intake/validation.test.ts
+
+✔ a phone or text preference requires a reachable number (0.823083ms)
+✔ a phone preference rejects letters, short numbers and wrong country codes (0.177042ms)
+✔ a phone preference accepts a normal 10-digit US number (0.080416ms)
+✔ a supplied number is validated even when email or chat is preferred (0.065584ms)
+✔ an 11-digit number is accepted only with the US country code (0.060084ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 79.032209
+EXIT 0
+
+===== database checks =====
+$ npm run check:db
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:db
+> node scripts/check-db.mjs
+
+PASS | migration 1 run 1 | undefined
+PASS | migration 2 run 1 | undefined
+PASS | migration 3 run 1 | undefined
+PASS | migration 4 run 1 | undefined
+PASS | migration 5 run 1 | undefined
+PASS | migration 1 run 2 | undefined
+PASS | migration 2 run 2 | undefined
+PASS | migration 3 run 2 | undefined
+PASS | migration 4 run 2 | undefined
+PASS | migration 5 run 2 | undefined
+PASS | RLS enabled on sensitive tables | [{"relname":"app_settings","relrowsecurity":true},{"relname":"case_deletions","relrowsecurity":true},{"relname":"case_review_log","relrowsecurity":true},{"relname":"cases","relrowsecurity":true},{"relname":"email_events","relrowsecurity":true},{"relname":"marketing_revocations","relrowsecurity":true},{"relname":"submission_rate_limits","relrowsecurity":true}]
+PASS | aal1 reviewer sees zero cases | [{"n":0}]
+PASS | aal1 reviewer sees zero case summaries | [{"n":0}]
+PASS | aal1 reviewer cannot record a review | error=Not authorised
+PASS | aal2 reviewer sees the case | [{"n":1}]
+PASS | aal2 reviewer sees the queue summary without a payload | [{"reference":"LPP-2026-TEST01","first_name":"Test","last_name":"Case","residence_state":"TX","unanswered":1}]
+PASS | queue summary has no answer or payload column | [{"column_name":"reference"},{"column_name":"submitted_at"},{"column_name":"status"},{"column_name":"notification_state"},{"column_name":"notification_attempts"},{"column_name":"notification_detail"},{"column_name":"notification_updated_at"},{"column_name":"crisis_disclosure"},{"column_name":"first_name"},{"column_name":"last_name"},{"column_name":"residence_state"},{"column_name":"unanswered"}]
+PASS | queue summary cannot be asked for payload | error=column "payload" does not exist
+PASS | aal2 reviewer can record opened | [{"record_case_review":""}]
+PASS | opened is deduplicated within the session window | [{"record_case_review":""}]
+PASS | exactly one opened entry exists | [{"n":1}]
+PASS | reviewer cannot update workflow status directly | error=permission denied for table cases
+PASS | reviewer cannot insert a review-log entry directly | error=permission denied for table case_review_log
+PASS | direct writes left the status and log unchanged | [{"status":"submitted","n":0}]
+PASS | reviewer can still mark reviewed through the RPC | [{"record_case_review":""}]
+PASS | the RPC updates status and log atomically | [{"status":"reviewed","n":1}]
+PASS | anonymous caller cannot read case summaries | error=permission denied for view case_summaries
+PASS | service role cannot change crisis triage evidence | error=Submitted case snapshots and triage evidence are immutable
+PASS | service role cannot change residence state | error=Submitted case snapshots and triage evidence are immutable
+PASS | service role cannot rewrite the idempotency key | error=Submitted case snapshots and triage evidence are immutable
+PASS | duplicate idempotency key is rejected | error=duplicate key value violates unique constraint "cases_idempotency_key_idx"
+PASS | first claim wins | [{"reference":"LPP-2026-TEST01","submitted_at":"2026-10-27T12:00:00.000Z","notification_attempts":1}]
+PASS | second concurrent claim gets no row | []
+PASS | acceptance completes the lease | [{"complete_case_notification":""}]
+PASS | accepted case cannot be claimed again | []
+PASS | accepted event applies to a queued case | [{"apply_email_event":"applied"}]
+PASS | duplicate event is ignored by id | [{"apply_email_event":"duplicate"}]
+PASS | delivered event applies | [{"apply_email_event":"applied"}]
+PASS | late accepted event cannot regress delivered | [{"apply_email_event":"ignored"}]
+PASS | bounce after delivery cannot regress | [{"apply_email_event":"ignored"}]
+PASS | case remains delivered | [{"notification_state":"delivered"}]
+PASS | message-id-only event reconciles | [{"apply_email_event":"applied"}]
+PASS | event before message-id correlation is unmatched, not lost | [{"apply_email_event":"unmatched"}]
+PASS | retry of the same event applies after correlation | [{"apply_email_event":"applied"}]
+PASS | the raced case records delivered | [{"notification_state":"delivered"}]
+PASS | a later duplicate of the correlated race event is ignored | [{"apply_email_event":"duplicate"}]
+PASS | rate limit allows the first two | [true,true]
+PASS | rate limit rejects the third | [{"allowed":false}]
+PASS | reviewer records a phone revocation | [{"record_marketing_revocation":""}]
+PASS | suppression is queryable | [{"suppressed":true}]
+PASS | revocation is audited | [{"n":1}]
+PASS | retention is disabled while no schedule is approved | [{"n":0}]
+PASS | approved retention deletes the expired case | [{"n":1}]
+PASS | retention deletion is audited | [{"n":1}]
+PASS | reviewer deletes a case with a reason | [{"delete_case":""}]
+PASS | case is gone | [{"n":0}]
+PASS | deletion is audited | [{"n":1}]
+SUMMARY failures=0
+EXIT 0
+
+===== Deno edge-function tests =====
+$ npx --yes deno@2.9.6 test --allow-env --lock=deno.lock supabase/functions/tests/
+[0m[32mCheck[0m supabase/functions/tests/email_test.ts
+[0m[32mCheck[0m supabase/functions/tests/submit-case_test.ts
+[0m[32mCheck[0m supabase/functions/tests/svix_test.ts
+[0m[32mCheck[0m supabase/functions/tests/validate-draft_test.ts
+[0m[38;5;245mrunning 5 tests from ./supabase/functions/tests/email_test.ts[0m
+notification carries a reference and portal link, never health data ... [0m[32mok[0m [0m[38;5;245m(3ms)[0m
+provider acceptance is never reported as delivered ... [0m[32mok[0m [0m[38;5;245m(593µs)[0m
+no provider key produces not_sent and makes no request ... [0m[32mok[0m [0m[38;5;245m(249µs)[0m
+retries reuse the case reference as the provider idempotency key ... [0m[32mok[0m [0m[38;5;245m(12ms)[0m
+a provider rejection is failed, not accepted ...
+[0m[38;5;245m------- output -------[0m
+Case notification rejected 422
+[0m[38;5;245m----- output end -----[0m
+a provider rejection is failed, not accepted ... [0m[32mok[0m [0m[38;5;245m(2ms)[0m
+[0m[38;5;245mrunning 7 tests from ./supabase/functions/tests/submit-case_test.ts[0m
+refuses live intake until the questionnaire is explicitly approved ... [0m[32mok[0m [0m[38;5;245m(13ms)[0m
+fails closed when the durable rate limiter is unavailable ...
+[0m[38;5;245m------- post-test output -------[0m
+Durable rate limiter is unavailable
+[0m[38;5;245m----- post-test output end -----[0m
+fails closed when the durable rate limiter is unavailable ... [0m[32mok[0m [0m[38;5;245m(836µs)[0m
+rejects a draft with no consent records ... [0m[32mok[0m [0m[38;5;245m(2ms)[0m
+rejects a draft missing the intake permission ... [0m[32mok[0m [0m[38;5;245m(366µs)[0m
+rejects a declined intake permission ... [0m[32mok[0m [0m[38;5;245m(317µs)[0m
+rejects a draft missing the privacy acknowledgement ... [0m[32mok[0m [0m[38;5;245m(304µs)[0m
+rejects a multibyte body above the 512 KiB byte budget with 413 ... [0m[32mok[0m [0m[38;5;245m(645µs)[0m
+[0m[38;5;245mrunning 5 tests from ./supabase/functions/tests/svix_test.ts[0m
+accepts a correctly signed Svix event ... [0m[32mok[0m [0m[38;5;245m(2ms)[0m
+rejects a replayed event outside the timestamp window ... [0m[32mok[0m [0m[38;5;245m(167µs)[0m
+rejects a body changed after signing ... [0m[32mok[0m [0m[38;5;245m(7ms)[0m
+rejects a missing or malformed secret/header ... [0m[32mok[0m [0m[38;5;245m(121µs)[0m
+accepts a valid signature during key rotation ... [0m[32mok[0m [0m[38;5;245m(137µs)[0m
+[0m[38;5;245mrunning 19 tests from ./supabase/functions/tests/validate-draft_test.ts[0m
+accepts a complete canonical draft and rebuilds source rows ... [0m[32mok[0m [0m[38;5;245m(10ms)[0m
+rejects a held HIV row presented as answered ... [0m[32mok[0m [0m[38;5;245m(333µs)[0m
+rejects an invented question id ... [0m[32mok[0m [0m[38;5;245m(97µs)[0m
+rejects a zero-answer payload ... [0m[32mok[0m [0m[38;5;245m(54µs)[0m
+ignores client-invented source wording and restores the canonical row ... [0m[32mok[0m [0m[38;5;245m(221µs)[0m
+rejects marketing consent when the server has no enabled channel ... [0m[32mok[0m [0m[38;5;245m(117µs)[0m
+rejects a privacy record with the wrong notice version ... [0m[32mok[0m [0m[38;5;245m(71µs)[0m
+rejects duplicate consent records ... [0m[32mok[0m [0m[38;5;245m(73µs)[0m
+rejects a consent timestamp after the submission ... [0m[32mok[0m [0m[38;5;245m(106µs)[0m
+rejects a stale submission acknowledgement ... [0m[32mok[0m [0m[38;5;245m(86µs)[0m
+derives crisis disclosure and an urgent flag from MH-05 yes ... [0m[32mok[0m [0m[38;5;245m(223µs)[0m
+rejects a 17-year-old applicant ... [0m[32mok[0m [0m[38;5;245m(50µs)[0m
+rejects a non-US or invented state code ... [0m[32mok[0m [0m[38;5;245m(54µs)[0m
+rejects fields attached to a branch-closed row ... [0m[32mok[0m [0m[38;5;245m(184µs)[0m
+rejects a non-self relationship even when the flag says self ... [0m[32mok[0m [0m[38;5;245m(66µs)[0m
+rejects phone and text contact preferences without a phone number ... [0m[32mok[0m [0m[38;5;245m(78µs)[0m
+rejects a junk or unusable supplied phone number ... [0m[32mok[0m [0m[38;5;245m(240µs)[0m
+normalises a valid ten-digit phone number ... [0m[32mok[0m [0m[38;5;245m(156µs)[0m
+rejects a forged questionnaire version ... [0m[32mok[0m [0m[38;5;245m(33µs)[0m
+
+[0m[32mok[0m | 36 passed | 0 failed [0m[38;5;245m(242ms)[0m
+
+EXIT 0
+
+===== dependency audit =====
+$ npm audit --audit-level=high
+found 0 vulnerabilities
+EXIT 0
+
+===== reconciliation report stability =====
+
+> lifepolicypilot-pre-underwriting@0.1.0 report:reconciliation
+> tsx scripts/report-reconciliation.ts
+
+Wrote docs/question-bank-reconciliation.md — 92 rows, 92 records, 28 gaps.
+EXIT 0
+DOC_DIFF_EXIT 0
+
+FAILURES 0

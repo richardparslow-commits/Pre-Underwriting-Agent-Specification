@@ -31,6 +31,14 @@ import type {
  * client-controlled.
  */
 
+export interface CasePage {
+  items: CaseListItem[];
+  /** Total rows visible to this reviewer, not just this page. */
+  total: number;
+  /** Pass back to listCases() for the next page; null means the queue is complete. */
+  nextCursor: string | null;
+}
+
 export interface CaseListItem {
   reference: string;
   submittedAt: string;
@@ -394,10 +402,34 @@ export async function submitCase(
 // Reviewer portal
 // ---------------------------------------------------------------------------
 
-export async function listCases(): Promise<CaseListItem[]> {
+const QUEUE_PAGE_SIZE = 25;
+
+function summaryToItem(row: CaseSummaryRow): CaseListItem {
+  return {
+    reference: row.reference,
+    submittedAt: row.submitted_at,
+    status: row.status,
+    notificationState: row.notification_state,
+    crisisDisclosure: row.crisis_disclosure,
+    firstName: row.first_name ?? "",
+    lastName: row.last_name ?? "",
+    residenceState: row.residence_state ?? "",
+    unanswered: Number(row.unanswered) || 0,
+  };
+}
+
+/**
+ * One page of the reviewer queue.
+ *
+ * Keyset pagination on (submitted_at, reference), never an offset: a case
+ * submitted while the reviewer pages through must not shift a row out of the
+ * next page and hide it. `total` is the exact visible count so the UI can say
+ * "showing N of M" instead of silently truncating.
+ */
+export async function listCases(cursor?: string): Promise<CasePage> {
   if (PREVIEW_MODE) {
     ensurePreviewSeed();
-    return Array.from(previewCases.values())
+    const items = Array.from(previewCases.values())
       .sort((a, b) => Date.parse(b.submittedAt) - Date.parse(a.submittedAt))
       .map((record) => ({
         reference: record.reference,
@@ -411,34 +443,47 @@ export async function listCases(): Promise<CaseListItem[]> {
         unanswered: record.answers.filter((answer) => answer.disposition === "unresolved").length,
         sample: record.sample,
       }));
+    return { items, total: items.length, nextCursor: null };
   }
 
   if (!supabase) throw new Error("Sign-in is not configured.");
 
   // The queue is a metadata projection. Never select `payload` here: that
-  // would transfer every health answer for up to 50 cases before the reviewer
+  // would transfer every health answer for a whole page before the reviewer
   // opens any of them and would bypass the per-case `opened` audit.
-  const { data, error } = await supabase
+  let query = supabase
     .from("case_summaries")
     .select(
       "reference, submitted_at, status, notification_state, crisis_disclosure, first_name, last_name, residence_state, unanswered",
+      { count: "exact" },
     )
     .order("submitted_at", { ascending: false })
-    .limit(50);
+    .order("reference", { ascending: false })
+    .limit(QUEUE_PAGE_SIZE + 1);
 
+  if (cursor) {
+    const separator = cursor.indexOf("|");
+    const submittedAt = cursor.slice(0, separator);
+    const reference = cursor.slice(separator + 1);
+    if (separator < 1 || !reference) throw new Error("The case cursor is not valid.");
+    query = query.or(
+      `submitted_at.lt.${submittedAt},and(submitted_at.eq.${submittedAt},reference.lt.${reference})`,
+    );
+  }
+
+  const { data, error, count } = await query;
   if (error) throw new Error("Cases could not be loaded.");
 
-  return (data as CaseSummaryRow[]).map((row) => ({
-    reference: row.reference,
-    submittedAt: row.submitted_at,
-    status: row.status,
-    notificationState: row.notification_state,
-    crisisDisclosure: row.crisis_disclosure,
-    firstName: row.first_name ?? "",
-    lastName: row.last_name ?? "",
-    residenceState: row.residence_state ?? "",
-    unanswered: Number(row.unanswered) || 0,
-  }));
+  const rows = (data ?? []) as CaseSummaryRow[];
+  const page = rows.slice(0, QUEUE_PAGE_SIZE);
+  const last = page[page.length - 1];
+  const hasMore = rows.length > QUEUE_PAGE_SIZE;
+
+  return {
+    items: page.map(summaryToItem),
+    total: count ?? page.length,
+    nextCursor: hasMore && last ? `${last.submitted_at}|${last.reference}` : null,
+  };
 }
 
 export async function getCase(reference: string): Promise<CaseRecord | null> {
@@ -575,7 +620,13 @@ export async function sendSignInLink(email: string): Promise<void> {
   if (!supabase) throw new Error("Sign-in is not configured.");
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: `${window.location.origin}/portal` },
+    options: {
+      // A reviewer address must already exist. Without this, any address gets
+      // an account created on first sign-in, which defeats the allowlist even
+      // though RLS still blocks case data.
+      shouldCreateUser: false,
+      emailRedirectTo: `${window.location.origin}/portal`,
+    },
   });
   if (error) throw new Error("The sign-in link could not be sent.");
 }

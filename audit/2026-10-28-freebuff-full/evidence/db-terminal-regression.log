@@ -1,0 +1,33 @@
+$ node .tmp/audit-2026-10-28/probes/db-terminal-regression.mjs
+{
+  "scenarioA": {
+    "before": {
+      "notification_state": "delivered"
+    },
+    "after": {
+      "notification_state": "accepted"
+    },
+    "regressed": true,
+    "sameEventRedelivery": {
+      "result": "duplicate"
+    }
+  },
+  "scenarioB": {
+    "before": {
+      "notification_state": "delivered"
+    },
+    "after": {
+      "notification_state": "failed",
+      "requeued": true
+    },
+    "reclaimedByRetryWorker": 1,
+    "reclaimed": [
+      {
+        "reference": "LPP-2026-RACE0B",
+        "submitted_at": "2026-10-28T09:02:14.946Z",
+        "notification_attempts": 2
+      }
+    ]
+  }
+}
+EXIT 0

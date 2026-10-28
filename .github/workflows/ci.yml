@@ -79,6 +79,11 @@ jobs:
           npm run check:server-bank
           npm run check:server-policy
 
+      # Reviewer access must stay in-app: TOTP enrolment and challenge, no
+      # self-service sign-up, and a cursor-paginated queue with an exact count.
+      - name: Reviewer access guard
+        run: npm run check:portal
+
       # Counts and claims in customer/reviewer docs must match the audited data.
       - name: Documentation counts are current
         run: npm run check:docs

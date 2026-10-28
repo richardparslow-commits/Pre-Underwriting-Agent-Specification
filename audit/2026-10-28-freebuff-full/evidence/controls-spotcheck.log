@@ -1,0 +1,98 @@
+=== fixed recipient / from / subject ===
+13:export const APPROVED_RECIPIENT = "richardparslow@lifepolicypilot.blog";
+29:  if (!configured) return APPROVED_RECIPIENT;
+31:  const allowlist = [APPROVED_RECIPIENT];
+35:  return APPROVED_RECIPIENT;
+42:}): { subject: string; text: string; to: string } {
+64:    to: resolveRecipient(),
+65:    subject: `New Life Policy Pilot pre-underwriting submission — Case ${input.reference}`,
+115:        to: [message.to],
+116:        subject: message.subject,
+
+=== email body fields ===
+42:}): { subject: string; text: string; to: string } {
+43-  const submitted = new Date(input.submittedAt).toISOString().replace(".000", "");
+44-  const portalUrl = `${input.portalOrigin.replace(/\/$/, "")}/portal`;
+45-
+46-  const text = [
+47-    "A customer has submitted a pre-underwriting questionnaire for your review.",
+48-    "",
+--
+117:        text: message.text,
+118-        // Lets the delivery webhook reconcile an event to a case without
+119-        // sending any customer data to the provider.
+120-        tags: [{ name: "case_reference", value: input.reference }],
+121-      }),
+122-    });
+123-
+
+=== origin and byte cap ===
+14: *   * a streaming 512 KB byte cap and a canonical 92-row completeness check,
+35:const MAX_BODY_BYTES = 512 * 1024;
+64:    const hash = Array.from(new Uint8Array(digest), (byte) =>
+65:      byte.toString(16).padStart(2, "0"),
+113:  const origin = resolveOrigin(req);
+116:    if (!origin) {
+122:        "Access-Control-Allow-Origin": origin,
+132:  if (!origin) {
+137:    return jsonResponse({ error: "Method not allowed" }, 405, origin);
+150:      origin,
+156:    return jsonResponse({ error: "A valid idempotency key is required" }, 400, origin);
+159:  const declaredLength = Number(req.headers.get("content-length") ?? "0");
+160:  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+161:    return jsonResponse({ error: "Submission too large" }, 413, origin);
+172:      origin,
+181:          origin,
+192:        origin,
+197:  // Content-Length can be absent or lie, so the byte budget is enforced while
+199:  const bodyResult = await readBodyWithLimit(req, MAX_BODY_BYTES);
+202:      return jsonResponse({ error: "Submission too large" }, 413, origin);
+204:    return jsonResponse({ error: "Could not read submission" }, 400, origin);
+212:    return jsonResponse({ error: "Invalid submission" }, 400, origin);
+217:    return jsonResponse({ error: validation.reason }, 422, origin);
+224:  // ---- A retried request returns the original case, never a second one ----
+238:      origin,
+243:    return jsonResponse(receiptFromRow(existing.data, true), 200, origin);
+301:        return jsonResponse(receiptFromRow(replay.data, true), 200, origin);
+316:      origin,
+342:      origin,
+381:    origin,
+
+=== retry auth ===
+5: * scheduler) with the `x-cron-secret` header:
+58:  const expected = Deno.env.get("CRON_SECRET");
+59:  const provided = req.headers.get("x-cron-secret");
+
+=== webhook raw body + signature ===
+9: * Authentication is the provider's Svix signature over the raw body, not a
+14: * Events are deduplicated by svix-id and applied through a monotonic SQL
+20:import { verifySvixSignature } from "../_shared/svix.ts";
+70:  const rawBody = bodyResult.text;
+75:      id: req.headers.get("svix-id"),
+76:      timestamp: req.headers.get("svix-timestamp"),
+77:      signature: req.headers.get("svix-signature"),
+79:    rawBody,
+83:    return jsonResponse({ error: "Invalid signature" }, 401, null);
+88:    body = JSON.parse(rawBody);
+127:  const eventId = req.headers.get("svix-id") ?? "";
+
+=== supabase client session config ===
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/config/site";
+
+/**
+ * Lovable Cloud / Supabase client.
+ *
+ * Kept at this path because that is where Lovable's integrations expect it.
+ * The anon key is public by design; row level security is what protects the
+ * cases table. Never put a service-role key in this file or any other VITE_
+ * variable — everything here is shipped to the browser.
+ *
+ * Null in preview mode, so the portal cannot pretend to have a real session.
+ */
+export const supabase: SupabaseClient | null =
+  SUPABASE_URL && SUPABASE_ANON_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: true, autoRefreshToken: true },
+      })
+    : null;

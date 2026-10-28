@@ -1,0 +1,24 @@
+$ npm run test:engine
+
+
+> lifepolicypilot-pre-underwriting@0.1.0 test:engine
+> tsx --test src/features/interview/engine.test.ts
+
+✔ closing a parent branch removes the descendant answer and its details (0.868958ms)
+✔ closing a nested branch removes descendants that are only visible through it (0.153ms)
+✔ a branch-closed row never emits fields or supplemental detail (0.29425ms)
+✔ reviewer notes are not present on any public question row (0.079459ms)
+✔ a held row stays held and carries no answer content (0.151875ms)
+✔ a blank answer is unresolved, never No (0.052625ms)
+✔ current crisis is disclosed even when the history answer is No, Unknown or declined (0.085542ms)
+✔ crisis is not disclosed when the current-safety answer is not Yes (0.063209ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 87.107125
+
+EXIT 0

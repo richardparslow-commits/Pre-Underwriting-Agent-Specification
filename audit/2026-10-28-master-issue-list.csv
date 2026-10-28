@@ -1,0 +1,22 @@
+mi_id,issue,source_ids,severity,type,status,launch_impact,next_action
+MI-01,No production deployment or live provider/scheduler/retention/reviewer evidence,SC-03;A7-01,High,Operational evidence missing,Open,Blocks launch,Deploy to a non-production project with labelled data and capture live evidence
+MI-02,Questionnaire not signed off (0/92; 28 gaps),SC-04;A7-02,High,Business/clinical approval missing,Open,Blocks launch,Named reviewer closes all rows and out-of-scope reasons
+MI-03,Legal entity and counsel/vendor/retention approvals absent,SC-05;A7-03,High,Legal/counsel decision,Open,Blocks launch,Counsel sign-off plus entity states retention and vendor review
+MI-04,Portal requires AAL2 but has no TOTP enrolment or challenge,SC-09;A7-04,High,Confirmed defect,Open,Blocks launch,Add in-app enrol/challenge/verify with a two-session test
+MI-05,Specification AI assistant and AI summary not implemented,SC-01;A7-05,High,Specification conflict,Open,Blocks specification conformance,Amend the specification or approve a model layer
+MI-06,Delivered notification can regress and a late failure can duplicate a send,A7-06,Medium,Confirmed defect (reproduced),Open,Blocks delivery evidence,Make complete_case_notification monotonic and add regression tests
+MI-07,Server accepts contradictory identity values and value/prose mismatches,SC-10;A7-07,Medium,Confirmed defect (reproduced),Open,Blocks data-integrity sign-off,Add cross-field checks and negative handler tests
+MI-08,Magic-link sign-in can create accounts for any address,SC-11;A7-08,Medium,Confirmed defect/configuration,Open,Configuration blocker before public portal,Set shouldCreateUser false and disable hosted signups
+MI-09,No customer-facing marketing revocation path,SC-02;A7-09,Medium,Future-feature pre-enable gate,Open,Conditional; blocking if a channel is enabled,Add revocation route and vendor propagation before enabling
+MI-10,Chat-exposed staging database password has no recorded rotation,A7-17,Medium,Operational evidence missing,Open,Blocks promoting staging to production,Rotate and record the date and operator
+MI-11,Reviewer queue silently stops at 50 cases,SC-12;A7-10,Low,Confirmed defect,Open,Nonblocking at current volume,Add pagination or a date filter with a count
+MI-12,Yes with no supplemental detail accepted where the bank defines details,A7-11,Low,Confirmed defect (reproduced),Open,Nonblocking; review quality,Require declared details on yes or record an explicit no-detail state
+MI-13,Submission acknowledgement can precede the consents it acknowledges,A7-12,Low,Confirmed defect (reproduced),Open,Nonblocking; evidence integrity,Enforce acknowledgement ordering
+MI-14,No automated cross-answer inconsistency flags,SC-08;A7-13,Low,Review-package gap,Open,Nonblocking; review quality,Add inconsistency flags starting with the identity mismatches
+MI-15,README says the backend was never run against a project,SC-06;A7-14,Low,Documentation contradiction,Open,Documentation only,State the staging and production status accurately
+MI-16,A delivered case cannot regress is false,A7-15,Low,Documentation contradiction,Open,Documentation only,Fix MI-06 then keep the claim with a test
+MI-17,Gate 7 calls staff MFA unverified when the step-up does not exist,A7-16,Low,Documentation contradiction,Open,Documentation only,Say not implemented until MI-04 closes
+MI-18,Held review notes were in the public bundle,QW2-01,Medium,Privacy defect,Resolved local,Closed,Guarded by check:bundle and the engine test
+MI-19,Reviewer queue selected full payloads,QW2-02,Medium,Privacy/least-privilege defect,Resolved local,Closed,Payload-free case_summaries view verified locally and on staging
+MI-20,Portal claimed a retention schedule that did not exist,QW2-03,Low,Documentation defect,Resolved local,Closed,Honest copy guarded by check:docs
+MI-21,Edge-function tests were not run in the first A6 pass,SC-07,Informational,Verification gap,Closed in pass,Closed,36/36 re-run and repeated in A7

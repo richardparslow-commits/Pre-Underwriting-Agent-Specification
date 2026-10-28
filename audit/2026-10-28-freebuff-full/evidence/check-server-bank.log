@@ -1,0 +1,9 @@
+$ npm run check:server-bank
+
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:server-bank
+> tsx scripts/check-server-bank.ts
+
+Server bank matches the client bank: 92 rows.
+
+EXIT 0

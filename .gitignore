@@ -26,6 +26,9 @@ dist-ssr
 supabase/.branches
 supabase/.temp
 
+# Local audit scratch space (probes, extracted text, throwaway installs)
+.tmp/
+
 # Logs
 npm-debug.log*
 yarn-debug.log*

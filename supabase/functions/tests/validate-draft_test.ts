@@ -285,3 +285,173 @@ Deno.test("rejects a forged questionnaire version", () => {
     "Questionnaire version is not approved",
   );
 });
+
+Deno.test("rejects prose that does not match the chosen option", () => {
+  const body = buildValidDraft({
+    answers: buildAnswers({
+      "RES-01": {
+        disposition: "answered",
+        answerText: "U.S. citizen",
+        answerValues: ["permanent"],
+      },
+    }),
+  });
+
+  assertEquals(rejected(body), "The answer does not match the selected option");
+});
+
+Deno.test("rejects an invented single-choice label", () => {
+  const body = buildValidDraft({
+    answers: buildAnswers({
+      "RES-01": {
+        disposition: "answered",
+        answerText: "Invented status",
+      },
+    }),
+  });
+
+  assertEquals(rejected(body), "The answer is not a valid option");
+});
+
+Deno.test("rejects a date of birth answer that contradicts the lead form", () => {
+  const body = buildValidDraft({
+    answers: buildAnswers({
+      "ID-01": { disposition: "answered", answerText: "1979-12-31" },
+    }),
+  });
+
+  assertEquals(
+    rejected(body),
+    "The date of birth answer does not match the contact details",
+  );
+});
+
+Deno.test("rejects a state answer that contradicts the lead form", () => {
+  const body = buildValidDraft({
+    answers: buildAnswers({
+      "ID-03": { disposition: "answered", answerText: "CA" },
+    }),
+  });
+
+  assertEquals(
+    rejected(body),
+    "The state answer does not match the contact details",
+  );
+});
+
+Deno.test("accepts a state answer written as the full state name", () => {
+  const draft = accepted(
+    buildValidDraft({
+      answers: buildAnswers({
+        "ID-03": { disposition: "answered", answerText: "Texas" },
+      }),
+    }),
+  );
+
+  const row = draft.answers.find((answer) => answer.questionId === "ID-03");
+  assertEquals(row?.answerText, "Texas");
+});
+
+Deno.test("an unanswered identity row is not cross-checked", () => {
+  const draft = accepted(
+    buildValidDraft({
+      answers: buildAnswers({
+        "ID-03": {
+          disposition: "unresolved",
+          answerText: "Not answered",
+        },
+      }),
+    }),
+  );
+
+  const row = draft.answers.find((answer) => answer.questionId === "ID-03");
+  assertEquals(row?.disposition, "unresolved");
+});
+
+Deno.test("rejects an acknowledgement that predates the consents it relies on", () => {
+  const body = buildValidDraft({
+    acknowledgements: [
+      {
+        id: "submission_requested",
+        text: TEST_CONSENT.submissionAcknowledgementText,
+        textVersion: TEST_CONSENT.consentVersion,
+        timestamp: new Date(Date.now() - 20 * 60_000 - 5_000).toISOString(),
+      },
+    ],
+  });
+
+  assertEquals(
+    rejected(body),
+    "The submission acknowledgement predates the permissions it relies on",
+  );
+});
+
+Deno.test("flags a yes answer that carries no supplemental detail", () => {
+  const draft = accepted(
+    buildValidDraft({
+      answers: buildAnswers({
+        "MED-01": {
+          disposition: "answered",
+          answerState: "yes",
+          answerText: "Yes",
+        },
+      }),
+    }),
+  );
+
+  const flag = draft.flags.find((entry) => entry.id === "supplemental-detail-missing");
+  assert(flag, "expected a supplemental-detail-missing flag");
+  assert(flag.detail.includes("MED-01"));
+});
+
+Deno.test("flags a shorter-window yes that the longer window denies", () => {
+  const draft = accepted(
+    buildValidDraft({
+      answers: buildAnswers({
+        "NIC-01": {
+          disposition: "answered",
+          answerState: "yes",
+          answerText: "Yes",
+        },
+        "NIC-02": {
+          disposition: "answered",
+          answerState: "no",
+          answerText: "No",
+        },
+      }),
+    }),
+  );
+
+  const flag = draft.flags.find((entry) => entry.id === "timeframe-contradiction");
+  assert(flag, "expected a timeframe-contradiction flag");
+  assert(flag.detail.includes("NIC-01 vs NIC-02"));
+});
+
+Deno.test("does not flag consistent short and long windows", () => {
+  const draft = accepted(
+    buildValidDraft({
+      answers: buildAnswers({
+        "NIC-01": {
+          disposition: "answered",
+          answerState: "yes",
+          answerText: "Yes",
+        },
+        "NIC-02": {
+          disposition: "answered",
+          answerState: "yes",
+          answerText: "Yes",
+        },
+        "NIC-03": {
+          disposition: "answered",
+          answerState: "yes",
+          answerText: "Yes",
+        },
+      }),
+    }),
+  );
+
+  assertEquals(
+    draft.flags.some((entry) => entry.id === "timeframe-contradiction"),
+    false,
+  );
+});

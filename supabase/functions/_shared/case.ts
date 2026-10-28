@@ -272,6 +272,27 @@ const US_STATE_CODES = new Set([
   "WV", "WI", "WY",
 ]);
 
+/**
+ * The same jurisdictions by name. The residence question is free text in the
+ * browser, so a customer may type "Texas" instead of "TX"; the server still
+ * needs to compare it with the lead form without rejecting a valid answer.
+ */
+const US_STATE_NAMES: Record<string, string> = {
+  alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA",
+  colorado: "CO", connecticut: "CT", delaware: "DE", "district of columbia": "DC",
+  florida: "FL", georgia: "GA", hawaii: "HI", idaho: "ID", illinois: "IL",
+  indiana: "IN", iowa: "IA", kansas: "KS", kentucky: "KY", louisiana: "LA",
+  maine: "ME", maryland: "MD", massachusetts: "MA", michigan: "MI",
+  minnesota: "MN", mississippi: "MS", missouri: "MO", montana: "MT",
+  nebraska: "NE", nevada: "NV", "new hampshire": "NH", "new jersey": "NJ",
+  "new mexico": "NM", "new york": "NY", "north carolina": "NC",
+  "north dakota": "ND", ohio: "OH", oklahoma: "OK", oregon: "OR",
+  pennsylvania: "PA", "rhode island": "RI", "south carolina": "SC",
+  "south dakota": "SD", tennessee: "TN", texas: "TX", utah: "UT",
+  vermont: "VT", virginia: "VA", washington: "WA", "west virginia": "WV",
+  wisconsin: "WI", wyoming: "WY",
+};
+
 const DISPOSITIONS = new Set([
   "answered",
   "unknown",
@@ -285,6 +306,19 @@ const DISPOSITIONS = new Set([
 const ANSWER_STATES = new Set(["yes", "no", "unknown", "declined", "not_applicable"]);
 
 const SERVER_BY_ID = new Map(SERVER_BANK.map((question) => [question.id, question]));
+
+/**
+ * Pairs where the first row covers a shorter reporting window that is wholly
+ * contained in the second row's window, asking about the same conduct. A yes
+ * followed by a no cannot both be true, so the reviewer sees a flag instead of
+ * having to compare timeframes by hand.
+ */
+const SUBSET_WINDOWS: ReadonlyArray<readonly [narrow: string, wide: string]> = [
+  ["NIC-01", "NIC-02"],
+  ["NIC-02", "NIC-03"],
+  ["DRV-01", "DRV-02"],
+  ["AVI-01", "AVI-02"],
+];
 
 type AnswerStateValue = "yes" | "no" | "unknown" | "declined" | "not_applicable";
 
@@ -308,6 +342,14 @@ function dateOnly(value: unknown): string | null {
   if (Number.isNaN(parsed.getTime())) return null;
   if (parsed.toISOString().slice(0, 10) !== value) return null;
   return value;
+}
+
+/** Accepts a two-letter code or a full state name and returns the code. */
+function stateCode(value: string): string | null {
+  const trimmed = value.trim();
+  const upper = trimmed.toUpperCase();
+  if (US_STATE_CODES.has(upper)) return upper;
+  return US_STATE_NAMES[trimmed.toLowerCase()] ?? null;
 }
 
 /** Age in whole years on a specific date, computed in UTC. */
@@ -487,6 +529,49 @@ function derivedFlags(answers: ServerAnswer[]): ServerFlag[] {
       label: `${unknown} uncertain answer${unknown === 1 ? "" : "s"}`,
       detail: "Recorded as uncertain, not as No. Confirm the detail during the review call.",
       severity: "info",
+    });
+  }
+
+  // Supplemental detail is optional by design, but a "Yes" with none must be
+  // visible to the reviewer rather than looking like a complete answer.
+  const missingDetail = answers.filter(
+    (answer) =>
+      answer.disposition === "answered" &&
+      answer.answerState === "yes" &&
+      (SERVER_BY_ID.get(answer.questionId)?.detailPrompts.length ?? 0) > 0 &&
+      (answer.details?.length ?? 0) === 0,
+  );
+  if (missingDetail.length > 0) {
+    flags.push({
+      id: "supplemental-detail-missing",
+      label: `${missingDetail.length} yes answer${missingDetail.length === 1 ? "" : "s"} without supplemental detail`,
+      detail: `No optional follow-up detail was recorded for: ${missingDetail
+        .map((answer) => answer.questionId)
+        .join(", ")}. Ask about these during the review rather than assuming the answer is complete.`,
+      severity: "info",
+    });
+  }
+
+  // Deterministic subset-window contradictions. Each pair asks about the same
+  // conduct over a longer window, so a "yes" in the shorter window and a "no"
+  // in the longer one cannot both be true. Only these literal overlaps are
+  // flagged; clinical judgement and occupation context stay with the reviewer.
+  const answerById = new Map(
+    answers.map((answer) => [answer.questionId, answer]),
+  );
+  const stateOf = (questionId: string) =>
+    answerById.get(questionId)?.answerState;
+  const contradictions = SUBSET_WINDOWS.filter(
+    ([narrow, wide]) => stateOf(narrow) === "yes" && stateOf(wide) === "no",
+  );
+  if (contradictions.length > 0) {
+    flags.push({
+      id: "timeframe-contradiction",
+      label: `${contradictions.length} timeframe contradiction${contradictions.length === 1 ? "" : "s"}`,
+      detail: `A shorter reporting window was answered yes while the longer window that contains it was answered no: ${contradictions
+        .map(([narrow, wide]) => `${narrow} vs ${wide}`)
+        .join("; ")}. Treat both answers as unconfirmed and ask the customer.`,
+      severity: "attention",
     });
   }
 
@@ -704,6 +789,22 @@ export function validateDraft(body: unknown): ValidationResult {
     return { ok: false, reason: "Submission acknowledgement is not current" };
   }
 
+  // The customer cannot ask to submit before granting the permissions that
+  // submission relies on. Both timestamps come from the same client clock, so
+  // no skew allowance is needed here.
+  const latestConsentMs = Math.max(
+    0,
+    ...consents
+      .map((consent) => (consent.grantedAt ? Date.parse(consent.grantedAt) : Number.NaN))
+      .filter((value) => Number.isFinite(value)),
+  );
+  if (acknowledgementMs < latestConsentMs) {
+    return {
+      ok: false,
+      reason: "The submission acknowledgement predates the permissions it relies on",
+    };
+  }
+
   const acknowledgements: ServerAcknowledgement[] = [
     {
       id: "submission_requested",
@@ -752,6 +853,25 @@ export function validateDraft(body: unknown): ValidationResult {
     const answerText = text(raw.answerText, MAX_TEXT);
     if (!answerText || hasControlChars(answerText)) {
       return { ok: false, reason: "Incomplete answer record" };
+    }
+
+    // A single-choice row has a closed option set. The prose must be one of
+    // the approved labels, and any structured value must agree with it; a
+    // forged pair must not reach the reviewer summary.
+    if (question.kind === "single_choice") {
+      const allowed = new Set(question.options.map((option) => option.label));
+      if (!allowed.has(answerText)) {
+        return { ok: false, reason: "The answer is not a valid option" };
+      }
+      if (values && values.length > 0) {
+        if (values.length !== 1) {
+          return { ok: false, reason: "Select exactly one option" };
+        }
+        const selected = question.options.find((option) => option.value === values[0]);
+        if (!selected || selected.label !== answerText) {
+          return { ok: false, reason: "The answer does not match the selected option" };
+        }
+      }
     }
 
     parsed.set(questionId, {
@@ -908,6 +1028,44 @@ export function validateDraft(body: unknown): ValidationResult {
         entry.answerText,
       ),
     );
+  }
+
+  // ---- Identity answers must agree with the lead form ---------------------
+  // A forged or buggy client could otherwise submit a header that contradicts
+  // the answers the reviewer reads. Unanswered, unknown and declined rows are
+  // not cross-checked because they make no claim.
+  const answerById = new Map(answers.map((answer) => [answer.questionId, answer]));
+  const answeredText = (questionId: string): string | null => {
+    const answer = answerById.get(questionId);
+    return answer?.disposition === "answered" ? answer.answerText : null;
+  };
+
+  const birthAnswer = answeredText("ID-01");
+  if (birthAnswer) {
+    const answerDob = dateOnly(birthAnswer);
+    if (!answerDob) {
+      return { ok: false, reason: "The date of birth answer is not a valid date" };
+    }
+    if (answerDob !== dateOfBirth) {
+      return {
+        ok: false,
+        reason: "The date of birth answer does not match the contact details",
+      };
+    }
+  }
+
+  const residenceAnswer = answeredText("ID-03");
+  if (residenceAnswer) {
+    const answerStateCode = stateCode(residenceAnswer);
+    if (!answerStateCode) {
+      return { ok: false, reason: "The state answer is not recognised" };
+    }
+    if (answerStateCode !== state.toUpperCase()) {
+      return {
+        ok: false,
+        reason: "The state answer does not match the contact details",
+      };
+    }
   }
 
   const draft: ServerDraft = {

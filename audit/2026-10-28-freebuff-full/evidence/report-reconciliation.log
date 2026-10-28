@@ -1,0 +1,7 @@
+$ (cd .tmp/recon-copy && tsx scripts/report-reconciliation.ts)  # disposable cwd
+Wrote docs/question-bank-reconciliation.md — 92 rows, 92 records, 28 gaps.
+EXIT 0
+
+$ diff -u docs/question-bank-reconciliation.md .tmp/recon-copy/docs/question-bank-reconciliation.md
+NO DIFF
+DIFF_EXIT 0

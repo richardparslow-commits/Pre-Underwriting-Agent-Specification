@@ -3,6 +3,13 @@ import { PREVIEW_MODE, SITE } from "@/config/site";
 import { sendSignInLink, signOut } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 
+/** True when the session has not completed a second factor. */
+async function sessionNeedsStepUp(): Promise<boolean> {
+  if (!supabase) return false;
+  const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  return data?.currentLevel !== "aal2";
+}
+
 /**
  * Reviewer authentication.
  *
@@ -38,8 +45,7 @@ export function useReviewerAuth() {
 
       // Supabase does not enforce AAL2 at the gateway. The portal refuses an
       // aal1 session, and every reviewer RLS policy independently requires it.
-      const { data: assurance } = await supabase!.auth.mfa.getAuthenticatorAssuranceLevel();
-      setNeedsMfa(assurance?.currentLevel !== "aal2");
+      setNeedsMfa(await sessionNeedsStepUp());
     }
 
     supabase.auth.getSession().then(async ({ data }) => {
@@ -79,6 +85,14 @@ export function useReviewerAuth() {
 
   const unlockPreview = useCallback(() => setPreviewUnlocked(true), []);
 
+  /** Re-reads AAL after the in-app TOTP gate succeeds. */
+  const refreshAssurance = useCallback(async () => {
+    if (!supabase) return;
+    const { data } = await supabase.auth.getSession();
+    setEmail(data.session?.user.email ?? null);
+    setNeedsMfa(data.session ? await sessionNeedsStepUp() : false);
+  }, []);
+
   return {
     previewMode: PREVIEW_MODE,
     signedIn: PREVIEW_MODE ? previewUnlocked : email !== null && !needsMfa,
@@ -90,5 +104,6 @@ export function useReviewerAuth() {
     requestLink,
     leave,
     unlockPreview,
+    refreshAssurance,
   };
 }

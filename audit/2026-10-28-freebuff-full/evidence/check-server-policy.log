@@ -1,0 +1,9 @@
+$ npm run check:server-policy
+
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:server-policy
+> tsx scripts/check-server-policy.ts
+
+Server consent policy matches the client consent wording.
+
+EXIT 0

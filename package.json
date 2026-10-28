@@ -12,6 +12,7 @@
     "check:bank": "tsx scripts/check-bank.ts",
     "check:docs": "tsx scripts/check-docs.ts",
     "check:bundle": "tsx scripts/check-bundle.ts",
+    "check:portal": "tsx scripts/check-portal-auth.ts",
     "check:server-bank": "tsx scripts/check-server-bank.ts",
     "check:server-policy": "tsx scripts/check-server-policy.ts",
     "generate:server-bank": "tsx scripts/generate-server-bank.ts",

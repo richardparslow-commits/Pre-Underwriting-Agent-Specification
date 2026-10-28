@@ -11,6 +11,15 @@
 
 project_id = "lifepolicypilot"
 
+# Reviewer accounts are created by an operator, never by the sign-in form.
+# `sendSignInLink` also passes shouldCreateUser: false; this block keeps a
+# local or linked project from accepting self-service sign-ups underneath it.
+# The hosted project must have the same setting under Authentication → Sign In /
+# Providers → "Allow new users to sign up" = off.
+[auth]
+enable_signup = false
+enable_anonymous_sign_ins = false
+
 [functions.submit-case]
 verify_jwt = false
 

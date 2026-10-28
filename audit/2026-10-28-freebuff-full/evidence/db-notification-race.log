@@ -1,0 +1,10 @@
+{
+  "before": {
+    "notification_state": "delivered"
+  },
+  "after": {
+    "notification_state": "accepted",
+    "provider_message_id": "msg-race"
+  },
+  "regressed": true
+}

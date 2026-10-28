@@ -1,0 +1,251 @@
+=== git baseline ===
+79e8af4f58ad74914241ef4660f765da105949c9
+## main...origin/main
+ M audit/AUDIT-INDEX.md
+?? .tmp/
+?? audit/2026-10-28-freebuff-full/
+?? audit/2026-10-28-spec-conformance/
+79e8af4 (HEAD -> main, origin/main, origin/HEAD) Merge pull request #7 from richardparslow-commits/audit/migration-0005-live-aal2-2026-10-28
+619844a (origin/audit/migration-0005-live-aal2-2026-10-28, audit/migration-0005-live-aal2-2026-10-28) Capture live AAL2 reviewer queue response
+e5b3d1e Merge pull request #6 from richardparslow-commits/audit/migration-0005-staging-2026-10-28
+1174f70 (origin/audit/migration-0005-staging-2026-10-28, audit/migration-0005-staging-2026-10-28) Record hosted verification of migration 0005
+f9d26e4 Merge pull request #5 from richardparslow-commits/fix/a5-privacy-remediation
+=== differences from preparation commit ===
+12
+ .env.example                                       |    2 +
+ .github/workflows/ci.yml                           |   54 +-
+ LOVABLE.md                                         |   17 +-
+ README.md                                          |  194 +-
+ audit/2026-10-27-freebuff/INPUT-audit-prompt.txt   |  173 ++
+ audit/2026-10-27-freebuff/MANIFEST.sha256          |   23 +
+ audit/2026-10-27-freebuff/README.md                |   90 +
+ audit/2026-10-27-freebuff/REPORT.md                |  587 ++++
+ audit/2026-10-27-freebuff/evidence/build.log       |   19 +
+ audit/2026-10-27-freebuff/evidence/check-bank.log  |   29 +
+ audit/2026-10-27-freebuff/evidence/check-docs.log  |    5 +
+ .../evidence/check-server-bank.log                 |    5 +
+ .../evidence/check-server-policy.log               |    5 +
+ .../2026-10-27-freebuff/evidence/consent-tests.log |   19 +
+ audit/2026-10-27-freebuff/evidence/deno-tests.log  |   47 +
+ .../2026-10-27-freebuff/evidence/engine-tests.log  |   18 +
+ .../evidence/nested-branch-probe.log               |   37 +
+ .../evidence/nested-branch-reopen-probe.log        |   31 +
+ audit/2026-10-27-freebuff/evidence/npm-audit.log   |    1 +
+ audit/2026-10-27-freebuff/evidence/phone_probe.out |    5 +
+ .../evidence/probes/nested-branch-probe.ts         |   46 +
+ .../evidence/probes/nested-branch-reopen-probe.ts  |   46 +
+ .../evidence/probes/phone_probe.ts                 |   35 +
+ .../evidence/probes/server-edge-probes.ts          |   85 +
+ .../evidence/probes/sql_probe_security.mjs         |  224 ++
+ .../evidence/server-edge-probes.log                |   29 +
+ .../evidence/sql_probe_security.out                |   43 +
+ audit/2026-10-27-freebuff/evidence/typecheck.log   |    4 +
+ audit/2026-10-27-issue-register.csv                |   19 +
+ audit/2026-10-27-issue-register.json               |  396 +++
+ audit/2026-10-27-issue-register.md                 |  559 ++++
+ audit/2026-10-27-master-issue-list.md              |  159 +
+ audit/2026-10-27-pre-underwriting-audit.md         |  452 +++
+ audit/2026-10-27-questionnaire-matrix.md           |  245 ++
+ .../INPUT-QwencloudPre-Underwriting-Agent.md       |   54 +
+ audit/2026-10-27-qwencloud/PRIOR-LISTS.md          |   32 +
+ audit/2026-10-27-qwencloud/README.md               |   59 +
+ audit/2026-10-27-qwencloud/evidence/baseline.txt   |   18 +
+ .../2026-10-27-qwencloud/evidence/branch-probe.out |   22 +
+ .../evidence/branch-summary.txt                    |   18 +
+ audit/2026-10-27-qwencloud/evidence/build.log      |   13 +
+ audit/2026-10-27-qwencloud/evidence/byte-probe.out |    3 +
+ audit/2026-10-27-qwencloud/evidence/check-bank.log |   29 +
+ .../evidence/consent-tests.log                     |   18 +
+ audit/2026-10-27-qwencloud/evidence/deno-tests.log |   10 +
+ .../evidence/developer-handoff.txt                 |  Bin 0 -> 7988 bytes
+ .../2026-10-27-qwencloud/evidence/email-probe.out  |   22 +
+ .../2026-10-27-qwencloud/evidence/engine-probe.out |   13 +
+ audit/2026-10-27-qwencloud/evidence/npm-audit.json |  277 ++
+ .../evidence/npm-ci-ignore-scripts.log             |   12 +
+ .../evidence/owner-specification.txt               |  670 +++++
+ .../2026-10-27-qwencloud/evidence/pglite-probe.out |   26 +
+ .../evidence/questionnaire-matrix-summary.json     |    9 +
+ .../evidence/questionnaire-summary.json            |   87 +
+ .../evidence/report-reconciliation.log             |    1 +
+ .../evidence/source-normalization.txt              |   12 +
+ audit/2026-10-27-qwencloud/evidence/typecheck.log  |    4 +
+ .../evidence/validate-probe.out                    |   22 +
+ audit/2026-10-27-qwencloud/qwencloud-audit.md      |  664 ++++
+ .../qwencloud-findings-index.csv                   |   25 +
+ .../2026-10-27-qwencloud/qwencloud-gate-matrix.csv |   11 +
+ audit/2026-10-27-qwencloud/qwencloud-issues.csv    |   25 +
+ audit/2026-10-27-qwencloud/qwencloud-issues.json   |  484 +++
+ audit/2026-10-27-qwencloud/qwencloud-issues.md     |  626 ++++
+ .../qwencloud-questionnaire-bank.csv               |   93 +
+ .../qwencloud-questionnaire-matrix.csv             |  114 +
+ .../qwencloud-questionnaire-matrix.md              | 2248 ++++++++++++++
+ .../2026-10-27-qwencloud/qwencloud-test-ledger.csv |   29 +
+ audit/2026-10-27-qwencode-remediation/LEDGER.md    |  121 +
+ .../MANIFEST.sha256                                |   25 +
+ audit/2026-10-27-qwencode-remediation/README.md    |   64 +
+ .../logs/ALL-CHECKS-PASSED.txt                     |    1 +
+ .../2026-10-27-qwencode-remediation/logs/build.log |   19 +
+ .../logs/bundle-phrase-scan.log                    |   11 +
+ .../logs/check-bank.log                            |   29 +
+ .../logs/check-bundle.log                          |    5 +
+ .../logs/check-db.log                              |   55 +
+ .../logs/check-docs.log                            |    5 +
+ .../logs/check-server-bank.log                     |    5 +
+ .../logs/check-server-policy.log                   |    5 +
+ .../logs/deno-tests.log                            |   54 +
+ .../logs/deno-version.log                          |    3 +
+ .../logs/diff-check.log                            |    0
+ .../logs/environment.log                           |  104 +
+ .../logs/generate-server-bank.log                  |   24 +
+ .../logs/npm-audit.log                             |    1 +
+ .../logs/npm-ci.log                                |    7 +
+ .../logs/pre-commit-verification.log               |  260 ++
+ .../logs/reconciliation-doc-stability.log          |    1 +
+ .../logs/report-reconciliation.log                 |    5 +
+ .../logs/test-consent.log                          |   19 +
+ .../logs/test-engine.log                           |   19 +
+ .../logs/test-validation.log                       |   17 +
+ .../logs/typecheck.log                             |    3 +
+ audit/2026-10-27-reconciliation-decisions.md       |  431 +++
+ audit/2026-10-27-remediation-ledger.md             |  111 +
+ audit/2026-10-27-remediation/build.log             |   19 +
+ audit/2026-10-27-remediation/check-bank.log        |   29 +
+ audit/2026-10-27-remediation/check-docs.log        |    5 +
+ audit/2026-10-27-remediation/check-server-bank.log |    5 +
+ .../2026-10-27-remediation/check-server-policy.log |    5 +
+ audit/2026-10-27-remediation/consent-tests.log     |   19 +
+ audit/2026-10-27-remediation/deno-tests.log        |   47 +
+ audit/2026-10-27-remediation/engine-tests.log      |   18 +
+ audit/2026-10-27-remediation/final-tree.log        |   86 +
+ audit/2026-10-27-remediation/npm-audit.log         |    1 +
+ audit/2026-10-27-remediation/sql-probe.log         |   40 +
+ audit/2026-10-27-remediation/typecheck.log         |    4 +
+ audit/2026-10-27-spec-remediation/MANIFEST.sha256  |   15 +
+ audit/2026-10-27-spec-remediation/README.md        |   65 +
+ audit/2026-10-27-spec-remediation/build.log        |   19 +
+ audit/2026-10-27-spec-remediation/check-bank.log   |   29 +
+ audit/2026-10-27-spec-remediation/check-docs.log   |    5 +
+ .../check-server-bank.log                          |    5 +
+ .../check-server-policy.log                        |    5 +
+ .../2026-10-27-spec-remediation/consent-tests.log  |   19 +
+ .../db-check-after-ci.log                          |   55 +
+ audit/2026-10-27-spec-remediation/db-check.log     |   55 +
+ audit/2026-10-27-spec-remediation/deno-tests.log   |   50 +
+ audit/2026-10-27-spec-remediation/engine-tests.log |   19 +
+ audit/2026-10-27-spec-remediation/npm-audit.log    |    1 +
+ audit/2026-10-27-spec-remediation/npm-ci.log       |    2 +
+ audit/2026-10-27-spec-remediation/typecheck.log    |    4 +
+ .../validation-tests.log                           |   17 +
+ audit/2026-10-28-deployment-rehearsal.md           |  109 +
+ .../MANIFEST.sha256                                |    3 +
+ audit/2026-10-28-migration-0005-staging/README.md  |   77 +
+ .../http-queue-verification.log                    |   13 +
+ .../verification.log                               |   28 +
+ audit/2026-10-28-qwencloud-reaudit/MANIFEST.sha256 |    7 +
+ audit/2026-10-28-qwencloud-reaudit/README.md       |   56 +
+ audit/2026-10-28-qwencloud-reaudit/REPORT.md       |  455 +++
+ .../evidence/check-bundle-coverage.log             |   28 +
+ .../evidence/held-review-notes.log                 |   29 +
+ .../evidence/hosted-anon-probe.log                 |    9 +
+ .../evidence/queue-and-retention.log               |   79 +
+ .../evidence/verification.log                      |  259 ++
+ audit/2026-10-28-qwencloud-remediation/LEDGER.md   |  101 +
+ .../MANIFEST.sha256                                |    4 +
+ audit/2026-10-28-qwencloud-remediation/README.md   |   33 +
+ .../logs/bundle-red-test.log                       |    7 +
+ .../logs/full-verification.log                     |  353 +++
+ audit/AUDIT-INDEX.md                               |   73 +
+ audit/MASTER-CONDITIONS.csv                        |   14 +
+ audit/MASTER-ISSUE-LIST.csv                        |   25 +
+ audit/MASTER-ISSUE-LIST.json                       | 1030 +++++++
+ audit/MASTER-ISSUE-LIST.md                         |  158 +
+ .../2026-10-27-issue-register.csv                  |   19 +
+ .../2026-10-27-issue-register.json                 |  396 +++
+ .../2026-10-27-issue-register.md                   |  559 ++++
+ .../2026-10-27-pre-underwriting-audit.md           |  452 +++
+ .../2026-10-27-questionnaire-matrix.md             |  245 ++
+ .../2026-10-27-reconciliation-decisions.md         |  431 +++
+ .../INPUT-QwencloudPre-Underwriting-Agent.md       |   54 +
+ .../2026-10-27-pre-qwencloud/LIST-1-FINDINGS.md    |  559 ++++
+ .../2026-10-27-pre-qwencloud/LIST-2-CONDITIONS.md  |   20 +
+ .../2026-10-27-pre-qwencloud/MANIFEST.sha256       |   10 +
+ .../2026-10-27-pre-qwencloud/PRESERVATION-INDEX.md |   57 +
+ deno.lock                                          |   46 +
+ docs/LAUNCH-GATES.md                               |   42 +-
+ docs/OPERATIONS.md                                 |   78 +
+ docs/question-bank-reconciliation.md               |   20 +-
+ package-lock.json                                  | 3174 +++++++++-----------
+ package.json                                       |   18 +-
+ scripts/check-bank.ts                              |   38 +
+ scripts/check-bundle.ts                            |   90 +
+ scripts/check-db.mjs                               |  336 +++
+ scripts/check-docs.ts                              |  182 ++
+ scripts/check-server-bank.ts                       |   24 +
+ scripts/check-server-policy.ts                     |   23 +
+ scripts/generate-question-refs.ts                  |   49 +
+ scripts/generate-server-bank.ts                    |  112 +
+ scripts/generate-server-policy.ts                  |   55 +
+ scripts/generate-source-index.ts                   |   89 +
+ src/config/site.ts                                 |   28 +-
+ src/features/consent/consentTexts.ts               |    1 +
+ src/features/consent/marketingConsent.test.ts      |    9 +
+ src/features/consent/marketingConsent.ts           |    4 +-
+ src/features/intake/ConfirmationScreen.tsx         |   15 +-
+ src/features/intake/LeadForm.tsx                   |   52 +-
+ src/features/intake/ReviewScreen.tsx               |   42 +-
+ src/features/intake/validation.test.ts             |   45 +
+ src/features/intake/validation.ts                  |   53 +-
+ src/features/interview/engine.test.ts              |  141 +
+ src/features/interview/engine.ts                   |   49 +-
+ src/features/interview/questionBank.ts             |  122 +-
+ src/features/interview/questionSourceRefs.ts       |  106 +
+ src/features/interview/reconciliation.ts           |   28 +-
+ src/features/interview/reviewNotes.server.ts       |   22 +
+ src/features/interview/sourceIndex.ts              |  749 +++++
+ src/features/interview/sourceInventory.ts          |    5 +
+ src/features/interview/sourceText.ts               |   29 +
+ src/features/interview/types.ts                    |   25 +-
+ src/features/interview/useInterview.ts             |   49 +-
+ src/features/interview/validateQuestionBank.ts     |   46 +-
+ src/features/portal/CaseReview.tsx                 |    5 +-
+ src/features/portal/useReviewerAuth.ts             |   28 +-
+ src/lib/api.ts                                     |   88 +-
+ src/main.tsx                                       |   16 +-
+ src/pages/IntakePage.tsx                           |    3 +-
+ src/pages/LandingPage.tsx                          |    2 +-
+ src/pages/PortalCasePage.tsx                       |   20 +
+ src/pages/PortalPage.tsx                           |   30 +-
+ src/pages/PrivacyPage.tsx                          |    2 +-
+ supabase/config.toml                               |   23 +
+ supabase/functions/_shared/bank.generated.ts       | 3057 +++++++++++++++++++
+ supabase/functions/_shared/case.ts                 |  818 ++++-
+ supabase/functions/_shared/email.ts                |   12 +-
+ supabase/functions/_shared/policy.generated.ts     |   16 +
+ supabase/functions/_shared/svix.ts                 |   93 +
+ supabase/functions/email-events/index.ts           |   94 +-
+ .../functions/retry-case-notifications/index.ts    |  102 +-
+ supabase/functions/submit-case/deno.json           |    2 +-
+ supabase/functions/submit-case/index.ts            |  236 +-
+ supabase/functions/tests/email_test.ts             |  116 +
+ supabase/functions/tests/fixtures.ts               |  178 ++
+ supabase/functions/tests/submit-case_test.ts       |  137 +-
+ supabase/functions/tests/svix_test.ts              |  121 +
+ supabase/functions/tests/validate-draft_test.ts    |  287 ++
+ .../migrations/0003_reliability_and_access.sql     |  585 ++++
+ supabase/migrations/0004_reviewer_write_paths.sql  |  137 +
+ supabase/migrations/0005_case_summary_view.sql     |   46 +
+ supabase/ops/retry-schedule.sql                    |   66 +
+ vite.config.ts                                     |    2 +-
+ 224 files changed, 27171 insertions(+), 2399 deletions(-)
+=== tools ===
+v24.16.0
+11.13.0
+tsx v4.23.15
+node v24.16.0
+bash: line 14: deno: command not found
+=== source hash ===
+afe91d876f2c9e932302267ad10d0c46b774b4161efea8d0d2ffe71e3c82cca2  source/Detialed-Life-insurance-Questions.pdf
+93ba54d4322063db0047d65d835cc62db1294cca965a6f28d4802bf371b5d670  source/Detialed-Life-insurance-Questions.txt
+=== untracked audit workspace ===
+?? .tmp/
+?? audit/2026-10-28-freebuff-full/

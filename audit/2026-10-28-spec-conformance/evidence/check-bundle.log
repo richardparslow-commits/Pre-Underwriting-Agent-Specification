@@ -1,0 +1,6 @@
+$ npm run check:bundle
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:bundle
+> tsx scripts/check-bundle.ts
+
+Bundle check passed: 1 JavaScript asset(s); 5 withheld source items, 5 reviewer notes and 5 held reconciliation records are absent.
