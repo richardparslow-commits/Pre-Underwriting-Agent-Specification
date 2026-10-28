@@ -12,8 +12,8 @@
 | Finding | Severity / trigger | What is true now | What is still missing | Plan outcome |
 | --- | --- | --- | --- | --- |
 | `SC-01` | High — product decision | The interview is deterministic. `FEATURES.aiExplainerEnabled` is `false`; customer copy says no AI assistant is active; the summary is extractive and source-linked by question id. | A signed decision to amend the specification, or an approved, tested model layer. | A dated product decision plus either a signed amendment or the AI acceptance suite below. |
-| `SC-02` | Medium — conditional; becomes a launch blocker if a call/text channel is enabled | The working tree has a customer `/marketing-opt-out` route, a `revoke-marketing` function, a reference-plus-contact match, append-only revocation evidence, a vendor-sync outbox and a service-role send guard. Marketing flags still default to off. | The migration is not applied to staging or production. No outbound sender, no local-time or licensed-state enforcement, no live STOP/email intake and no vendor endpoint are verified. The changes are uncommitted. | Either a dated “no channel operated” closure, or the full pre-enable acceptance suite. A web form alone does not close it. |
-| `SC-03` | High — launch blocker | Staging has migrations `0001`–`0005`, the payload-free `case_summaries` view, the AAL1/AAL2 boundary and one live AAL2 queue response. | No production deployment, applied `0006`/`0007`, real staff TOTP, live provider/inbox test, scheduler tick or retention execution. | A production acceptance package with raw, redacted logs. |
+| `SC-02` | Medium — conditional; becomes a launch blocker if a call/text channel is enabled | The working tree has a customer `/marketing-opt-out` route, a `revoke-marketing` function, a reference-plus-contact match, append-only revocation evidence, a vendor-sync outbox, a replay guard and a service-role send guard. A server-only sender gate enforces the approved-state allowlist and the 08:00–21:00 local window before the suppression guard and provider callback. Marketing flags still default to off. | The migration is not applied to staging or production. The licensed-state list is empty, no approved matrix exists, no provider adapter is built, and no live STOP/email intake or vendor endpoint is verified. The changes are uncommitted. | Either a dated “no channel operated” closure, or the full pre-enable acceptance suite. A web form alone does not close it. |
+| `SC-03` | High — launch blocker | Staging has migrations `0001`–`0005`, the payload-free `case_summaries` view, the AAL1/AAL2 boundary and one live AAL2 queue response. | No production deployment, applied `0006`–`0008`, real staff TOTP, live provider/inbox test, scheduler tick or retention execution. | A production acceptance package with raw, redacted logs. |
 | `SC-04` | High — launch blocker | 92 bank rows: 87 approved for interview, 5 held. 113 source questions, 85 traced, 28 gaps (19 partly collected, 9 out of scope). Zero rows are signed off. | A named clinical/underwriting reviewer’s decision on every row, gap and held item; an approved questionnaire version. | 92/92 row decisions, 28/28 gap decisions and a recorded approved version. |
 | `SC-05` | High — legal/operations blocker | `SITE.legalEntity` is unset, `legalReviewPending` is `true`, retention is null, and no vendor or mailbox/MFA evidence exists. | Entity, licensed states, counsel-approved wording, HIPAA/Texas applicability analysis, retention/backup/incident decisions, vendor review and mailbox control. | A dated approval matrix, not a code change. |
 
@@ -73,6 +73,8 @@ Record one of these before changing copy or code:
 
 The decision record must name the option, the approver, the date, the scope, and the residual risk. It should be committed under `audit/` and linked from the audit index. A verbal decision or a code flag is not a decision record.
 
+Decision and issue: [`2026-10-28-sc-01-decision-record.md`](2026-10-28-sc-01-decision-record.md) records the owner's **approved** Path A decision, and [`2026-10-28-sc-01-specification-v1.1.md`](2026-10-28-sc-01-specification-v1.1.md) is the **issued** version `1.1` amendment with its SHA-256 record. [`2026-10-28-sc-01-copy-walkthrough.md`](2026-10-28-sc-01-copy-walkthrough.md) records the non-customer permission, review and portal label walkthrough; no AI-active claim or AI-generated summary label was found. `SC-01` remains open until `typecheck`/`build` and the dated closure note pass; the owner approval, specification issue and copy review are complete.
+
 ### Work items
 
 | # | Action | Owner | Output |
@@ -124,8 +126,8 @@ The decision record must name the option, the approver, the date, the scope, and
 | Suppression and revocation evidence | Implemented; append-only rows and `source`/`request_id` evidence |
 | Vendor propagation outbox | Implemented; no vendor URL or secret configured |
 | Pre-send suppression guard | Implemented as `assert_marketing_send_allowed`; no outbound sender calls it |
-| Replay/idempotence | Not proven: `request_marketing_revocation` upserts the suppression on every request, and the trigger re-queues the outbox row, so a duplicate can re-open a synced row. The edge function also generates a new `request_id` per call. |
-| Local-time and licensed-state enforcement | Missing |
+| Replay/idempotence | **Implemented locally in `0008`.** The browser sends an `Idempotency-Key`; the edge function hashes it to the RPC request id; the RPC treats an existing request/suppression/outbox triple as a replay and does not re-open a synced row. A new request id can still re-queue propagation. `check:db` covers both paths; the hosted migration is not applied. |
+| Local-time and licensed-state enforcement | **Implemented locally as a fail-closed server policy.** `marketing-policy.ts` requires a licensed-state match and a phone window of 08:00–21:00 in every time zone of the state; `marketing-sender.ts` checks the policy, then the database suppression guard, before the provider callback. The licensed list is empty by default and no provider adapter exists. No approved state matrix or live send is claimed. |
 | STOP/email/vendor intake | Missing |
 | Live non-customer test | Missing |
 
@@ -140,13 +142,13 @@ The decision record must name the option, the approver, the date, the scope, and
 | # | Action | Owner | Output |
 | --- | --- | --- | --- |
 | B1 | Obtain counsel approval for the seller, channel, disclosure, calling window and revocation wording | Richard + counsel | Dated approval |
-| B2 | Commit and apply `0007`; record the schema and grants in staging | Engineering | Migration log |
+| B2 | Commit and apply `0007` and `0008`; record the schema, grants and replay behaviour in staging | Engineering | Migration log |
 | B3 | Configure the vendor suppression endpoint and secret; run one outbox drain | Operations | Synced test row and redacted request log |
-| B4 | Build the outbound sender so every attempt calls `assert_marketing_send_allowed` immediately before sending | Engineering | Sender plus bypass test |
-| B5 | Implement the approved local-time and licensed-state matrix, with a deterministic timezone source | Engineering | Sender policy and boundary tests |
+| B4 | Build the provider adapter behind the existing `sendMarketingMessage` wrapper, so every attempt checks policy and `assert_marketing_send_allowed` before sending | Engineering | Adapter plus bypass test |
+| B5 | Approve the state matrix and calling window, then load them through `MARKETING_LICENSED_STATES`; the fail-closed policy is already implemented locally | Engineering + counsel | Approved matrix and boundary tests |
 | B6 | Implement STOP/email/withdrawal intake with `source = 'stop_reply'` or `'email'`; keep the web form | Engineering + vendor | Intake handler and audit evidence |
 | B7 | Reconcile every suppression to `synced`; no `pending` row may remain before a flag is enabled | Operations | Outbox report |
-| B8 | Make replay idempotent: accept a caller idempotency key (or deduplicate the reference/contact pair) and do not re-queue a suppression that is already synced with the same request | Engineering | Idempotency test and updated trigger/RPC |
+| B8 | **Done locally.** Replay accepts a caller idempotency key and does not re-queue a suppression that is already synced with the same request | Engineering | `0008`, `check:db` and endpoint tests |
 | B9 | Run a labelled live opt-out against the vendor and delete the test contact | Operations + engineering | Dated acceptance log |
 
 ### Acceptance tests
@@ -163,13 +165,13 @@ The decision record must name the option, the approver, the date, the scope, and
 
 1. An unchecked marketing box creates no enrollment, no marketing consent record and no disclosure.
 2. A wrong reference/contact pair returns the same `202` as a match and writes zero suppression, revocation or outbox rows. A correct phone or email match writes the suppression, the append-only revocation and one pending outbox row.
-3. Repeating the same request with the same idempotency key does not duplicate the audit evidence or re-open a synced row. This requires the B8 change; the current edge function generates a new `request_id` per call.
-4. `assert_marketing_send_allowed` raises for the suppressed phone and email, and a test sender aborts before calling the provider. A static check confirms there is one sender entry point and no direct provider path bypasses the guard.
-5. A mock-clock send outside the approved local window is refused; a send inside the window and in a licensed state is permitted. At least one non-licensed state is refused. Boundary times are tested on both sides.
+3. Repeating the same request with the same idempotency key does not duplicate the audit evidence or re-open a synced row. `0008` and `check:db` cover the replay; the hosted migration still needs to be applied.
+4. `assert_marketing_send_allowed` raises for the suppressed phone and email, and a test sender aborts before calling the provider. `npm run check:marketing` confirms the wrapper is the only checked path and that the policy and guard precede `deliver`.
+5. A mock-clock send outside the approved local window is refused; a send inside the window and in a licensed state is permitted. At least one non-licensed state is refused. Both boundaries and a multi-zone state are tested; an approved matrix is still required before a live send.
 6. A STOP reply or email withdrawal is recorded with `source = 'stop_reply'`/`'email'`, suppresses immediately, and creates or re-queues the outbox row. The reviewer case view shows the original consent as withdrawn.
 7. The outbox worker marks `2xx` as `synced`, records bounded failures on non-`2xx`, and retries a failed row without duplicating a successful vendor request.
 8. Before any flag is enabled, a report shows zero `pending` and zero `failed` rows for the test contacts; a live non-customer opt-out and vendor acknowledgement are captured.
-9. `npm run test:consent`, `npm run check:db`, the new sender/time/state tests, `npm run check:docs` and `npm run build` pass.
+9. `npm run test:consent`, `npm run check:db`, `npm run check:marketing`, the sender/policy tests, `npm run check:docs` and `npm run build` pass.
 
 **Closure rule:** Path A needs the dated no-channel decision and the config assertions. Path B needs every test above and a live vendor acknowledgement. A deployed web form with unsynced outbox rows does not close `SC-02`.
 
@@ -197,7 +199,7 @@ The decision record must name the option, the approver, the date, the scope, and
 | # | Action | Owner | Output |
 | --- | --- | --- | --- |
 | C1 | Create/confirm the production project; record ref, region and owner; confirm no real data is present | Operations | Environment record |
-| C2 | Commit `0006`/`0007` if still untracked, then apply `0001`–`0007` in order; verify `supabase_migrations.schema_migrations`, RLS, the payload-free view and grants | Engineering | Migration log |
+| C2 | Commit `0006`–`0008` if still untracked, then apply `0001`–`0008` in order; verify `supabase_migrations.schema_migrations`, RLS, the payload-free view, grants and the revocation replay guard | Engineering | Migration log |
 | C3 | From the same committed revision, deploy `submit-case`, `email-events` and `retry-case-notifications`; deploy `revoke-marketing` if the public page is exposed; deploy `sync-marketing-suppressions` only for `SC-02` Path B | Engineering | Deployment receipt and `verify_jwt` settings |
 | C4 | Configure the approved sender domain, `CASE_NOTIFY_FROM`, provider key, webhook secret and `APP_ORIGIN`; keep `QUESTIONNAIRE_APPROVED=false` until the `SC-04` sign-off is recorded | Operations | Secret names only; no values in logs |
 | C5 | Disable hosted sign-ups and anonymous sign-ins; enable TOTP; enrol the real reviewer and complete an aal1 → aal2 challenge in the app | Operations + reviewer | Screen recording or redacted log |

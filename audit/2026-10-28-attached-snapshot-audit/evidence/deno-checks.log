@@ -1,0 +1,132 @@
+$ npx --yes --package=deno@2.9.6 deno test --allow-env --lock=deno.lock supabase/functions/tests/
+[0m[32mDownload[0m https://jsr.io/@std/assert/meta.json
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6_meta.json
+[0m[32mDownload[0m https://jsr.io/@std/internal/meta.json
+[0m[32mDownload[0m https://jsr.io/@std/internal/1.0.14_meta.json
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/mod.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/almost_equals.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/array_includes.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/equals.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/exists.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/false.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/greater_or_equal.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/greater.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/instance_of.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/is_error.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/less_or_equal.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/less.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/match.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/not_equals.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/not_instance_of.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/not_match.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/not_strict_equals.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/object_match.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/rejects.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/strict_equals.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/string_includes.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/throws.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/assert.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/assertion_error.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/equal.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/fail.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/unimplemented.ts
+[0m[32mDownload[0m https://jsr.io/@std/assert/1.0.6/unreachable.ts
+[0m[32mDownload[0m https://jsr.io/@std/internal/1.0.14/format.ts
+[0m[32mDownload[0m https://jsr.io/@std/internal/1.0.14/build_message.ts
+[0m[32mDownload[0m https://jsr.io/@std/internal/1.0.14/diff.ts
+[0m[32mDownload[0m https://jsr.io/@std/internal/1.0.14/diff_str.ts
+[0m[32mDownload[0m https://jsr.io/@std/internal/1.0.14/styles.ts
+[0m[32mDownload[0m https://jsr.io/@std/internal/1.0.14/types.ts
+[0m[32mCheck[0m supabase/functions/tests/email_test.ts
+[0m[32mCheck[0m supabase/functions/tests/revoke-marketing_test.ts
+[0m[32mCheck[0m supabase/functions/tests/submit-case_test.ts
+[0m[32mCheck[0m supabase/functions/tests/svix_test.ts
+[0m[32mCheck[0m supabase/functions/tests/sync-marketing-suppressions_test.ts
+[0m[32mCheck[0m supabase/functions/tests/validate-draft_test.ts
+[0m[38;5;245mrunning 5 tests from ./supabase/functions/tests/email_test.ts[0m
+notification carries a reference and portal link, never health data ... [0m[32mok[0m [0m[38;5;245m(854µs)[0m
+provider acceptance is never reported as delivered ... [0m[32mok[0m [0m[38;5;245m(166µs)[0m
+no provider key produces not_sent and makes no request ... [0m[32mok[0m [0m[38;5;245m(111µs)[0m
+retries reuse the case reference as the provider idempotency key ... [0m[32mok[0m [0m[38;5;245m(11ms)[0m
+a provider rejection is failed, not accepted ...
+[0m[38;5;245m------- output -------[0m
+Case notification rejected 422
+[0m[38;5;245m----- output end -----[0m
+a provider rejection is failed, not accepted ... [0m[32mok[0m [0m[38;5;245m(624µs)[0m
+[0m[38;5;245mrunning 11 tests from ./supabase/functions/tests/revoke-marketing_test.ts[0m
+rejects an unapproved origin ... [0m[32mok[0m [0m[38;5;245m(9ms)[0m
+rejects a method other than POST ... [0m[32mok[0m [0m[38;5;245m(198µs)[0m
+rejects malformed JSON ... [0m[32mok[0m [0m[38;5;245m(866µs)[0m
+requires a case reference ... [0m[32mok[0m [0m[38;5;245m(268µs)[0m
+rejects a case reference in the wrong format ... [0m[32mok[0m [0m[38;5;245m(268µs)[0m
+requires at least one contact detail ... [0m[32mok[0m [0m[38;5;245m(177µs)[0m
+rejects an unusable telephone number ... [0m[32mok[0m [0m[38;5;245m(184µs)[0m
+rejects an unusable email address ... [0m[32mok[0m [0m[38;5;245m(116µs)[0m
+rejects a reason above 500 characters ... [0m[32mok[0m [0m[38;5;245m(151µs)[0m
+enforces the 8 KiB body budget before parsing ... [0m[32mok[0m [0m[38;5;245m(184µs)[0m
+fails closed when the durable rate limiter is unavailable ...
+[0m[38;5;245m------- post-test output -------[0m
+Revocation rate limiter is unavailable
+[0m[38;5;245m----- post-test output end -----[0m
+fails closed when the durable rate limiter is unavailable ... [0m[32mok[0m [0m[38;5;245m(335µs)[0m
+[0m[38;5;245mrunning 7 tests from ./supabase/functions/tests/submit-case_test.ts[0m
+refuses live intake until the questionnaire is explicitly approved ... [0m[32mok[0m [0m[38;5;245m(9ms)[0m
+fails closed when the durable rate limiter is unavailable ...
+[0m[38;5;245m------- post-test output -------[0m
+Durable rate limiter is unavailable
+[0m[38;5;245m----- post-test output end -----[0m
+fails closed when the durable rate limiter is unavailable ... [0m[32mok[0m [0m[38;5;245m(435µs)[0m
+rejects a draft with no consent records ... [0m[32mok[0m [0m[38;5;245m(1ms)[0m
+rejects a draft missing the intake permission ... [0m[32mok[0m [0m[38;5;245m(533µs)[0m
+rejects a declined intake permission ... [0m[32mok[0m [0m[38;5;245m(326µs)[0m
+rejects a draft missing the privacy acknowledgement ... [0m[32mok[0m [0m[38;5;245m(259µs)[0m
+rejects a multibyte body above the 512 KiB byte budget with 413 ... [0m[32mok[0m [0m[38;5;245m(621µs)[0m
+[0m[38;5;245mrunning 5 tests from ./supabase/functions/tests/svix_test.ts[0m
+accepts a correctly signed Svix event ... [0m[32mok[0m [0m[38;5;245m(1ms)[0m
+rejects a replayed event outside the timestamp window ... [0m[32mok[0m [0m[38;5;245m(9ms)[0m
+rejects a body changed after signing ... [0m[32mok[0m [0m[38;5;245m(221µs)[0m
+rejects a missing or malformed secret/header ... [0m[32mok[0m [0m[38;5;245m(76µs)[0m
+accepts a valid signature during key rotation ... [0m[32mok[0m [0m[38;5;245m(116µs)[0m
+[0m[38;5;245mrunning 3 tests from ./supabase/functions/tests/sync-marketing-suppressions_test.ts[0m
+rejects a method other than POST ... [0m[32mok[0m [0m[38;5;245m(9ms)[0m
+rejects a missing or wrong cron secret ... [0m[32mok[0m [0m[38;5;245m(270µs)[0m
+reports not configured without claiming pending rows ... [0m[32mok[0m [0m[38;5;245m(250µs)[0m
+[0m[38;5;245mrunning 29 tests from ./supabase/functions/tests/validate-draft_test.ts[0m
+accepts a complete canonical draft and rebuilds source rows ... [0m[32mok[0m [0m[38;5;245m(10ms)[0m
+rejects a held HIV row presented as answered ... [0m[32mok[0m [0m[38;5;245m(366µs)[0m
+rejects an invented question id ... [0m[32mok[0m [0m[38;5;245m(102µs)[0m
+rejects a zero-answer payload ... [0m[32mok[0m [0m[38;5;245m(81µs)[0m
+ignores client-invented source wording and restores the canonical row ... [0m[32mok[0m [0m[38;5;245m(264µs)[0m
+rejects marketing consent when the server has no enabled channel ... [0m[32mok[0m [0m[38;5;245m(90µs)[0m
+rejects a privacy record with the wrong notice version ... [0m[32mok[0m [0m[38;5;245m(66µs)[0m
+rejects duplicate consent records ... [0m[32mok[0m [0m[38;5;245m(83µs)[0m
+rejects a consent timestamp after the submission ... [0m[32mok[0m [0m[38;5;245m(110µs)[0m
+rejects a stale submission acknowledgement ... [0m[32mok[0m [0m[38;5;245m(83µs)[0m
+derives crisis disclosure and an urgent flag from MH-05 yes ... [0m[32mok[0m [0m[38;5;245m(219µs)[0m
+rejects a 17-year-old applicant ... [0m[32mok[0m [0m[38;5;245m(47µs)[0m
+rejects a non-US or invented state code ... [0m[32mok[0m [0m[38;5;245m(37µs)[0m
+rejects fields attached to a branch-closed row ... [0m[32mok[0m [0m[38;5;245m(152µs)[0m
+rejects a non-self relationship even when the flag says self ... [0m[32mok[0m [0m[38;5;245m(47µs)[0m
+rejects phone and text contact preferences without a phone number ... [0m[32mok[0m [0m[38;5;245m(77µs)[0m
+rejects a junk or unusable supplied phone number ... [0m[32mok[0m [0m[38;5;245m(185µs)[0m
+normalises a valid ten-digit phone number ... [0m[32mok[0m [0m[38;5;245m(160µs)[0m
+rejects a forged questionnaire version ... [0m[32mok[0m [0m[38;5;245m(315µs)[0m
+rejects prose that does not match the chosen option ... [0m[32mok[0m [0m[38;5;245m(663µs)[0m
+rejects an invented single-choice label ... [0m[32mok[0m [0m[38;5;245m(634µs)[0m
+rejects a date of birth answer that contradicts the lead form ... [0m[32mok[0m [0m[38;5;245m(327µs)[0m
+rejects a state answer that contradicts the lead form ... [0m[32mok[0m [0m[38;5;245m(235µs)[0m
+accepts a state answer written as the full state name ... [0m[32mok[0m [0m[38;5;245m(212µs)[0m
+an unanswered identity row is not cross-checked ... [0m[32mok[0m [0m[38;5;245m(180µs)[0m
+rejects an acknowledgement that predates the consents it relies on ... [0m[32mok[0m [0m[38;5;245m(74µs)[0m
+flags a yes answer that carries no supplemental detail ... [0m[32mok[0m [0m[38;5;245m(176µs)[0m
+flags a shorter-window yes that the longer window denies ... [0m[32mok[0m [0m[38;5;245m(185µs)[0m
+does not flag consistent short and long windows ... [0m[32mok[0m [0m[38;5;245m(176µs)[0m
+
+[0m[32mok[0m | 60 passed | 0 failed [0m[38;5;245m(429ms)[0m
+
+npm notice
+npm notice New major version of npm available! 11.13.0 -> 12.2.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+npm notice To update run: npm install -g npm@12.2.1
+npm notice
+EXIT STATUS: 0

@@ -1,0 +1,14 @@
+type Handler = (request: Request) => Response | Promise<Response>;
+let handler: Handler | undefined;
+const original = Deno.serve;
+(Deno as unknown as { serve: unknown }).serve = (candidate: Handler) => { handler = candidate; return {} as Deno.HttpServer; };
+Deno.env.set('ENVIRONMENT', 'test');
+Deno.env.set('APP_ORIGIN', 'https://intake.example.com');
+await import('./supabase/functions/submit-case/index.ts');
+(Deno as unknown as { serve: unknown }).serve = original;
+if (!handler) throw new Error('Handler not captured');
+const response = await handler(new Request('http://local.test/submit-case', { method: 'OPTIONS', headers: { origin: 'https://intake.example.com', 'access-control-request-method': 'POST', 'access-control-request-headers': 'authorization,content-type,apikey,idempotency-key' } }));
+const allowed = response.headers.get('access-control-allow-headers') ?? '';
+const idempotencyAllowed = allowed.split(',').map(s => s.trim().toLowerCase()).includes('idempotency-key');
+console.log(JSON.stringify({status: response.status, requested: 'authorization,content-type,apikey,idempotency-key', allowed, idempotencyAllowed, browserCrossOriginConsequence: idempotencyAllowed ? 'preflight permits requested header' : 'preflight rejects requested header'}, null, 2));
+if (response.status !== 204 || idempotencyAllowed) throw new Error('Snapshot differs from expected preflight finding');

@@ -51,6 +51,26 @@ async function errorFrom(response: Response): Promise<string> {
   return body.error ?? "";
 }
 
+Deno.test("allows the idempotency header in the CORS preflight", async () => {
+  if (!handler) throw new Error("submit-case handler was not captured");
+  const response = await handler(
+    new Request("http://localhost/submit-case", {
+      method: "OPTIONS",
+      headers: {
+        origin: "http://localhost:5173",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "idempotency-key",
+      },
+    }),
+  );
+
+  assertEquals(response.status, 204);
+  assertEquals(
+    response.headers.get("access-control-allow-headers")?.includes("idempotency-key"),
+    true,
+  );
+});
+
 Deno.test("refuses live intake until the questionnaire is explicitly approved", async () => {
   Deno.env.set("QUESTIONNAIRE_APPROVED", "false");
   const response = await submit(buildValidDraft());

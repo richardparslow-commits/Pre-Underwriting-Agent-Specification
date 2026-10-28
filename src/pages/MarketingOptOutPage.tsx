@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { Mail, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,8 @@ export default function MarketingOptOutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<MarketingRevocationResult | null>(null);
+  const idempotencyKey = useRef<string>(crypto.randomUUID());
+  const attemptSignature = useRef<string | null>(null);
 
   function validate(): FormErrors {
     const next: FormErrors = {};
@@ -72,11 +74,29 @@ export default function MarketingOptOutPage() {
     setSubmitting(true);
     try {
       const normalisedPhone = phone.trim() ? normaliseUsPhone(phone) : null;
+      const normalisedEmail = email.trim().toLowerCase();
+      const normalisedReference = reference.trim().toUpperCase();
+      const normalisedReason = reason.trim();
+
+      // A retry after a network error sends the same body and reuses the key.
+      // Any changed contact or reason is a new attempt and gets a new key.
+      const signature = JSON.stringify([
+        normalisedReference,
+        normalisedPhone,
+        normalisedEmail,
+        normalisedReason,
+      ]);
+      if (attemptSignature.current !== signature) {
+        attemptSignature.current = signature;
+        idempotencyKey.current = crypto.randomUUID();
+      }
+
       const response = await requestMarketingRevocation({
-        reference: reference.trim().toUpperCase(),
+        reference: normalisedReference,
         phone: normalisedPhone ?? undefined,
-        email: email.trim() || undefined,
-        reason: reason.trim() || undefined,
+        email: normalisedEmail || undefined,
+        reason: normalisedReason || undefined,
+        idempotencyKey: idempotencyKey.current,
       });
       setResult(response);
     } catch (submitError) {
@@ -98,6 +118,8 @@ export default function MarketingOptOutPage() {
     setErrors({});
     setError(null);
     setResult(null);
+    attemptSignature.current = null;
+    idempotencyKey.current = crypto.randomUUID();
   }
 
   if (result) {
@@ -115,7 +137,7 @@ export default function MarketingOptOutPage() {
         >
           {result.preview ? (
             <>
-              This build has no backend, so nothing was sent. To record a real request, email{" "}
+              This is a local preview, so nothing was sent. To request an opt-out, email{" "}
               <a href={`mailto:${SITE.reviewerEmail}`} className="link-quiet">
                 {SITE.reviewerEmail}
               </a>{" "}
@@ -133,8 +155,9 @@ export default function MarketingOptOutPage() {
         <section className="panel mt-6 space-y-3 p-6">
           <h2 className="text-lg">What this does and does not do</h2>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            It stops future marketing calls or texts to the contact details you supplied. It does not
-            cancel your requested review, delete your case, or change any interview answer.
+            If the telephone number you supplied matches the case, it is suppressed for future
+            marketing calls and texts. An email-only request does not suppress the telephone number.
+            This request does not cancel your review, delete your case, or change any interview answer.
           </p>
           <p className="text-sm leading-relaxed text-muted-foreground">
             If you need written confirmation, or the details on your case have changed, email{" "}
@@ -178,8 +201,8 @@ export default function MarketingOptOutPage() {
 
       {!MARKETING_ENABLED ? (
         <Alert tone="neutral" className="mt-8">
-          No marketing calls or texts are being sent in this version. You can still record a stop
-          request here; it will apply if marketing is enabled later.
+          No marketing calls or texts are being sent in this version. You can still submit a stop
+          request; only contact details matching the case are suppressed.
         </Alert>
       ) : null}
 
@@ -187,8 +210,9 @@ export default function MarketingOptOutPage() {
         <div className="flex gap-3">
           <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-ok" aria-hidden />
           <p className="text-sm leading-relaxed text-muted-foreground">
-            We match the case reference and the contact detail you provide against the case on file.
-            If they match, the suppression is recorded immediately and applies to future marketing.
+            We match the case reference and each contact detail you provide against the case on file.
+            Only matching details are suppressed. To stop marketing calls and texts, provide the
+            telephone number on your case; an email-only request does not suppress that number.
             Do not include health information in the reason box.
           </p>
         </div>

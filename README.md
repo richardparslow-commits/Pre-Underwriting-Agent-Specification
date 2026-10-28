@@ -25,8 +25,8 @@ service. The following are deliberate, visible gaps:
 | Legal wording (intake acknowledgment, TCPA disclosure) | Draft, pending counsel. `SITE.legalEntity` is supplied by `VITE_LEGAL_ENTITY`; marketing consent and the TCPA disclosure appear only when a seller and at least one channel are configured. `SITE.legalReviewPending` is `true`. |
 | Language-model explainer | **Not wired.** The interview engine is deterministic. `FEATURES.aiExplainerEnabled = false`, so the customer copy does not claim an AI assistant is active. |
 | Email notification | Implemented against Resend in a Supabase edge function; no provider key is configured here, so the UI reports `not_sent` honestly. |
-| Marketing revocation | A customer form at `/marketing-opt-out` matches the case reference plus the email or phone on file, writes the suppression and audit rows immediately, and queues a vendor-sync row. The scheduler worker is implemented, but no vendor endpoint is configured and no outbound marketing sender exists, so every channel remains disabled. |
-| Supabase deployment | Applied and exercised on a non-production staging project on 28 Oct 2026: migrations 0001–0005 are applied; the 0005 `case_summaries` view, its grants and the AAL1/AAL2 boundary were verified; and a live AAL2 queue response was captured with a labelled temporary reviewer. No edge-function or production deployment is recorded, and no live provider delivery, scheduler run or retention execution exists. Forward migrations 0006 (terminal notification state) and 0007 (marketing revocation) are not applied there. |
+| Marketing revocation | A customer form at `/marketing-opt-out` matches the case reference plus the email or phone on file, writes the suppression and audit rows immediately, and queues a vendor-sync row. The form sends an idempotency key; migration `0008` makes a retry a no-op, so it cannot duplicate evidence or re-open a synced outbox row. A server-only sender gate refuses unlicensed states and phone sends outside 08:00–21:00 local time, conservatively in every time zone of the state. The licensed-state list is empty by default, no provider adapter exists and no vendor endpoint is configured, so every channel remains disabled. |
+| Supabase deployment | Applied and exercised on a non-production staging project on 28 Oct 2026: migrations 0001–0005 are applied; the 0005 `case_summaries` view, its grants and the AAL1/AAL2 boundary were verified; and a live AAL2 queue response was captured with a labelled temporary reviewer. No edge-function or production deployment is recorded, and no live provider delivery, scheduler run or retention execution exists. Forward migrations 0006 (terminal notification state), 0007 (marketing revocation) and 0008 (revocation replay safety) are not applied there. |
 | Retention / deletion job | Deletion and expiry functions are implemented in `0003_reliability_and_access.sql`; the schedule stays unset (`retention_months = null`) until counsel approves it. |
 | Carrier screening, quoting, rate classes | Intentionally absent. |
 
@@ -102,12 +102,15 @@ supabase/
   migrations/0005_case_summary_view.sql
   migrations/0006_notification_terminal_state.sql
   migrations/0007_marketing_revocation.sql
+  migrations/0008_marketing_revocation_idempotency.sql
   ops/retry-schedule.sql         operator-applied pg_cron schedule
   functions/submit-case/         public intake, server-generated reference
   functions/revoke-marketing/    public opt-out, reference plus contact match
   functions/_shared/case.ts      validation, byte cap, rate limit, service client
   functions/_shared/bank.generated.ts    canonical server question bank
   functions/_shared/policy.generated.ts  canonical consent wording/versions
+  functions/_shared/marketing-policy.ts  licensed-state and local-time policy
+  functions/_shared/marketing-sender.ts  only pre-send gate for a provider
   functions/_shared/svix.ts      provider signature verification
   functions/_shared/email.ts     minimal notification, fixed recipient, Resend
   functions/email-events/        delivery webhook → notification state
@@ -185,8 +188,11 @@ Marketing withdrawal is independent of the case. [`/marketing-opt-out`](src/page
 matches the case reference plus the email or phone on file, then writes an
 audited suppression. It does not edit the submitted case, its consent evidence or
 the review. A phone suppression covers both calls and texts to that number. The
-vendor-sync outbox and server-only send guard are in
-[`0007_marketing_revocation.sql`](supabase/migrations/0007_marketing_revocation.sql).
+vendor-sync outbox and replay guard are in
+[`0007_marketing_revocation.sql`](supabase/migrations/0007_marketing_revocation.sql)
+and [`0008_marketing_revocation_idempotency.sql`](supabase/migrations/0008_marketing_revocation_idempotency.sql);
+the only permitted pre-send path is
+[`marketing-sender.ts`](supabase/functions/_shared/marketing-sender.ts).
 
 ## Security decisions
 
@@ -230,18 +236,20 @@ In Supabase (or Lovable Cloud) run the migrations in order:
 [`0003_reliability_and_access.sql`](supabase/migrations/0003_reliability_and_access.sql),
 [`0004_reviewer_write_paths.sql`](supabase/migrations/0004_reviewer_write_paths.sql),
 [`0005_case_summary_view.sql`](supabase/migrations/0005_case_summary_view.sql),
-[`0006_notification_terminal_state.sql`](supabase/migrations/0006_notification_terminal_state.sql) and
-[`0007_marketing_revocation.sql`](supabase/migrations/0007_marketing_revocation.sql).
+[`0006_notification_terminal_state.sql`](supabase/migrations/0006_notification_terminal_state.sql),
+[`0007_marketing_revocation.sql`](supabase/migrations/0007_marketing_revocation.sql) and
+[`0008_marketing_revocation_idempotency.sql`](supabase/migrations/0008_marketing_revocation_idempotency.sql).
 They create the reviewer allowlist, immutable cases, review log, corrections,
 suppressions, idempotency, notification leases, delivery-event dedupe, durable
 rate limiting, AAL2 reviewer policies, RPC-only reviewer writes, a payload-free
 queue summary view, audited deletion, the opt-in retention job, a terminal
 delivery state enforced by both the completion RPC and a table trigger, and a
-customer marketing-revocation path with a vendor-sync outbox and an outbound
-send guard. Do not stop after 0001: the portal's correction
+customer marketing-revocation path with a vendor-sync outbox, replay-safe
+idempotency and an outbound send guard. Do not stop after 0001: the portal's correction
 action needs 0002, the reliability controls need 0003 and 0004, a database
 that already ran 0003 still needs 0006 because editing an applied migration
-does not change it, and the customer opt-out needs 0007.
+does not change it, and the customer opt-out needs 0007 plus the replay guard
+in 0008.
 
 ### 2. Create the reviewer
 
@@ -457,13 +465,16 @@ is the reviewer's signature in the report.
 - `npm run report:reconciliation` — regenerates the review document from the
   data (92 rows, 28 gaps).
 - `npm run check:db` — isolated PostgreSQL (PGlite) replay of migrations
-  0001–0007, including AAL2 denial, the payload-free queue summary, RPC-only
+  0001–0008, including AAL2 denial, the payload-free queue summary, RPC-only
   reviewer writes, opened-log dedupe, immutable triage columns, duplicate
   idempotency key rejection, notification claim races, monotonic delivery
   events, terminal delivery through both the RPC and a direct-write trigger,
   unmatched-event retry, durable rate limits, customer marketing revocation,
-  outbound suppression denial, vendor-sync queueing, retention and audited
-deletion — 0 failures.
+  revocation replay safety, outbound suppression denial, vendor-sync queueing,
+  retention and audited deletion — 0 failures.
+- `npm run check:marketing` — fails if a state or IANA zone is missing, the
+  licensed-state list stops defaulting to empty, the idempotency key stops being
+  hashed, or the sender drops the policy or database guard before `deliver`.
 - **Not run during this remediation:** a fresh browser walkthrough of the
   changed screens. The manual script is in [docs/LAUNCH-GATES.md](docs/LAUNCH-GATES.md);
   earlier preview-mode observations are not treated as evidence for these edits.

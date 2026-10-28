@@ -90,11 +90,13 @@ requireText("README.md", [
   "0005_case_summary_view.sql",
   "0006_notification_terminal_state.sql",
   "0007_marketing_revocation.sql",
+  "0008_marketing_revocation_idempotency.sql",
   "Applied and exercised on a non-production staging project",
   "revoke-marketing",
   "sync-marketing-suppressions",
   "/marketing-opt-out",
   "check:portal",
+  "check:marketing",
 ]);
 forbidText("README.md", [
   "45 source questions",
@@ -113,6 +115,7 @@ requireText("docs/LAUNCH-GATES.md", [
   "Svix",
   "complete_case_notification",
   "assert_marketing_send_allowed",
+  "sendMarketingMessage",
   "check:portal",
 ]);
 forbidText("docs/LAUNCH-GATES.md", [
@@ -135,8 +138,10 @@ requireText("docs/OPERATIONS.md", [
   "assert_marketing_send_allowed",
   "pending_marketing_suppressions",
   "MARKETING_SUPPRESSION_WEBHOOK_URL",
+  "MARKETING_LICENSED_STATES",
+  "sendMarketingMessage",
   "BLOCKED",
-  "0001–0007",
+  "0001–0009",
 ]);
 
 requireText(".env.example", [
@@ -144,6 +149,7 @@ requireText(".env.example", [
   "QUESTIONNAIRE_APPROVED",
   "VITE_REVOKE_MARKETING_URL",
   "MARKETING_SUPPRESSION_WEBHOOK_URL",
+  "MARKETING_LICENSED_STATES",
 ]);
 
 forbidText("src/config/site.ts", ["all 56 rows"]);
@@ -152,8 +158,9 @@ forbidText("src/pages/LandingPage.tsx", ["Source questions"]);
 forbidText("src/pages/PrivacyPage.tsx", [
   "encryption in transit and at rest",
   "encrypted at rest",
+  "or information about family members",
 ]);
-requireText("src/pages/PrivacyPage.tsx", ["transmitted over TLS", "provider controls"]);
+requireText("src/pages/PrivacyPage.tsx", ["transmitted over TLS", "provider controls", "family medical history"]);
 
 requireText("src/pages/LandingPage.tsx", ["Core questions"]);
 

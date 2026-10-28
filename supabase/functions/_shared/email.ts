@@ -105,9 +105,8 @@ export async function sendCaseNotification(input: {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        // Resend honours Idempotency-Key for 24 hours. A crash after provider
-        // acceptance therefore cannot produce a second reviewer email when the
-        // lease expires and the outbox row is retried.
+        // Resend honours Idempotency-Key for 24 hours. This does not guarantee
+        // deduplication when an uncertain acceptance is retried after that window.
         "Idempotency-Key": input.idempotencyKey ?? input.reference,
       },
       body: JSON.stringify({

@@ -6,7 +6,7 @@
  * run before a revocation can reach the database.
  */
 
-import { assertEquals } from "jsr:@std/assert@1.0.6";
+import { assertEquals, assertNotEquals } from "jsr:@std/assert@1.0.6";
 
 type Handler = (request: Request) => Response | Promise<Response>;
 
@@ -21,7 +21,8 @@ const originalServe = Deno.serve;
 Deno.env.set("ENVIRONMENT", "test");
 Deno.env.set("APP_ORIGIN", "http://localhost:5173");
 
-await import("../revoke-marketing/index.ts");
+const revokeModule = await import("../revoke-marketing/index.ts");
+const requestIdFromIdempotencyKey = revokeModule.requestIdFromIdempotencyKey;
 
 (Deno as unknown as { serve: unknown }).serve = originalServe;
 
@@ -31,6 +32,7 @@ async function revoke(
     method?: string;
     origin?: string | null;
     rawBody?: string;
+    headers?: Record<string, string>;
   } = {},
 ): Promise<Response> {
   if (!handler) throw new Error("revoke-marketing handler was not captured");
@@ -38,6 +40,7 @@ async function revoke(
     "content-type": "application/json",
   };
   if (options.origin !== null) headers.origin = options.origin ?? "http://localhost:5173";
+  Object.assign(headers, options.headers ?? {});
 
   return await handler(
     new Request("http://localhost/revoke-marketing", {
@@ -52,6 +55,49 @@ async function errorFrom(response: Response): Promise<string> {
   const body = (await response.json()) as { error?: string };
   return body.error ?? "";
 }
+
+Deno.test("derives a stable UUID from the idempotency key", async () => {
+  const first = await requestIdFromIdempotencyKey("form-attempt-123");
+  const replay = await requestIdFromIdempotencyKey("form-attempt-123");
+  const different = await requestIdFromIdempotencyKey("form-attempt-124");
+
+  assertEquals(first, replay);
+  assertNotEquals(first, different);
+  assertEquals(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(first),
+    true,
+  );
+});
+
+Deno.test("rejects a malformed idempotency key", async () => {
+  const response = await revoke(
+    { reference: "LPP-2026-ABC123", phone: "5125550199" },
+    { headers: { "idempotency-key": "not a valid key!" } },
+  );
+
+  assertEquals(response.status, 400);
+  assertEquals(await errorFrom(response), "Invalid idempotency key.");
+});
+
+Deno.test("allows the idempotency header in the CORS preflight", async () => {
+  if (!handler) throw new Error("revoke-marketing handler was not captured");
+  const response = await handler(
+    new Request("http://localhost/revoke-marketing", {
+      method: "OPTIONS",
+      headers: {
+        origin: "http://localhost:5173",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "idempotency-key",
+      },
+    }),
+  );
+
+  assertEquals(response.status, 204);
+  assertEquals(
+    response.headers.get("access-control-allow-headers")?.includes("idempotency-key"),
+    true,
+  );
+});
 
 Deno.test("rejects an unapproved origin", async () => {
   const response = await revoke(

@@ -498,40 +498,23 @@ export async function getCase(reference: string): Promise<CaseRecord | null> {
 
   if (!supabase) throw new Error("Sign-in is not configured.");
 
-  const { data, error } = await supabase
-    .from("cases")
-    .select(
-      "id, reference, submitted_at, status, payload, notification_state, notification_attempts, notification_detail, notification_updated_at, crisis_disclosure",
-    )
-    .eq("reference", reference)
-    .maybeSingle();
-
+  // The database checks AAL2 and allowlist membership and records the opening
+  // in the same transaction before returning any sensitive case content.
+  const { data, error } = await supabase.rpc("open_case_for_review", {
+    p_reference: reference,
+  });
   if (error) throw new Error("This case could not be loaded.");
   if (!data) return null;
 
-  const record = fromRow(data as CaseRow);
-
-  // Opening a sensitive case is an access event. The RPC deduplicates repeated
-  // loads by the same reviewer within eight hours, so a refresh does not spam
-  // the log. A logging failure must not block legitimate review.
-  const { error: accessLogError } = await supabase.rpc("record_case_review", {
-    p_reference: reference,
-    p_action: "opened",
-    p_note: null,
-  });
-  if (accessLogError) {
-    console.warn("Access log write failed", accessLogError.code);
-  }
-
-  const { data: log } = await supabase
-    .from("case_review_log")
-    .select("action, actor, created_at, note")
-    .eq("case_id", (data as CaseRow).id)
-    .order("created_at", { ascending: false })
-    .limit(20);
-
-  const reviewLog: ReviewLogEntry[] = Array.isArray(log)
-    ? log.map((entry) => ({
+  const result = data as {
+    case: CaseRow;
+    review_log: Array<{ action: string; actor: string; created_at: string; note: string | null }>;
+    corrections: Array<{ id: number; detail: string; recorded_by: string; created_at: string }>;
+    revocations: Array<{ channel: string; reason: string | null; source: string; recorded_by: string; created_at: string }>;
+  };
+  const record = fromRow(result.case);
+  const reviewLog: ReviewLogEntry[] = Array.isArray(result.review_log)
+    ? result.review_log.map((entry) => ({
         action: entry.action as ReviewLogEntry["action"],
         actor: String(entry.actor ?? ""),
         at: String(entry.created_at ?? ""),
@@ -539,15 +522,8 @@ export async function getCase(reference: string): Promise<CaseRecord | null> {
       }))
     : [];
 
-  const { data: correctionRows } = await supabase
-    .from("case_corrections")
-    .select("id, detail, recorded_by, created_at")
-    .eq("case_id", (data as CaseRow).id)
-    .order("created_at", { ascending: false })
-    .limit(50);
-
-  const corrections: CorrectionRecord[] = Array.isArray(correctionRows)
-    ? correctionRows.map((entry) => ({
+  const corrections: CorrectionRecord[] = Array.isArray(result.corrections)
+    ? result.corrections.map((entry) => ({
         id: Number(entry.id),
         detail: String(entry.detail ?? ""),
         recordedBy: String(entry.recorded_by ?? ""),
@@ -555,15 +531,8 @@ export async function getCase(reference: string): Promise<CaseRecord | null> {
       }))
     : [];
 
-  const { data: revocationRows } = await supabase
-    .from("marketing_revocations")
-    .select("channel, reason, source, recorded_by, created_at")
-    .eq("case_reference", reference)
-    .order("created_at", { ascending: false })
-    .limit(20);
-
-  const marketingRevocations: MarketingRevocationRecord[] = Array.isArray(revocationRows)
-    ? revocationRows.map((entry) => ({
+  const marketingRevocations: MarketingRevocationRecord[] = Array.isArray(result.revocations)
+    ? result.revocations.map((entry) => ({
         channel: entry.channel === "email" ? "email" : "phone",
         reason: String(entry.reason ?? ""),
         source: String(entry.source ?? "operator"),

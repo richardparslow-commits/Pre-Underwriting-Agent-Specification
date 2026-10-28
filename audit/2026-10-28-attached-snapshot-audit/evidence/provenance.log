@@ -1,0 +1,15 @@
+--- audit inputs (SHA-256) ---
+d4d38d5fdfaae6c6b26553440da4a94ef1d33e37f7b6464ae6a44767a4decbad  /Users/richardparslow/Desktop/Pre-Underwriting-Agent-Specification-main.zip
+41ddd529ccf28926ad76dc48bac81f3a3ca40b467e576138b5a1731e9c490588  /Users/richardparslow/Desktop/QwencloudPre-Underwriting Agent.md
+--- repository ---
+main
+20e0eff79a42d71b8980a5a0489422aa7176892b
+22
+--- attached snapshot questionnaire SHA-256 ---
+afe91d876f2c9e932302267ad10d0c46b774b4161efea8d0d2ffe71e3c82cca2  .tmp/zip-audit-20261028-3z9hDN/Pre-Underwriting-Agent-Specification-main/source/Detialed-Life-insurance-Questions.pdf
+93ba54d4322063db0047d65d835cc62db1294cca965a6f28d4802bf371b5d670  .tmp/zip-audit-20261028-3z9hDN/Pre-Underwriting-Agent-Specification-main/source/Detialed-Life-insurance-Questions.txt
+--- working-tree SC-01 hash record, outside ZIP ---
+audit/2026-10-28-sc-01-specification-v1.1.md: OK
+audit/2026-10-28-sc-01-decision-record.md: FAILED
+shasum: WARNING: 1 computed checksum did NOT match
+SC-01 CHECK EXIT STATUS: 1

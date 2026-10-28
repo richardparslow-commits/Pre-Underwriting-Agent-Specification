@@ -5,6 +5,8 @@ export interface MarketingRevocationInput {
   phone?: string;
   email?: string;
   reason?: string;
+  /** Stable per form attempt; a retry must reuse it. */
+  idempotencyKey?: string;
 }
 
 export interface MarketingRevocationResult {
@@ -40,6 +42,7 @@ export async function requestMarketingRevocation(
         "Content-Type": "application/json",
         apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        ...(input.idempotencyKey ? { "Idempotency-Key": input.idempotencyKey } : {}),
       },
       body: JSON.stringify({
         reference: input.reference,

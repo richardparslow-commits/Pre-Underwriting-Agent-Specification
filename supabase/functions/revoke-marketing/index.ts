@@ -16,6 +16,10 @@
  * the intake endpoint, plus an 8 KiB byte cap. It does not use the questionnaire
  * launch lock: a customer must be able to withdraw marketing consent even while
  * new intake is paused.
+ *
+ * The browser sends an `Idempotency-Key` per form attempt. The server hashes it
+ * to the RPC request id, so a retry cannot create duplicate revocation evidence
+ * or re-open an outbox row that the vendor worker already marked synced.
  */
 
 import {
@@ -31,6 +35,7 @@ const RATE_LIMIT = 5;
 const RATE_WINDOW_SECONDS = 10 * 60;
 const REFERENCE_PATTERN = /^LPP-\d{4}-[0-9A-Z]{6,12}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._:-]{8,128}$/;
 
 interface RevocationInput {
   reference: string;
@@ -60,6 +65,23 @@ function optionalString(value: unknown): string | null {
   if (value === undefined || value === null) return null;
   if (typeof value !== "string") return null;
   return value.trim();
+}
+
+/**
+ * Converts a caller idempotency key into the UUID stored on the revocation and
+ * outbox rows. A SHA-256 digest, with UUID version/variant bits, is stable for
+ * the same key and has no database round trip.
+ */
+export async function requestIdFromIdempotencyKey(key: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`marketing-revocation:${key}`),
+  );
+  const bytes = new Uint8Array(digest).slice(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 export function validateRevocation(body: unknown): ValidationResult {
@@ -138,7 +160,8 @@ function corsPreflight(origin: string): Response {
     headers: {
       "Access-Control-Allow-Origin": origin,
       "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+      "Access-Control-Allow-Headers":
+        "authorization, x-client-info, apikey, content-type, idempotency-key",
       "Access-Control-Max-Age": "600",
       Vary: "Origin",
       "Cache-Control": "no-store",
@@ -177,6 +200,22 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: validation.error }, 400, origin);
   }
 
+  const idempotencyHeader = req.headers.get("idempotency-key");
+  let idempotencyKey: string;
+  if (idempotencyHeader !== null) {
+    const trimmed = idempotencyHeader.trim();
+    if (!IDEMPOTENCY_KEY_PATTERN.test(trimmed)) {
+      return jsonResponse({ error: "Invalid idempotency key." }, 400, origin);
+    }
+    idempotencyKey = trimmed;
+  } else {
+    // Older cached clients do not send the header. A stable body-derived key
+    // still makes their retries replay-safe without making the header a hard
+    // breaking change.
+    idempotencyKey = `body:${validation.value.reference}:${validation.value.phone ?? ""}:${validation.value.email ?? ""}`;
+  }
+  const requestId = await requestIdFromIdempotencyKey(idempotencyKey);
+
   // Validate before spending a rate-limit slot: a malformed request should not
   // let an attacker exhaust a real customer's revocation attempts.
   const durableLimited = await durableRateLimited(req);
@@ -206,7 +245,7 @@ Deno.serve(async (req: Request) => {
       p_email: validation.value.email,
       p_reason: validation.value.reason,
       p_source: "customer_web",
-      p_request_id: crypto.randomUUID(),
+      p_request_id: requestId,
     });
 
     if (error) {

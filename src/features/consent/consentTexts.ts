@@ -18,7 +18,7 @@ import {
 export const CONSENT_VERSION = "2026-10-b";
 export const DISCLOSURE_VERSION = "2026-10-b";
 
-export const PRIVACY_PRACTICES_VERSION = "2026-10-a";
+export const PRIVACY_PRACTICES_VERSION = "2026-10-b";
 
 /** Marketing labels and selection types are defined with the pure builder. */
 export { MARKETING_CALL_LABEL, MARKETING_TEXT_LABEL } from "./marketingConsent";

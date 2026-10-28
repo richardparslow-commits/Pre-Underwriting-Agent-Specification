@@ -55,7 +55,9 @@ A match writes:
 - `marketing_revocations` — an audit row with `source = 'customer_web'` and the request id;
 - `marketing_suppression_sync` — a pending row for vendor/CRM propagation.
 
-A phone suppression covers both marketing calls and texts to that number. The revocation does not edit the case payload, its consent evidence or the review. The reviewer case view loads the append-only revocation rows and marks the original marketing consent as revoked.
+Only the matching contact details supplied in the request are suppressed: an email-only request does not suppress a phone number, and the form now states that limitation. A matching phone suppression covers both marketing calls and texts to that number. Product and counsel must approve the intended withdrawal scope, and vendor propagation must be verified before marketing is enabled. The revocation does not edit the case payload, its consent evidence or the review. The reviewer case view loads the append-only revocation rows and marks the original marketing consent as revoked.
+
+A repeated request with the same `Idempotency-Key` (or a body-derived key from an older client) hashes to the same request id. Migration `0008` treats an existing request id plus suppression and outbox row as a replay: it returns the recorded channel without updating the suppression, so a synced outbox row cannot be reset to pending. A genuinely new request id is still allowed to re-queue propagation.
 
 ### Operator path
 
@@ -71,13 +73,23 @@ select public.is_contact_suppressed('phone', '+15125550134');
 
 ### Outbound send guard
 
-Every future marketing sender must call this immediately before an outbound attempt:
+Every future marketing sender must call `sendMarketingMessage` in `supabase/functions/_shared/marketing-sender.ts`. It is the only approved path to a provider callback and checks, in order:
 
-```sql
-select public.assert_marketing_send_allowed('phone', '+15125550134');
+1. `MARKETING_LICENSED_STATES` contains the stored case's state. The list is empty by default, so every send is refused.
+2. For `phone`, every time zone in that state is inside `MARKETING_CALLING_START_HOUR` (default `8`) and before `MARKETING_CALLING_END_HOUR` (default `21`). A multi-zone state must be inside the window in every zone. Email has no calling-hours restriction, but still requires an approved state.
+3. The database `assert_marketing_send_allowed` guard. It raises `Contact is suppressed for marketing` when the contact is on the list.
+
+Only after all three pass does the wrapper invoke the injected provider adapter. There is no provider adapter in this repository, and no channel is enabled.
+
+The SQL guard remains the canonical suppression check; a sender must not query the suppression table itself and drift from its normalisation. The state/time policy is server-side TypeScript, not a database rule, so a sender that bypasses `sendMarketingMessage` bypasses it. `npm run check:marketing` fails if the wrapper stops checking policy and suppression before `deliver`.
+
+The state comes from the stored case, never the browser's `timeZone` field. The wrapper trusts the `state` argument, so its caller must read it from the stored case row; passing a browser-supplied value defeats the policy. For a state that spans zones, the conservative all-zones rule can refuse a contact who is inside the window in their own zone. That is deliberate until counsel approves a contact-level time-zone source. Do not set `MARKETING_LICENSED_STATES` merely to make a test pass; record the approved state matrix and calling window first.
+
+```bash
+MARKETING_LICENSED_STATES=TX
+MARKETING_CALLING_START_HOUR=8
+MARKETING_CALLING_END_HOUR=21
 ```
-
-It raises `Contact is suppressed for marketing` when the contact is on the list. The service-role-only guard is the only authorised pre-send check; a sender that queries the suppression table itself can drift from the canonical normalisation.
 
 ### Vendor propagation
 
@@ -103,21 +115,21 @@ Rows stay `pending` or `failed` until the worker records success. Do not enable 
 
 ### Before enabling a channel
 
-1. Obtain counsel approval for the seller, disclosure, channel and revocation wording.
-2. Connect the outbound sender to `assert_marketing_send_allowed` and test a blocked send.
+1. Obtain counsel approval for the seller, disclosure, channel, state matrix, calling window and revocation wording.
+2. Connect the outbound sender through `sendMarketingMessage`; do not call the provider directly. Test a blocked suppression and a send outside the window.
 3. Configure `MARKETING_SUPPRESSION_WEBHOOK_URL` and its secret, run the worker, and confirm every suppression leaves `pending`.
-4. Implement local-time and licensed-state restrictions in the sender; this repository does not yet enforce them.
+4. Set and record the approved `MARKETING_LICENSED_STATES` and calling window. Leave the list empty until each state is approved; the default refuses every send.
 5. Implement and test the live STOP/withdrawal intake with the vendor.
-6. Re-run the consent and revocation regression tests, then add a live non-customer STOP test.
+6. Re-run the consent, revocation, policy and sender regression tests, then add a live non-customer STOP test.
 
 ## Deployment checklist
 
-- [ ] Apply migrations 0001–0007 and record the applied versions. **Staging:** 0001–0005 applied and verified on 28 Oct 2026; 0006 (terminal notification state) and 0007 (marketing revocation) are pending. **Production:** not applied.
+- [ ] Apply migrations 0001–0009 and record the applied versions. **Staging:** 0001–0005 applied and verified on 28 Oct 2026; 0006 (terminal notification state), 0007 (marketing revocation), 0008 (revocation replay safety) and 0009 (audited case reads) have no hosted application evidence. **Production:** not verified. Deploy the matching portal code and migration together; verify AAL1/AAL2, non-reviewer and direct REST denial, and logging failure with labelled data.
 - [ ] Keep `QUESTIONNAIRE_APPROVED=false` until 0/92 rows become 92/92 signed off.
 - [ ] Set `RATE_LIMIT_SALT` to a random value and confirm the durable limiter is active; without it production returns 503 (fail closed). Only `ENVIRONMENT=test` uses the in-memory guard.
 - [ ] Store `project_url` and `cron_secret` in Vault, apply `supabase/ops/retry-schedule.sql`, and verify one scheduler tick.
-- [ ] Deploy `revoke-marketing` and `sync-marketing-suppressions` with `verify_jwt = false`, then submit one labelled opt-out and confirm the suppression and outbox rows.
-- [ ] Configure `EMAIL_WEBHOOK_SECRET` with the provider's `whsec_…` secret and send one signed test event.
+- [ ] Deploy `revoke-marketing` and `sync-marketing-suppressions` with `verify_jwt = false`, then submit one labelled opt-out twice with the same `Idempotency-Key` and confirm one audit row and one outbox state; use a new key to confirm propagation re-queues.
+- [ ] Configure `EMAIL_WEBHOOK_SECRET` with the provider's `whsec_…` secret and test a signed unmatched event arriving before message-id correlation: verify the 503 triggers provider retry and eventual correlation. Verify the provider retry horizon and the separate 24-hour idempotency versus seven-day retry risk.
 - [ ] Configure `MARKETING_SUPPRESSION_WEBHOOK_URL` and its secret, then run one suppression-sync tick against a non-customer test address and confirm the row leaves `pending`.
 - [ ] Confirm reviewer MFA enrolment and an aal1 → aal2 step-up on a non-customer account.
 - [ ] Decide and record `retention_months`, backup expiry and the incident contact path.

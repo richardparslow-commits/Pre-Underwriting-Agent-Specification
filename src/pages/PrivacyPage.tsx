@@ -6,7 +6,7 @@ import { PRIVACY_PRACTICES_VERSION } from "@/features/consent/consentTexts";
 const SECTIONS = [
   {
     title: "What this interview collects",
-    body: "Contact details you enter (name, state, email, and a telephone number only if you choose a call or text), the answers you give to the interview, optional coverage details, and the consent choices you make. We do not collect Social Security numbers, payment card details, passport, visa or green-card numbers, identity-document scans, or information about family members.",
+    body: "Contact details you enter (name, state, email, and a telephone number only if you choose a call or text), the answers you give to the interview, optional coverage details, and the consent choices you make. The interview also asks about certain family medical history, such as a parent's or sibling's condition and age. We do not collect Social Security numbers, payment card details, passport, visa or green-card numbers, identity-document scans, or unrelated family identifiers.",
   },
   {
     title: "Why it is collected",
@@ -18,7 +18,7 @@ const SECTIONS = [
   },
   {
     title: "Marketing choices",
-    body: `Marketing calls and texts are optional and are never required to submit. You can withdraw at any time using the marketing opt-out page or by emailing ${SITE.reviewerEmail}. A withdrawal stops future marketing and does not affect your requested review.`,
+    body: `Marketing calls and texts are optional and are never required to submit. You can withdraw at any time using the marketing opt-out page or by emailing ${SITE.reviewerEmail}. The opt-out form suppresses matching contact details only: provide your telephone number to stop calls and texts to that number. A withdrawal does not affect your requested review.`,
   },
   {
     title: "Who reads it",
