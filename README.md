@@ -96,6 +96,7 @@ supabase/
   migrations/0001_pre_underwriting.sql
   migrations/0002_case_corrections.sql
   migrations/0003_reliability_and_access.sql
+  migrations/0004_reviewer_write_paths.sql
   ops/retry-schedule.sql         operator-applied pg_cron schedule
   functions/submit-case/         public intake, server-generated reference
   functions/_shared/case.ts      validation, byte cap, rate limit, service client
@@ -111,6 +112,7 @@ scripts/check-bank.ts            launch-gate bank + reconciliation check
 scripts/check-server-bank.ts     fails if the server bank drifts
 scripts/check-server-policy.ts   fails if consent wording drifts
 scripts/check-docs.ts            fails on stale counts/claims
+scripts/check-db.mjs             isolated PGlite RLS and delivery-event checks
 scripts/report-reconciliation.ts regenerates the reconciliation report
 docs/question-bank-reconciliation.md  every row's flags and required decision
 docs/LAUNCH-GATES.md             acceptance-test mapping and remaining work
@@ -184,7 +186,9 @@ is stored as evidence. Medical-record release is **not** collected in this intak
 - `cases` has RLS enabled with `anon` fully revoked; reviewers authenticate with
   Supabase Auth, must exist in `public.reviewers`, and must have an AAL2 (MFA)
   session. The portal also refuses an aal1 session, so a stolen password alone
-  cannot read cases. Every read is checked.
+  cannot read cases. Every read is checked. Workflow status and review-log
+  writes are RPC-only after `0004_reviewer_write_paths.sql`; an AAL2 reviewer
+  cannot update `cases.status` or insert audit evidence directly.
 - Health answers are kept out of URLs, analytics, logs, error echoes and the
   notification email. The email contains only a reference, timestamp and portal
   link.
@@ -198,13 +202,14 @@ is stored as evidence. Medical-record release is **not** collected in this intak
 
 In Supabase (or Lovable Cloud) run the migrations in order:
 [`0001_pre_underwriting.sql`](supabase/migrations/0001_pre_underwriting.sql),
-[`0002_case_corrections.sql`](supabase/migrations/0002_case_corrections.sql) and
-[`0003_reliability_and_access.sql`](supabase/migrations/0003_reliability_and_access.sql).
+[`0002_case_corrections.sql`](supabase/migrations/0002_case_corrections.sql),
+[`0003_reliability_and_access.sql`](supabase/migrations/0003_reliability_and_access.sql) and
+[`0004_reviewer_write_paths.sql`](supabase/migrations/0004_reviewer_write_paths.sql).
 They create the reviewer allowlist, immutable cases, review log, corrections,
 suppressions, idempotency, notification leases, delivery-event dedupe, durable
-rate limiting, AAL2 reviewer policies, audited deletion and the opt-in retention
-job. Do not stop after 0001: the portal's correction action needs 0002 and the
-reliability controls need 0003.
+rate limiting, AAL2 reviewer policies, RPC-only reviewer writes, audited deletion
+and the opt-in retention job. Do not stop after 0001: the portal's correction
+action needs 0002 and the reliability controls need 0003 and 0004.
 
 ### 2. Create the reviewer
 
@@ -357,26 +362,30 @@ is the reviewer's signature in the report.
   questions, driving its separate 24-month, 5-year and ever questions, and the
   newly added rows branched only where the source branches (solo climbing,
   salvage diving, bankruptcy discharge date, military mission type).
-- `deno test --allow-env --lock=deno.lock supabase/functions/tests/` — 32 tests:
+- `deno test --allow-env --lock=deno.lock supabase/functions/tests/` — 35 tests:
   handler-level launch lock, required consent and byte-cap checks; canonical
-  snapshot/consent/crisis/age/branch rejection tests; and Svix signature tests
-  for valid, replayed, tampered and rotating-key events. This runs in CI with
-  Deno 2.
+  snapshot/consent/crisis/age/branch rejection tests; phone/text contact rules;
+  and Svix signature tests for valid, replayed, tampered and rotating-key events.
+  This runs in CI with Deno 2.
 - `npm run test:consent` — 7 tests over the pure consent builder: only enabled
   marketing channels produce a record, each enabled channel appears once, an
   unchecked box is stored as `granted: false` with no timestamp, and a blank or
   bracketed placeholder seller produces no marketing record or disclosure. CI
   runs it with Node's test runner through `tsx`.
-- `npm run test:engine` — 6 tests over branch pruning, payload integrity, blank
-  answers and current-crisis behaviour.
+- `npm run test:engine` — 7 tests over recursive branch pruning, payload
+  integrity, blank answers and current-crisis behaviour.
+- `npm run test:validation` — 5 tests over the lead form's contact rules,
+  including phone/text requirements and normalisation.
 - `npm run check:server-bank` and `npm run check:server-policy` — fail if the
   server’s canonical bank or consent wording drifts from the client source.
 - `npm run report:reconciliation` — regenerates the review document from the
   data (92 rows, 28 gaps).
-- Isolated PostgreSQL (PGlite) replay of migrations 0001–0003, including AAL2
-  denial, opened-log dedupe, immutable triage columns, duplicate idempotency key
-  rejection, notification claim races, monotonic delivery events, durable rate
-  limits, revocation, retention and audited deletion — 0 failures.- **Not run during this remediation:** a fresh browser walkthrough of the
+- `npm run check:db` — isolated PostgreSQL (PGlite) replay of migrations
+  0001–0004, including AAL2 denial, RPC-only reviewer writes, opened-log dedupe,
+  immutable triage columns, duplicate idempotency key rejection, notification
+  claim races, monotonic delivery events, unmatched-event retry, durable rate
+  limits, revocation, retention and audited deletion — 0 failures.
+- **Not run during this remediation:** a fresh browser walkthrough of the
   changed screens. The manual script is in [docs/LAUNCH-GATES.md](docs/LAUNCH-GATES.md);
   earlier preview-mode observations are not treated as evidence for these edits.
 - **Not run:** the functions against a live Supabase project, real email

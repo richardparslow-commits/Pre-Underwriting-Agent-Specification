@@ -17,6 +17,8 @@
     "generate:server-policy": "tsx scripts/generate-server-policy.ts",
     "test:consent": "tsx --test src/features/consent/marketingConsent.test.ts",
     "test:engine": "tsx --test src/features/interview/engine.test.ts",
+    "test:validation": "tsx --test src/features/intake/validation.test.ts",
+    "check:db": "node scripts/check-db.mjs",
     "report:reconciliation": "tsx scripts/report-reconciliation.ts"
   },
   "dependencies": {
@@ -31,6 +33,7 @@
     "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.3.14",
     "@types/node": "^22.10.2",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",

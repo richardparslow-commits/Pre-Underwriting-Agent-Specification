@@ -13,6 +13,8 @@ This file is the entry point for the preserved audit corpus. It records what was
 
 The current state of the repository is described by **A4**. A1–A3 are historical evidence at the earlier baseline and must not be read as current status. [`MASTER-ISSUE-LIST.md`](MASTER-ISSUE-LIST.md) is a 24-finding consolidation at the earlier baseline; it does not include A4's new findings F-03, F-05, F-09, F-10, F-11 or F-12, or the reopened nested case under M-05.
 
+[`2026-10-27-spec-remediation/`](2026-10-27-spec-remediation/) is not another audit. It records the code changes and verification logs produced after A4 while following the product specification. It links the fixed local controls and the gates that remain blocked.
+
 ## What each package contains
 
 - **A1:** full 18-finding report, issue register in Markdown/JSON/CSV, questionnaire matrix and reconciliation decisions.

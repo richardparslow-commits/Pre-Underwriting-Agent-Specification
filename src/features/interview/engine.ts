@@ -244,21 +244,29 @@ export function crisisDisclosed(answers: Answers): boolean {
  * portal. Held rows are never pruned because they are not branch answers.
  */
 export function pruneBranchClosedAnswers(answers: Answers): Answers {
-  const visible = new Set(visibleQuestions(answers).map((question) => question.id));
-  const next: Answers = {};
-  let changed = false;
+  let current = answers;
 
-  for (const [questionId, answer] of Object.entries(answers)) {
-    const question = ORDERED_QUESTIONS.find((candidate) => candidate.id === questionId);
-    if (!question) continue;
-    if (question.askWhen && !visible.has(questionId)) {
-      changed = true;
-      continue;
+  // Removing a direct child can make a grandchild unreachable only on the next
+  // pass. Keep recomputing visibility until no answer is removed, so a stale
+  // nested answer cannot reappear if the customer later reopens the branch.
+  for (;;) {
+    const visible = new Set(visibleQuestions(current).map((question) => question.id));
+    const next: Answers = {};
+    let changed = false;
+
+    for (const [questionId, answer] of Object.entries(current)) {
+      const question = ORDERED_QUESTIONS.find((candidate) => candidate.id === questionId);
+      if (!question) continue;
+      if (question.askWhen && !visible.has(questionId)) {
+        changed = true;
+        continue;
+      }
+      next[questionId] = answer;
     }
-    next[questionId] = answer;
-  }
 
-  return changed ? next : answers;
+    if (!changed) return current;
+    current = next;
+  }
 }
 
 export function unansweredQuestions(answers: Answers): Question[] {
