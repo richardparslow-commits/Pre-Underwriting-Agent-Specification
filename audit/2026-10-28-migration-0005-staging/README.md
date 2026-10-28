@@ -2,7 +2,7 @@
 
 **Date:** 28 October 2026
 **Target:** Supabase project `mndgqpoxfupiuqlojpoe`, session pooler `aws-0-us-east-1.pooler.supabase.com`
-**Status:** `0005` was already applied; the hosted view and its RLS boundary are verified. A live AAL2 HTTP queue response was not captured because the project has no reviewer identity and Auth test-user creation was blocked.
+**Status:** `0005` was already applied; the hosted view, its RLS boundary, and the live AAL2 HTTP queue response are verified with a labelled temporary reviewer. No production migration or launch approval is claimed.
 **Scope:** This is staging evidence only. It is not a production migration, a launch approval, or a legal/clinical/compliance approval.
 
 ## 1. Migration state
@@ -35,7 +35,7 @@ Local  | Remote
 | AAL2 reviewer role (temporary, rolled back) | **1** summary; `unanswered = 1` |
 | Cleanup | 0 cases, 0 reviewers, 0 temporary auth users |
 
-The AAL1/AAL2 proof used a temporary auth user, reviewer allowlist row and labelled case inside one database transaction, then rolled back. It exercised the real hosted RLS policy and `security_invoker` view, but it did not use a GoTrue-issued JWT.
+The AAL1/AAL2 role proof used a temporary auth user, reviewer allowlist row and labelled case inside one database transaction, then rolled back. It exercised the real hosted RLS policy and `security_invoker` view, but it did not use a GoTrue-issued JWT. Section 3 records the separate GoTrue password + TOTP HTTP proof.
 
 ## 3. Live HTTP queue check
 
@@ -48,19 +48,30 @@ first_name, last_name, residence_state, unanswered
 
 The deployed view has no payload or answer columns, so this query cannot return them. Anonymous REST access is already denied with `42501`.
 
-A live AAL2 HTTP response was **not** captured. The project had zero reviewers and zero auth users. Creating a test identity through the supported sign-up endpoint was rejected for reserved domains and then hit the project’s email sign-up rate limit; hand-built Auth rows produced a GoTrue `500`. This is a missing test identity, not a failure of `0005`. Do not report the live HTTP reviewer queue as verified until a real reviewer account completes TOTP and the 200 response is captured.
+A live AAL2 HTTP response **was captured** on 28 October 2026 with a labelled temporary reviewer, a reviewer allowlist row and one labelled case. The flow was:
+
+1. password grant returned `200` and an `aal1` access token;
+2. TOTP factor enrolment returned `200` with a secret;
+3. `POST /auth/v1/factors/{id}/challenge` returned `200`;
+4. `POST /auth/v1/factors/{id}/verify` returned `200` and an `aal2` access token;
+5. `GET /rest/v1/case_summaries` with the exact client select returned `200`, **1 row**, the exact nine summary keys and `unanswered = 1`;
+6. the AAL1 token returned `200` with **0 rows**;
+7. `select=payload` returned `400` with `42703`;
+8. an anonymous request returned `401`.
+
+The temporary Auth row was provisioned directly because the supported sign-up endpoint was rate-limited on confirmation email; the password grant and TOTP challenge/verify were genuine GoTrue flows. The temporary user and case were deleted; the final counts are zero. Raw output: [`http-queue-verification.log`](http-queue-verification.log).
 
 ## 4. Cleanup and credential handling
 
 All temporary rows were rolled back or deleted; the final counts are zero. No case, auth user or reviewer remains.
 
-The database password supplied in chat was used for this verification. It was already exposed in chat and **must be rotated**. It is not written to this package, any tracked file, or the verification log; the log redacts connection URLs. No access token, publishable key or MFA secret is stored in this package.
+The database password supplied in chat was used for this verification. It was already exposed in chat and **must be rotated**. It is not written to this package, any tracked file, or either verification log; the logs redact connection URLs and print no access token, publishable key or MFA secret.
 
 ## 5. Remaining actions
 
-1. Create a real reviewer in Auth, add the `reviewers` row, enrol TOTP, and capture an AAL2 `GET /rest/v1/case_summaries` response with exactly the nine summary keys.
+1. Enrol a real staff reviewer (the hosted test used a labelled temporary account) and repeat the AAL2 queue check.
 2. Rebuild and deploy the client, then verify the portal queue network response.
 3. Apply `0001`–`0005` to production only after separate approval; do not treat this staging result as production evidence.
 4. Rotate the chat-supplied database password.
 
-Raw command output: [`verification.log`](verification.log).
+Raw command output: [`verification.log`](verification.log) and [`http-queue-verification.log`](http-queue-verification.log).
