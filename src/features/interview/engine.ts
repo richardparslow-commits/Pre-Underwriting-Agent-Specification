@@ -292,7 +292,6 @@ export function toSubmittedAnswers(answers: Answers): SubmittedAnswer[] {
       timeframe: question.timeframe,
       status: question.status,
       reviewStatus: question.reviewStatus,
-      reviewNote: question.reviewNote,
       sensitive: question.sensitive ? true : undefined,
       disposition,
       answerState:

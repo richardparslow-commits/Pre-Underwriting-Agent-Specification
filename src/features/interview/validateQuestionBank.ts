@@ -35,13 +35,16 @@ export function validateQuestionBank(bank: Question[] = QUESTION_BANK): string[]
       issues.push(`${question.id}: unknown section "${question.section}"`);
     }
 
-    if (question.reviewStatus === "human_review_required" && !question.reviewNote) {
-      issues.push(`${question.id}: held-for-review question needs a reviewNote`);
+    // Reviewer rationale is server-only. Keeping it off the public row is the
+    // invariant that stops it being bundled again; the server-bank generator
+    // attaches it from reviewNotes.server.ts.
+    if (Object.prototype.hasOwnProperty.call(question, "reviewNote")) {
+      issues.push(`${question.id}: reviewNote must not be present on the public question row`);
     }
 
     // Held rows are never rendered. Their customer label must not name the
-    // withheld topic in the public bundle; the reviewer-facing reviewNote and
-    // the internal reconciliation record carry the detail.
+    // withheld topic in the public bundle; the internal reconciliation record
+    // carries the reviewer detail.
     if (question.reviewStatus === "human_review_required") {
       const label = question.customerText.toLowerCase();
       for (const term of [

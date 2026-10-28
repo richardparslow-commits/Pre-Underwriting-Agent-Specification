@@ -13,6 +13,7 @@ import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { QUESTION_BANK } from "../src/features/interview/questionBank";
+import { REVIEW_NOTES } from "../src/features/interview/reviewNotes.server";
 import { sourceTextFor } from "../src/features/interview/sourceText";
 import { QUESTIONNAIRE_VERSION } from "../src/features/interview/types";
 
@@ -20,6 +21,21 @@ const here = dirname(fileURLToPath(import.meta.url));
 const target = resolve(here, "../supabase/functions/_shared/bank.generated.ts");
 
 export function renderServerBank(): string {
+  const held = QUESTION_BANK.filter(
+    (question) => question.reviewStatus === "human_review_required",
+  );
+  const missingNotes = held.filter((question) => !REVIEW_NOTES[question.id]);
+  const orphanNotes = Object.keys(REVIEW_NOTES).filter(
+    (questionId) => !held.some((question) => question.id === questionId),
+  );
+  if (missingNotes.length > 0 || orphanNotes.length > 0) {
+    throw new Error(
+      `Reviewer note map does not match the held rows: missing=[${missingNotes
+        .map((question) => question.id)
+        .join(", ")}], orphaned=[${orphanNotes.join(", ")}]`,
+    );
+  }
+
   const rows = QUESTION_BANK.map((question) => ({
     id: question.id,
     section: question.section,
@@ -31,7 +47,7 @@ export function renderServerBank(): string {
     compound: question.compound === true,
     status: question.status,
     reviewStatus: question.reviewStatus,
-    reviewNote: question.reviewNote ?? null,
+    reviewNote: REVIEW_NOTES[question.id] ?? null,
     sensitive: question.sensitive === true,
     crisisFollowUp: question.crisisFollowUp === true,
     askWhen: question.askWhen
@@ -55,7 +71,8 @@ export function renderServerBank(): string {
 
   return `/**
  * GENERATED FILE — do not edit by hand.
- * Source: src/features/interview/questionBank.ts
+ * Sources: src/features/interview/questionBank.ts and
+ *          src/features/interview/reviewNotes.server.ts
  * Regenerate: npm run generate:server-bank
  */
 export const QUESTIONNAIRE_VERSION = ${JSON.stringify(QUESTIONNAIRE_VERSION)} as const;

@@ -37,8 +37,8 @@ be imported, edited and deployed from Lovable without restructuring.
    injects `VITE_SUPABASE_URL` and the publishable key).
 2. Open the Supabase SQL editor and run, in order,
    `supabase/migrations/0001_pre_underwriting.sql`,
-   `0002_case_corrections.sql`, `0003_reliability_and_access.sql` and
-   `0004_reviewer_write_paths.sql` top to bottom.
+   `0002_case_corrections.sql`, `0003_reliability_and_access.sql`,
+   `0004_reviewer_write_paths.sql` and `0005_case_summary_view.sql` top to bottom.
 3. Auth → Users: create the reviewer account, enrol MFA, then register it. An
    AAL2 session is required by the policies, not merely recommended:
 

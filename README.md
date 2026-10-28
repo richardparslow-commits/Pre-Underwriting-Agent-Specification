@@ -97,6 +97,7 @@ supabase/
   migrations/0002_case_corrections.sql
   migrations/0003_reliability_and_access.sql
   migrations/0004_reviewer_write_paths.sql
+  migrations/0005_case_summary_view.sql
   ops/retry-schedule.sql         operator-applied pg_cron schedule
   functions/submit-case/         public intake, server-generated reference
   functions/_shared/case.ts      validation, byte cap, rate limit, service client
@@ -188,7 +189,9 @@ is stored as evidence. Medical-record release is **not** collected in this intak
   session. The portal also refuses an aal1 session, so a stolen password alone
   cannot read cases. Every read is checked. Workflow status and review-log
   writes are RPC-only after `0004_reviewer_write_paths.sql`; an AAL2 reviewer
-  cannot update `cases.status` or insert audit evidence directly.
+  cannot update `cases.status` or insert audit evidence directly. The queue reads
+  the payload-free `case_summaries` view; the full case payload is loaded only
+  on the individual case path, where an `opened` entry is recorded.
 - Health answers are kept out of URLs, analytics, logs, error echoes and the
   notification email. The email contains only a reference, timestamp and portal
   link.
@@ -203,12 +206,14 @@ is stored as evidence. Medical-record release is **not** collected in this intak
 In Supabase (or Lovable Cloud) run the migrations in order:
 [`0001_pre_underwriting.sql`](supabase/migrations/0001_pre_underwriting.sql),
 [`0002_case_corrections.sql`](supabase/migrations/0002_case_corrections.sql),
-[`0003_reliability_and_access.sql`](supabase/migrations/0003_reliability_and_access.sql) and
-[`0004_reviewer_write_paths.sql`](supabase/migrations/0004_reviewer_write_paths.sql).
+[`0003_reliability_and_access.sql`](supabase/migrations/0003_reliability_and_access.sql),
+[`0004_reviewer_write_paths.sql`](supabase/migrations/0004_reviewer_write_paths.sql) and
+[`0005_case_summary_view.sql`](supabase/migrations/0005_case_summary_view.sql).
 They create the reviewer allowlist, immutable cases, review log, corrections,
 suppressions, idempotency, notification leases, delivery-event dedupe, durable
-rate limiting, AAL2 reviewer policies, RPC-only reviewer writes, audited deletion
-and the opt-in retention job. Do not stop after 0001: the portal's correction
+rate limiting, AAL2 reviewer policies, RPC-only reviewer writes, a payload-free
+queue summary view, audited deletion and the opt-in retention job. Do not stop
+after 0001: the portal's correction
 action needs 0002 and the reliability controls need 0003 and 0004.
 
 ### 2. Create the reviewer
@@ -381,8 +386,9 @@ is the reviewer's signature in the report.
   unchecked box is stored as `granted: false` with no timestamp, and a blank or
   bracketed placeholder seller produces no marketing record or disclosure. CI
   runs it with Node's test runner through `tsx`.
-- `npm run test:engine` — 7 tests over recursive branch pruning, payload
-  integrity, blank answers and current-crisis behaviour.
+- `npm run test:engine` — 8 tests over recursive branch pruning, payload
+  integrity, blank answers, current-crisis behaviour and the public-bank
+  invariant that reviewer notes are server-only.
 - `npm run test:validation` — 5 tests over the lead form's contact rules,
   including phone/text requirements and normalisation.
 - `npm run check:server-bank` and `npm run check:server-policy` — fail if the
@@ -390,10 +396,11 @@ is the reviewer's signature in the report.
 - `npm run report:reconciliation` — regenerates the review document from the
   data (92 rows, 28 gaps).
 - `npm run check:db` — isolated PostgreSQL (PGlite) replay of migrations
-  0001–0004, including AAL2 denial, RPC-only reviewer writes, opened-log dedupe,
-  immutable triage columns, duplicate idempotency key rejection, notification
-  claim races, monotonic delivery events, unmatched-event retry, durable rate
-  limits, revocation, retention and audited deletion — 0 failures.
+  0001–0005, including AAL2 denial, the payload-free queue summary, RPC-only
+  reviewer writes, opened-log dedupe, immutable triage columns, duplicate
+  idempotency key rejection, notification claim races, monotonic delivery
+  events, unmatched-event retry, durable rate limits, revocation, retention and
+  audited deletion — 0 failures.
 - **Not run during this remediation:** a fresh browser walkthrough of the
   changed screens. The manual script is in [docs/LAUNCH-GATES.md](docs/LAUNCH-GATES.md);
   earlier preview-mode observations are not treated as evidence for these edits.
