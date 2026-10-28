@@ -1,0 +1,17 @@
+ACCEPTED A6-P1 lead date of birth conflicts with ID-01 answer
+{"leadDob":"1980-01-01","id01":"2010-01-01"}
+ACCEPTED A6-P2 lead state conflicts with ID-03 answer
+{"leadState":"TX","id03":"CA"}
+ACCEPTED A6-P3 single-choice structured value conflicts with prose answerText
+{"answerValues":["citizen"],"answerText":"Lawful permanent resident"}
+ACCEPTED A6-P4 yes/no yes with no supplemental detail
+{"answerState":"yes","details":null}
+REJECTED A6-P5 marketing record supplied while server has no marketing policy -> Marketing consent is not enabled for this deployment
+REJECTED A6-P6 not_applicable disposition on an applicable row -> Not applicable is not approved for this questionnaire
+ACCEPTED A6-P7 current crisis yes with historical MH-04 declined
+{"crisisDisclosure":true,"flags":["crisis-disclosure","declined-items","held-for-review"]}
+ACCEPTED A6-P8 acknowledgement timestamp precedes both consents
+{"acknowledgement":"2026-10-28T08:27:35.024Z","consents":["2026-10-28T08:47:20.079Z","2026-10-28T08:47:20.079Z"]}
+REJECTED A6-P9 empty/blank answer text on a free-text row -> Incomplete answer record
+ACCEPTED A6-P10 client-asserted flags and crisisDisclosure are ignored
+{"crisisDisclosure":false,"flags":["held-for-review"]}

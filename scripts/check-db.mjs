@@ -301,6 +301,51 @@ await pass(
   (rows) => rows[0].apply_email_event === "duplicate",
 );
 
+// A late submit/retry completion can arrive after the provider webhook. The
+// completion path must not regress a delivered case or put it back in the
+// retry queue, and a genuine retry after failure must still be stored.
+await query(
+  `insert into public.cases (reference, questionnaire_version, notification_state, provider_message_id, payload)
+   values ('LPP-2026-LATE1','v','delivered','msg_late1','{}'::jsonb),
+          ('LPP-2026-LATE2','v','delivered','msg_late2','{}'::jsonb),
+          ('LPP-2026-RETRY1','v','failed',null,'{}'::jsonb)`,
+);
+await pass(
+  "late acceptance cannot regress a delivered case",
+  () => query("select public.complete_case_notification('LPP-2026-LATE1','accepted','late submit','msg_late1')"),
+  () => true,
+);
+await pass(
+  "the delivered case stays delivered",
+  () => query("select notification_state from public.cases where reference='LPP-2026-LATE1'"),
+  (rows) => rows[0].notification_state === "delivered",
+);
+await pass(
+  "late failure cannot regress a delivered case",
+  () => query("select public.complete_case_notification('LPP-2026-LATE2','failed','provider timeout',null)"),
+  () => true,
+);
+await pass(
+  "the delivered case is not re-queued",
+  () => query("select notification_state, notification_next_attempt_at from public.cases where reference='LPP-2026-LATE2'"),
+  (rows) => rows[0].notification_state === "delivered" && rows[0].notification_next_attempt_at === null,
+);
+await pass(
+  "a delivered case cannot be claimed for another send",
+  () => query("select * from public.claim_case_notification('LPP-2026-LATE2','retry-worker')"),
+  (rows) => rows.length === 0,
+);
+await pass(
+  "a genuine retry after failure can still record acceptance",
+  () => query("select public.complete_case_notification('LPP-2026-RETRY1','accepted','retry succeeded','msg_retry1')"),
+  () => true,
+);
+await pass(
+  "the retried case is accepted",
+  () => query("select notification_state from public.cases where reference='LPP-2026-RETRY1'"),
+  (rows) => rows[0].notification_state === "accepted",
+);
+
 // --------------------------------------------------------------- rate limit
 await pass("rate limit allows the first two", async () => {
   const a = await query("select public.consume_submission_rate('rate-key-00000001',2,600) allowed");

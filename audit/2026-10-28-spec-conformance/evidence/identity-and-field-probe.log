@@ -1,0 +1,4 @@
+ACCEPTED | lead DOB and ID-01 answer conflict | {"lead":"1980-01-01","answer":"2010-01-01"}
+ACCEPTED | lead state and ID-03 answer conflict | {"lead":"TX","answer":"CA"}
+ACCEPTED | single-choice field accepts an invented option on MH-02 | {"id":"MH-02","fields":[{"id":"condition","label":"Main condition","value":"invented-option-not-in-bank"}]}
+SKIP | no date field in the bank

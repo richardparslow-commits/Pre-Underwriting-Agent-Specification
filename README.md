@@ -25,7 +25,7 @@ service. The following are deliberate, visible gaps:
 | Legal wording (intake acknowledgment, TCPA disclosure) | Draft, pending counsel. `SITE.legalEntity` is supplied by `VITE_LEGAL_ENTITY`; marketing consent and the TCPA disclosure appear only when a seller and at least one channel are configured. `SITE.legalReviewPending` is `true`. |
 | Language-model explainer | **Not wired.** The interview engine is deterministic. `FEATURES.aiExplainerEnabled = false`, so the customer copy does not claim an AI assistant is active. |
 | Email notification | Implemented against Resend in a Supabase edge function; no provider key is configured here, so the UI reports `not_sent` honestly. |
-| Supabase deployment | Migration and functions are written but have not been run against a project from this workspace. |
+| Supabase deployment | Applied and exercised on a non-production staging project on 28 Oct 2026: migrations 0001–0005 and the edge functions were deployed and probed with labelled data. No production project, live provider delivery, scheduler run or retention execution exists yet. |
 | Retention / deletion job | Deletion and expiry functions are implemented in `0003_reliability_and_access.sql`; the schedule stays unset (`retention_months = null`) until counsel approves it. |
 | Carrier screening, quoting, rate classes | Intentionally absent. |
 
@@ -141,6 +141,14 @@ LOVABLE.md                       import and wiring instructions for Lovable
   a fresh acknowledgment and the explicit **“Submit for Richard’s Review”** action.
 - Completeness is reported honestly: “All applicable questions answered” and
   “N unanswered questions” are different states.
+- The server rejects a lead date of birth or state that contradicts `ID-01`/
+  `ID-03`, and a structured choice that contradicts its prose. It also derives
+  two reviewer flags: a Yes answer with no optional supplemental detail, and a
+  deterministic timeframe contradiction (a shorter window answered Yes while
+  the longer window that contains it is answered No, for `NIC-01`→`NIC-02`→
+  `NIC-03`, `DRV-01`→`DRV-02` and `AVI-01`→`AVI-02`). Clinical, occupation and
+  income contradictions are not guessed at by code; the reviewer resolves them,
+  and this intake asks no income question.
 - A current-crisis answer pauses the sales context, shows 988 / 911 support, and
   states plainly that the site does not monitor emergencies. The current-crisis
   question is asked of every customer, so declining or being unsure about the
@@ -228,9 +236,18 @@ where email = 'richardparslow@lifepolicypilot.blog'
 on conflict (user_id) do nothing;
 ```
 
-Enrol MFA on that account. Reviewing requires an AAL2 session: the portal refuses
-a password-only session, and every reviewer RLS policy independently requires
-`aal2`. A forwarded notification email grants nothing without that session.
+Create the account as an operator: `sendSignInLink` passes
+`shouldCreateUser: false` and `supabase/config.toml` sets `enable_signup = false`,
+so a magic link can never create an account. Mirror that in the hosted project
+(Authentication → Sign In / Providers → allow new users = off).
+
+Reviewing requires an AAL2 session. After the email link, `/portal` enrols a TOTP
+authenticator in-app when the account has none (QR code plus setup key), then
+challenges and verifies the six-digit code before it calls `listCases()`. The
+portal refuses a password-only session, and every reviewer RLS policy
+independently requires `aal2`. A forwarded notification email grants nothing
+without that session. If a reviewer loses the authenticator, an operator must
+remove the factor before a replacement can be enrolled.
 
 ### 3. Deploy the functions
 
@@ -375,12 +392,13 @@ is the reviewer's signature in the report.
   questions, driving its separate 24-month, 5-year and ever questions, and the
   newly added rows branched only where the source branches (solo climbing,
   salvage diving, bankruptcy discharge date, military mission type).
-- `deno test --allow-env --lock=deno.lock supabase/functions/tests/` — 36 tests:
+- `deno test --allow-env --lock=deno.lock supabase/functions/tests/` — 46 tests:
   handler-level launch lock, required consent, fail-closed rate limiting and
   byte-cap checks; canonical snapshot/consent/crisis/age/branch rejection tests;
-  phone/text contact rules; and Svix signature tests for valid, replayed,
-  tampered and rotating-key events.
-  This runs in CI with Deno 2.
+  identity cross-checks (lead date of birth and state versus `ID-01`/`ID-03`),
+  structured-value/prose agreement, acknowledgement ordering, detail and
+  timeframe flags, phone/text contact rules; and Svix signature tests for valid,
+  replayed, tampered and rotating-key events. This runs in CI with Deno 2.
 - `npm run test:consent` — 7 tests over the pure consent builder: only enabled
   marketing channels produce a record, each enabled channel appears once, an
   unchecked box is stored as `granted: false` with no timestamp, and a blank or
@@ -393,6 +411,10 @@ is the reviewer's signature in the report.
   including phone/text requirements and normalisation.
 - `npm run check:server-bank` and `npm run check:server-policy` — fail if the
   server’s canonical bank or consent wording drifts from the client source.
+- `npm run check:portal` — fails if the portal loses in-app TOTP
+  enrolment/challenge/verify, if a magic link can create an account, if
+  self-service sign-up is re-enabled in config, or if the reviewer queue stops
+  paginating with an exact count.
 - `npm run report:reconciliation` — regenerates the review document from the
   data (92 rows, 28 gaps).
 - `npm run check:db` — isolated PostgreSQL (PGlite) replay of migrations
@@ -405,7 +427,8 @@ is the reviewer's signature in the report.
   changed screens. The manual script is in [docs/LAUNCH-GATES.md](docs/LAUNCH-GATES.md);
   earlier preview-mode observations are not treated as evidence for these edits.
 - **Not run:** the functions against a live Supabase project, real email
-  delivery or inbox receipt, live MFA step-up, provider signature
+  delivery or inbox receipt, in-app TOTP enrolment/step-up with a real staff
+  account, provider signature
   compatibility, cron execution, backups, retention execution or a production
   accessibility/load pass. The isolated PGlite replay is not a hosted-database
   verification. A separate hosted check of migration 0005's view and AAL1/AAL2

@@ -1,0 +1,8 @@
+{
+  "consentIds": [
+    "intake_permission:true",
+    "privacy_acknowledgement:true",
+    "marketing_call:false"
+  ],
+  "result": "REJECTED: Marketing consent is not enabled for this deployment"
+}

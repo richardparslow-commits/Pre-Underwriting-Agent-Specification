@@ -243,9 +243,28 @@ set search_path = public
 as $$
 declare
   v_retry timestamptz;
+  v_current text;
 begin
   if p_state not in ('not_sent', 'queued', 'accepted', 'delivered', 'failed') then
     raise exception 'Unsupported notification state';
+  end if;
+
+  select c.notification_state
+  into v_current
+  from public.cases c
+  where c.reference = p_reference
+  for update;
+
+  if not found then
+    return;
+  end if;
+
+  -- Delivered is terminal. A submit or retry call can finish after the
+  -- provider webhook has already recorded delivery; its own result must not
+  -- overwrite that evidence or clear the case back into the retry queue. This
+  -- guard is the completion-path counterpart to apply_email_event().
+  if v_current = 'delivered' then
+    return;
   end if;
 
   v_retry := case

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/form";
 import { Alert, Badge } from "@/components/ui/surface";
 import { SITE } from "@/config/site";
+import { MfaGate } from "@/features/portal/MfaGate";
 import { useReviewerAuth } from "@/features/portal/useReviewerAuth";
 import { listCases, type CaseListItem } from "@/lib/api";
 import type { CaseStatus, NotificationState } from "@/features/interview/types";
@@ -102,8 +103,9 @@ function SignInCard({ auth }: { auth: ReturnType<typeof useReviewerAuth> }) {
 
         <p className="mt-6 border-t border-border pt-4 text-[0.7rem] leading-relaxed text-muted-foreground">
           Multifactor authentication is required: the portal refuses an aal1 session and every
-          reviewer policy independently requires an aal2 session. Every case request is also
-          authorised against the reviewer allowlist on the server.
+          reviewer policy independently requires an aal2 session. After the email link, this page
+          walks you through an authenticator app if you have not enrolled one yet. Every case
+          request is also authorised against the reviewer allowlist on the server.
         </p>
       </div>
     </div>
@@ -113,18 +115,27 @@ function SignInCard({ auth }: { auth: ReturnType<typeof useReviewerAuth> }) {
 export default function PortalPage() {
   const auth = useReviewerAuth();
   const [cases, setCases] = useState<CaseListItem[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (cursor?: string) => {
+    const appending = Boolean(cursor);
+    if (appending) setLoadingMore(true);
+    else setLoading(true);
     setError(null);
     try {
-      setCases(await listCases());
+      const page = await listCases(cursor);
+      setCases((current) => (appending ? [...(current ?? []), ...page.items] : page.items));
+      setTotal(page.total);
+      setNextCursor(page.nextCursor);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Cases could not be loaded.");
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, []);
 
@@ -145,26 +156,11 @@ export default function PortalPage() {
 
   if (auth.needsMfa && !auth.previewMode) {
     return (
-      <div className="container max-w-md py-16">
-        <div className="panel p-7">
-          <Badge tone="warn">MFA required</Badge>
-          <h1 className="mt-4 text-2xl leading-snug">Step up your session</h1>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            You are signed in as {auth.email ?? "a reviewer"}, but this session has not completed
-            multifactor authentication. Case data is not available until you verify a second factor.
-            Enrol an authenticator in your account security settings, then sign in again and complete
-            the challenge.
-          </p>
-          <Alert tone="warn" className="mt-4">
-            A password-only session cannot read cases. This is enforced in the portal and in every
-            row-level security policy.
-          </Alert>
-          <Button variant="outline" className="mt-5" onClick={() => void auth.leave()}>
-            <LogOut aria-hidden />
-            Sign out and try again
-          </Button>
-        </div>
-      </div>
+      <MfaGate
+        email={auth.email}
+        onVerified={() => void auth.refreshAssurance()}
+        onLeave={() => void auth.leave()}
+      />
     );
   }
 
@@ -203,12 +199,12 @@ export default function PortalPage() {
           <p className="eyebrow">Reviewer portal</p>
           <h1 className="mt-2 text-3xl leading-tight sm:text-4xl">Case queue</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Signed in as {auth.email ?? "reviewer"} · {cases?.length ?? 0} case
-            {(cases?.length ?? 0) === 1 ? "" : "s"}
+            Signed in as {auth.email ?? "reviewer"} · showing {cases?.length ?? 0} of {total} case
+            {total === 1 ? "" : "s"}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading || loadingMore}>
             {loading ? <Loader2 className="animate-spin" aria-hidden /> : <RefreshCw aria-hidden />}
             Refresh
           </Button>
@@ -294,6 +290,26 @@ export default function PortalPage() {
             </div>
           </Link>
         ))}
+
+        {nextCursor ? (
+          <div className="pt-2 text-center">
+            <Button
+              variant="outline"
+              onClick={() => void load(nextCursor)}
+              disabled={loadingMore}
+            >
+              {loadingMore ? <Loader2 className="animate-spin" aria-hidden /> : null}
+              Load more cases
+            </Button>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Showing {cases?.length ?? 0} of {total}. Older cases load next.
+            </p>
+          </div>
+        ) : cases && cases.length > 0 ? (
+          <p className="pt-2 text-center text-xs text-muted-foreground">
+            Showing all {cases.length} case{cases.length === 1 ? "" : "s"} visible to you.
+          </p>
+        ) : null}
       </div>
     </div>
   );

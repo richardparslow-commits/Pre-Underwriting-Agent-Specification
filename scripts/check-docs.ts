@@ -88,6 +88,8 @@ requireText("README.md", [
   "0003_reliability_and_access.sql",
   "0004_reviewer_write_paths.sql",
   "0005_case_summary_view.sql",
+  "Applied and exercised on a non-production staging project",
+  "check:portal",
 ]);
 forbidText("README.md", [
   "45 source questions",
@@ -96,12 +98,21 @@ forbidText("README.md", [
   "Email_WEBHOOK_SECRET=...                             # random",
   "no-lock supabase/functions/tests",
   "Not implemented; schedule must be documented",
+  "have not been run against a project from this workspace",
 ]);
 
-requireText("docs/LAUNCH-GATES.md", ["0/92", "28", "AAL2", "Svix"]);
+requireText("docs/LAUNCH-GATES.md", [
+  "0/92",
+  "28",
+  "AAL2",
+  "Svix",
+  "complete_case_notification",
+  "check:portal",
+]);
 forbidText("docs/LAUNCH-GATES.md", [
   "MFA must be enabled on the account (operational task)",
   "shared secret, not provider signature",
+  "live MFA enrolment/step-up for a real staff reviewer remains unverified",
 ]);
 
 requireText("docs/question-bank-reconciliation.md", [

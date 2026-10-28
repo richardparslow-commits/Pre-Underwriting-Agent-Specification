@@ -1,0 +1,361 @@
+Verification run: 2026-10-28T09:31:50Z
+Node: v24.16.0; npm: 11.13.0
+Deno: deno 2.9.6 (stable, release, aarch64-apple-darwin)
+
+$ pwd
+/Users/richardparslow/.config/freebuff-desktop/local-projects/63e542bb-916b-480d-ae0c-3cf2709f03f7/threads/21116134370fef0acaacd3c35c93f2677f707f0dc911a97dd3065f3d4dc0d950
+
+$ git status --short
+ M .github/workflows/ci.yml
+ M README.md
+ M audit/AUDIT-INDEX.md
+ M docs/LAUNCH-GATES.md
+ M package.json
+ M scripts/check-db.mjs
+ M scripts/check-docs.ts
+ M src/features/portal/useReviewerAuth.ts
+ M src/lib/api.ts
+ M src/pages/PortalPage.tsx
+ M supabase/config.toml
+ M supabase/functions/_shared/case.ts
+ M supabase/functions/tests/fixtures.ts
+ M supabase/functions/tests/validate-draft_test.ts
+ M supabase/migrations/0003_reliability_and_access.sql
+?? .tmp/
+?? audit/2026-10-28-freebuff-full/
+?? audit/2026-10-28-master-issue-list.csv
+?? audit/2026-10-28-master-issue-list.md
+?? audit/2026-10-28-master-remediation/
+?? audit/2026-10-28-spec-conformance/
+?? scripts/check-portal-auth.ts
+?? src/features/portal/MfaGate.tsx
+
+$ git diff --stat
+ .github/workflows/ci.yml                           |   5 +
+ README.md                                          |  41 +++--
+ audit/AUDIT-INDEX.md                               |  38 +++--
+ docs/LAUNCH-GATES.md                               |   6 +-
+ package.json                                       |   1 +
+ scripts/check-db.mjs                               |  45 ++++++
+ scripts/check-docs.ts                              |  13 +-
+ src/features/portal/useReviewerAuth.ts             |  19 ++-
+ src/lib/api.ts                                     |  85 ++++++++---
+ src/pages/PortalPage.tsx                           |  72 +++++----
+ supabase/config.toml                               |   9 ++
+ supabase/functions/_shared/case.ts                 | 158 +++++++++++++++++++
+ supabase/functions/tests/fixtures.ts               |  22 ++-
+ supabase/functions/tests/validate-draft_test.ts    | 170 +++++++++++++++++++++
+ .../migrations/0003_reliability_and_access.sql     |  19 +++
+ 15 files changed, 630 insertions(+), 73 deletions(-)
+
+$ npm run typecheck
+
+> lifepolicypilot-pre-underwriting@0.1.0 typecheck
+> tsc --noEmit
+
+EXIT 0
+---
+$ npm run check:bank
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:bank
+> tsx scripts/check-bank.ts
+
+Question bank: 92 rows
+  approved for interview : 87
+  held for human review  : 5 (ID-04, MED-11, MH-06, RES-04, RES-05)
+  branching questions    : 14
+  supplemental           : 11
+  signed off by reviewer : 0
+
+Source questionnaire: 113 questions
+  traced to a bank row  : 85
+  gaps recorded         : 28 (19 partially collected, 9 out of scope, 0 collected nowhere)
+
+Reconciliation: 92 records, 29 with flags
+  matches_source    : 55
+  split_source_compound: 3
+  wording_changed   : 11
+  timeframe_changed : 7
+  added_by_lpp      : 9
+  not_in_source     : 2
+  held_for_review   : 5
+  flags: wording 16, timeframe 10, branching 12, attribution 10, omission 9
+
+Reconciliation is complete; 92 rows still need a named reviewer's sign-off.
+See docs/question-bank-reconciliation.md for each row's decision.
+
+Structural and reconciliation checks passed.
+EXIT 0
+---
+$ npm run check:docs
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:docs
+> tsx scripts/check-docs.ts
+
+Documentation matches the data: 92 rows, 87 approved, 5 held, 0 signed off; 113 source items, 85 traced, 28 gaps (19 partial, 9 out of scope).
+EXIT 0
+---
+$ npm run check:portal
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:portal
+> tsx scripts/check-portal-auth.ts
+
+Reviewer access guard passed: TOTP enrol/challenge/verify, in-app gate, no self-service sign-up, paginated queue with an exact count.
+EXIT 0
+---
+$ npm run check:server-bank
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:server-bank
+> tsx scripts/check-server-bank.ts
+
+Server bank matches the client bank: 92 rows.
+EXIT 0
+---
+$ npm run check:server-policy
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:server-policy
+> tsx scripts/check-server-policy.ts
+
+Server consent policy matches the client consent wording.
+EXIT 0
+---
+$ npm run test:consent
+
+> lifepolicypilot-pre-underwriting@0.1.0 test:consent
+> tsx --test src/features/consent/marketingConsent.test.ts
+
+✔ stamps the privacy acknowledgement with the privacy notice version (0.634875ms)
+✔ records no marketing consent when no channel is enabled (0.599083ms)
+✔ records only the text channel when calls are disabled (0.235291ms)
+✔ records only the call channel when texts are disabled (0.147166ms)
+✔ records each enabled channel exactly once when both are on (0.132625ms)
+✔ keeps marketing off while the seller is blank or a placeholder (0.10575ms)
+✔ keeps an enabled channel record when its box was left unchecked (0.09575ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 80.013125
+EXIT 0
+---
+$ npm run test:engine
+
+> lifepolicypilot-pre-underwriting@0.1.0 test:engine
+> tsx --test src/features/interview/engine.test.ts
+
+✔ closing a parent branch removes the descendant answer and its details (0.891542ms)
+✔ closing a nested branch removes descendants that are only visible through it (0.165833ms)
+✔ a branch-closed row never emits fields or supplemental detail (0.302708ms)
+✔ reviewer notes are not present on any public question row (0.081459ms)
+✔ a held row stays held and carries no answer content (0.161667ms)
+✔ a blank answer is unresolved, never No (0.055333ms)
+✔ current crisis is disclosed even when the history answer is No, Unknown or declined (0.087ms)
+✔ crisis is not disclosed when the current-safety answer is not Yes (0.065375ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 83.066541
+EXIT 0
+---
+$ npm run test:validation
+
+> lifepolicypilot-pre-underwriting@0.1.0 test:validation
+> tsx --test src/features/intake/validation.test.ts
+
+✔ a phone or text preference requires a reachable number (0.587125ms)
+✔ a phone preference rejects letters, short numbers and wrong country codes (0.181541ms)
+✔ a phone preference accepts a normal 10-digit US number (0.08325ms)
+✔ a supplied number is validated even when email or chat is preferred (0.069334ms)
+✔ an 11-digit number is accepted only with the US country code (0.062208ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 81.25725
+EXIT 0
+---
+$ npm run check:db
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:db
+> node scripts/check-db.mjs
+
+PASS | migration 1 run 1 | undefined
+PASS | migration 2 run 1 | undefined
+PASS | migration 3 run 1 | undefined
+PASS | migration 4 run 1 | undefined
+PASS | migration 5 run 1 | undefined
+PASS | migration 1 run 2 | undefined
+PASS | migration 2 run 2 | undefined
+PASS | migration 3 run 2 | undefined
+PASS | migration 4 run 2 | undefined
+PASS | migration 5 run 2 | undefined
+PASS | RLS enabled on sensitive tables | [{"relname":"app_settings","relrowsecurity":true},{"relname":"case_deletions","relrowsecurity":true},{"relname":"case_review_log","relrowsecurity":true},{"relname":"cases","relrowsecurity":true},{"relname":"email_events","relrowsecurity":true},{"relname":"marketing_revocations","relrowsecurity":true},{"relname":"submission_rate_limits","relrowsecurity":true}]
+PASS | aal1 reviewer sees zero cases | [{"n":0}]
+PASS | aal1 reviewer sees zero case summaries | [{"n":0}]
+PASS | aal1 reviewer cannot record a review | error=Not authorised
+PASS | aal2 reviewer sees the case | [{"n":1}]
+PASS | aal2 reviewer sees the queue summary without a payload | [{"reference":"LPP-2026-TEST01","first_name":"Test","last_name":"Case","residence_state":"TX","unanswered":1}]
+PASS | queue summary has no answer or payload column | [{"column_name":"reference"},{"column_name":"submitted_at"},{"column_name":"status"},{"column_name":"notification_state"},{"column_name":"notification_attempts"},{"column_name":"notification_detail"},{"column_name":"notification_updated_at"},{"column_name":"crisis_disclosure"},{"column_name":"first_name"},{"column_name":"last_name"},{"column_name":"residence_state"},{"column_name":"unanswered"}]
+PASS | queue summary cannot be asked for payload | error=column "payload" does not exist
+PASS | aal2 reviewer can record opened | [{"record_case_review":""}]
+PASS | opened is deduplicated within the session window | [{"record_case_review":""}]
+PASS | exactly one opened entry exists | [{"n":1}]
+PASS | reviewer cannot update workflow status directly | error=permission denied for table cases
+PASS | reviewer cannot insert a review-log entry directly | error=permission denied for table case_review_log
+PASS | direct writes left the status and log unchanged | [{"status":"submitted","n":0}]
+PASS | reviewer can still mark reviewed through the RPC | [{"record_case_review":""}]
+PASS | the RPC updates status and log atomically | [{"status":"reviewed","n":1}]
+PASS | anonymous caller cannot read case summaries | error=permission denied for view case_summaries
+PASS | service role cannot change crisis triage evidence | error=Submitted case snapshots and triage evidence are immutable
+PASS | service role cannot change residence state | error=Submitted case snapshots and triage evidence are immutable
+PASS | service role cannot rewrite the idempotency key | error=Submitted case snapshots and triage evidence are immutable
+PASS | duplicate idempotency key is rejected | error=duplicate key value violates unique constraint "cases_idempotency_key_idx"
+PASS | first claim wins | [{"reference":"LPP-2026-TEST01","submitted_at":"2026-10-27T12:00:00.000Z","notification_attempts":1}]
+PASS | second concurrent claim gets no row | []
+PASS | acceptance completes the lease | [{"complete_case_notification":""}]
+PASS | accepted case cannot be claimed again | []
+PASS | accepted event applies to a queued case | [{"apply_email_event":"applied"}]
+PASS | duplicate event is ignored by id | [{"apply_email_event":"duplicate"}]
+PASS | delivered event applies | [{"apply_email_event":"applied"}]
+PASS | late accepted event cannot regress delivered | [{"apply_email_event":"ignored"}]
+PASS | bounce after delivery cannot regress | [{"apply_email_event":"ignored"}]
+PASS | case remains delivered | [{"notification_state":"delivered"}]
+PASS | message-id-only event reconciles | [{"apply_email_event":"applied"}]
+PASS | event before message-id correlation is unmatched, not lost | [{"apply_email_event":"unmatched"}]
+PASS | retry of the same event applies after correlation | [{"apply_email_event":"applied"}]
+PASS | the raced case records delivered | [{"notification_state":"delivered"}]
+PASS | a later duplicate of the correlated race event is ignored | [{"apply_email_event":"duplicate"}]
+PASS | late acceptance cannot regress a delivered case | [{"complete_case_notification":""}]
+PASS | the delivered case stays delivered | [{"notification_state":"delivered"}]
+PASS | late failure cannot regress a delivered case | [{"complete_case_notification":""}]
+PASS | the delivered case is not re-queued | [{"notification_state":"delivered","notification_next_attempt_at":null}]
+PASS | a delivered case cannot be claimed for another send | []
+PASS | a genuine retry after failure can still record acceptance | [{"complete_case_notification":""}]
+PASS | the retried case is accepted | [{"notification_state":"accepted"}]
+PASS | rate limit allows the first two | [true,true]
+PASS | rate limit rejects the third | [{"allowed":false}]
+PASS | reviewer records a phone revocation | [{"record_marketing_revocation":""}]
+PASS | suppression is queryable | [{"suppressed":true}]
+PASS | revocation is audited | [{"n":1}]
+PASS | retention is disabled while no schedule is approved | [{"n":0}]
+PASS | approved retention deletes the expired case | [{"n":1}]
+PASS | retention deletion is audited | [{"n":1}]
+PASS | reviewer deletes a case with a reason | [{"delete_case":""}]
+PASS | case is gone | [{"n":0}]
+PASS | deletion is audited | [{"n":1}]
+SUMMARY failures=0
+EXIT 0
+---
+$ npx --yes deno@2.9.6 test --allow-env --lock=deno.lock supabase/functions/tests/
+[0m[32mCheck[0m supabase/functions/tests/email_test.ts
+[0m[32mCheck[0m supabase/functions/tests/submit-case_test.ts
+[0m[32mCheck[0m supabase/functions/tests/svix_test.ts
+[0m[32mCheck[0m supabase/functions/tests/validate-draft_test.ts
+[0m[38;5;245mrunning 5 tests from ./supabase/functions/tests/email_test.ts[0m
+notification carries a reference and portal link, never health data ... [0m[32mok[0m [0m[38;5;245m(3ms)[0m
+provider acceptance is never reported as delivered ... [0m[32mok[0m [0m[38;5;245m(530µs)[0m
+no provider key produces not_sent and makes no request ... [0m[32mok[0m [0m[38;5;245m(161µs)[0m
+retries reuse the case reference as the provider idempotency key ... [0m[32mok[0m [0m[38;5;245m(11ms)[0m
+a provider rejection is failed, not accepted ...
+[0m[38;5;245m------- output -------[0m
+Case notification rejected 422
+[0m[38;5;245m----- output end -----[0m
+a provider rejection is failed, not accepted ... [0m[32mok[0m [0m[38;5;245m(2ms)[0m
+[0m[38;5;245mrunning 7 tests from ./supabase/functions/tests/submit-case_test.ts[0m
+refuses live intake until the questionnaire is explicitly approved ... [0m[32mok[0m [0m[38;5;245m(11ms)[0m
+fails closed when the durable rate limiter is unavailable ...
+[0m[38;5;245m------- post-test output -------[0m
+Durable rate limiter is unavailable
+[0m[38;5;245m----- post-test output end -----[0m
+fails closed when the durable rate limiter is unavailable ... [0m[32mok[0m [0m[38;5;245m(512µs)[0m
+rejects a draft with no consent records ... [0m[32mok[0m [0m[38;5;245m(1ms)[0m
+rejects a draft missing the intake permission ... [0m[32mok[0m [0m[38;5;245m(360µs)[0m
+rejects a declined intake permission ... [0m[32mok[0m [0m[38;5;245m(327µs)[0m
+rejects a draft missing the privacy acknowledgement ... [0m[32mok[0m [0m[38;5;245m(294µs)[0m
+rejects a multibyte body above the 512 KiB byte budget with 413 ... [0m[32mok[0m [0m[38;5;245m(613µs)[0m
+[0m[38;5;245mrunning 5 tests from ./supabase/functions/tests/svix_test.ts[0m
+accepts a correctly signed Svix event ... [0m[32mok[0m [0m[38;5;245m(3ms)[0m
+rejects a replayed event outside the timestamp window ... [0m[32mok[0m [0m[38;5;245m(170µs)[0m
+rejects a body changed after signing ... [0m[32mok[0m [0m[38;5;245m(8ms)[0m
+rejects a missing or malformed secret/header ... [0m[32mok[0m [0m[38;5;245m(86µs)[0m
+accepts a valid signature during key rotation ... [0m[32mok[0m [0m[38;5;245m(114µs)[0m
+[0m[38;5;245mrunning 29 tests from ./supabase/functions/tests/validate-draft_test.ts[0m
+accepts a complete canonical draft and rebuilds source rows ... [0m[32mok[0m [0m[38;5;245m(10ms)[0m
+rejects a held HIV row presented as answered ... [0m[32mok[0m [0m[38;5;245m(295µs)[0m
+rejects an invented question id ... [0m[32mok[0m [0m[38;5;245m(94µs)[0m
+rejects a zero-answer payload ... [0m[32mok[0m [0m[38;5;245m(83µs)[0m
+ignores client-invented source wording and restores the canonical row ... [0m[32mok[0m [0m[38;5;245m(255µs)[0m
+rejects marketing consent when the server has no enabled channel ... [0m[32mok[0m [0m[38;5;245m(80µs)[0m
+rejects a privacy record with the wrong notice version ... [0m[32mok[0m [0m[38;5;245m(65µs)[0m
+rejects duplicate consent records ... [0m[32mok[0m [0m[38;5;245m(67µs)[0m
+rejects a consent timestamp after the submission ... [0m[32mok[0m [0m[38;5;245m(64µs)[0m
+rejects a stale submission acknowledgement ... [0m[32mok[0m [0m[38;5;245m(97µs)[0m
+derives crisis disclosure and an urgent flag from MH-05 yes ... [0m[32mok[0m [0m[38;5;245m(202µs)[0m
+rejects a 17-year-old applicant ... [0m[32mok[0m [0m[38;5;245m(49µs)[0m
+rejects a non-US or invented state code ... [0m[32mok[0m [0m[38;5;245m(43µs)[0m
+rejects fields attached to a branch-closed row ... [0m[32mok[0m [0m[38;5;245m(138µs)[0m
+rejects a non-self relationship even when the flag says self ... [0m[32mok[0m [0m[38;5;245m(42µs)[0m
+rejects phone and text contact preferences without a phone number ... [0m[32mok[0m [0m[38;5;245m(74µs)[0m
+rejects a junk or unusable supplied phone number ... [0m[32mok[0m [0m[38;5;245m(217µs)[0m
+normalises a valid ten-digit phone number ... [0m[32mok[0m [0m[38;5;245m(191µs)[0m
+rejects a forged questionnaire version ... [0m[32mok[0m [0m[38;5;245m(61µs)[0m
+rejects prose that does not match the chosen option ... [0m[32mok[0m [0m[38;5;245m(127µs)[0m
+rejects an invented single-choice label ... [0m[32mok[0m [0m[38;5;245m(318µs)[0m
+rejects a date of birth answer that contradicts the lead form ... [0m[32mok[0m [0m[38;5;245m(162µs)[0m
+rejects a state answer that contradicts the lead form ... [0m[32mok[0m [0m[38;5;245m(152µs)[0m
+accepts a state answer written as the full state name ... [0m[32mok[0m [0m[38;5;245m(159µs)[0m
+an unanswered identity row is not cross-checked ... [0m[32mok[0m [0m[38;5;245m(161µs)[0m
+rejects an acknowledgement that predates the consents it relies on ... [0m[32mok[0m [0m[38;5;245m(57µs)[0m
+flags a yes answer that carries no supplemental detail ... [0m[32mok[0m [0m[38;5;245m(156µs)[0m
+flags a shorter-window yes that the longer window denies ... [0m[32mok[0m [0m[38;5;245m(168µs)[0m
+does not flag consistent short and long windows ... [0m[32mok[0m [0m[38;5;245m(139µs)[0m
+
+[0m[32mok[0m | 46 passed | 0 failed [0m[38;5;245m(242ms)[0m
+
+EXIT 0
+---
+$ npm run build
+
+> lifepolicypilot-pre-underwriting@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v8.3.5 building client environment for production...
+transforming...
+✓ 1656 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.07 kB │ gzip:   0.57 kB
+dist/assets/index-DXQcH908.css   23.34 kB │ gzip:   5.67 kB
+dist/assets/index-lu-WUjb6.js   621.33 kB │ gzip: 172.55 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 642ms
+EXIT 0
+---
+$ npm run check:bundle
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:bundle
+> tsx scripts/check-bundle.ts
+
+Bundle check passed: 1 JavaScript asset(s); 5 withheld source items, 5 reviewer notes and 5 held reconciliation records are absent.
+EXIT 0
+---
+$ npm audit --audit-level=high
+found 0 vulnerabilities
+EXIT 0
+---
+ALL CHECKS PASSED

@@ -1,0 +1,18 @@
+id,title,severity,classification,verification,status,crosswalk,launch_impact
+A7-01,No production deployment or live provider/retention/reviewer evidence,High,operational evidence missing,not verified,open,SC-03,blocks launch
+A7-02,Questionnaire not signed off (0/92; 28 gaps),High,business approval missing,verified from code and source,open,SC-04,blocks launch
+A7-03,Legal entity and counsel/vendor/retention approvals absent,High,legal/counsel decision,absent,open,SC-05,blocks launch
+A7-04,Portal requires AAL2 but has no TOTP enrolment or challenge,High,confirmed defect,statically demonstrated,open,SC-09,blocks launch
+A7-05,Specification AI assistant and AI summary not implemented,High,specification conflict,verified from code and spec text,open,SC-01,blocks specification conformance
+A7-06,Delivered notification can regress and a late failure can duplicate a send,Medium,confirmed defect,runtime reproduced,open,New,blocks delivery evidence
+A7-07,Server accepts contradictory identity values and value/prose mismatches,Medium,confirmed defect,runtime reproduced,open,SC-10,blocks data-integrity sign-off
+A7-08,Magic-link sign-in can create accounts for any address,Medium,confirmed defect,statically demonstrated,open,SC-11,configuration blocker before public portal
+A7-09,No customer-facing marketing revocation path,Medium,future-feature pre-enable gate,statically demonstrated,open,SC-02,blocking only if a channel is enabled
+A7-10,Reviewer queue silently stops at 50 cases,Low,confirmed defect,statically demonstrated,open,SC-12,nonblocking at current volume
+A7-11,Yes with no supplemental detail accepted where the bank defines details,Low,confirmed defect,runtime reproduced,open,New,nonblocking; review quality
+A7-12,Submission acknowledgement can precede the consents it acknowledges,Low,confirmed defect,runtime reproduced,open,New,nonblocking; evidence integrity
+A7-13,No automated cross-answer inconsistency flags,Low,review-package gap,statically demonstrated,open,SC-08,nonblocking; review quality
+A7-14,README says the backend was never run against a project,Low,documentation contradiction,verified against staging record,open,SC-06,documentation only
+A7-15,A delivered case cannot regress is false,Low,documentation contradiction,contradicted by A7-06,open,New,documentation only
+A7-16,Gate 7 calls staff MFA unverified when the step-up does not exist,Low,documentation contradiction,verified against portal code,open,New,documentation only
+A7-17,Chat-exposed staging database password has no recorded rotation,Medium,operational evidence missing,documented not verifiable,open,New,blocks promoting staging to production

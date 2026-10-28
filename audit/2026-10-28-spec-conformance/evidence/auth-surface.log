@@ -1,0 +1,99 @@
+# Reviewer authentication surface — static evidence
+captured_utc: 2026-10-28T08:13:17Z
+head: 79e8af4f58ad74914241ef4660f765da105949c9
+
+## AAL2 enforcement in the portal
+src/features/portal/useReviewerAuth.ts-15-  const [loading, setLoading] = useState(!PREVIEW_MODE);
+src/features/portal/useReviewerAuth.ts-16-  const [previewUnlocked, setPreviewUnlocked] = useState(false);
+src/features/portal/useReviewerAuth.ts-17-  const [linkSent, setLinkSent] = useState(false);
+src/features/portal/useReviewerAuth.ts-18-  const [error, setError] = useState<string | null>(null);
+src/features/portal/useReviewerAuth.ts:19:  const [needsMfa, setNeedsMfa] = useState(false);
+src/features/portal/useReviewerAuth.ts-20-
+src/features/portal/useReviewerAuth.ts-21-  useEffect(() => {
+src/features/portal/useReviewerAuth.ts-22-    if (!supabase) {
+src/features/portal/useReviewerAuth.ts-23-      setLoading(false);
+--
+src/features/portal/useReviewerAuth.ts-37-      }
+src/features/portal/useReviewerAuth.ts-38-
+src/features/portal/useReviewerAuth.ts-39-      // Supabase does not enforce AAL2 at the gateway. The portal refuses an
+src/features/portal/useReviewerAuth.ts-40-      // aal1 session, and every reviewer RLS policy independently requires it.
+src/features/portal/useReviewerAuth.ts:41:      const { data: assurance } = await supabase!.auth.mfa.getAuthenticatorAssuranceLevel();
+src/features/portal/useReviewerAuth.ts-42-      setNeedsMfa(assurance?.currentLevel !== "aal2");
+src/features/portal/useReviewerAuth.ts-43-    }
+src/features/portal/useReviewerAuth.ts-44-
+src/features/portal/useReviewerAuth.ts-45-    supabase.auth.getSession().then(async ({ data }) => {
+--
+src/features/portal/useReviewerAuth.ts-80-  const unlockPreview = useCallback(() => setPreviewUnlocked(true), []);
+src/features/portal/useReviewerAuth.ts-81-
+src/features/portal/useReviewerAuth.ts-82-  return {
+src/features/portal/useReviewerAuth.ts-83-    previewMode: PREVIEW_MODE,
+src/features/portal/useReviewerAuth.ts:84:    signedIn: PREVIEW_MODE ? previewUnlocked : email !== null && !needsMfa,
+src/features/portal/useReviewerAuth.ts:85:    needsMfa,
+src/features/portal/useReviewerAuth.ts-86-    email: PREVIEW_MODE ? (previewUnlocked ? SITE.reviewerEmail : null) : email,
+src/features/portal/useReviewerAuth.ts-87-    loading,
+src/features/portal/useReviewerAuth.ts-88-    linkSent,
+src/features/portal/useReviewerAuth.ts-89-    error,
+--
+src/pages/PortalPage.tsx-142-      </div>
+src/pages/PortalPage.tsx-143-    );
+src/pages/PortalPage.tsx-144-  }
+src/pages/PortalPage.tsx-145-
+src/pages/PortalPage.tsx:146:  if (auth.needsMfa && !auth.previewMode) {
+src/pages/PortalPage.tsx-147-    return (
+src/pages/PortalPage.tsx-148-      <div className="container max-w-md py-16">
+src/pages/PortalPage.tsx-149-        <div className="panel p-7">
+src/pages/PortalPage.tsx-150-          <Badge tone="warn">MFA required</Badge>
+--
+src/pages/PortalCasePage.tsx-45-      </div>
+src/pages/PortalCasePage.tsx-46-    );
+src/pages/PortalCasePage.tsx-47-  }
+src/pages/PortalCasePage.tsx-48-
+src/pages/PortalCasePage.tsx:49:  if (auth.needsMfa && !auth.previewMode) {
+src/pages/PortalCasePage.tsx-50-    return (
+src/pages/PortalCasePage.tsx-51-      <div className="container max-w-md py-20">
+src/pages/PortalCasePage.tsx-52-        <div className="panel p-7">
+src/pages/PortalCasePage.tsx-53-          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-secondary">
+
+## MFA enroll/challenge/verify calls in src
+NO MATCH: the client never enrols a factor, creates a challenge, or verifies a TOTP code.
+
+## Magic-link request
+572-// ---------------------------------------------------------------------------
+573-
+574-export async function sendSignInLink(email: string): Promise<void> {
+575-  if (!supabase) throw new Error("Sign-in is not configured.");
+576:  const { error } = await supabase.auth.signInWithOtp({
+577-    email,
+578-    options: { emailRedirectTo: `${window.location.origin}/portal` },
+579-  });
+580-  if (error) throw new Error("The sign-in link could not be sent.");
+
+## Portal allowlist wording
+60-        <p className="mt-5 text-sm leading-relaxed text-muted-foreground">
+61-          Cases contain health information. Sign in with the address on the reviewer allowlist and
+62:          we will email a single-use link. A forwarded notification email does not grant access.
+63-        </p>
+64-
+--
+91-        {auth.linkSent ? (
+92-          <Alert tone="ok" className="mt-4">
+93:            If that address is on the allowlist, a sign-in link is on its way. Check the inbox for
+94-            the exact address you entered.
+95-          </Alert>
+
+## Hosted staging AAL2 proof (direct GoTrue flow, not the portal UI)
+A live AAL2 HTTP response **was captured** on 28 October 2026 with a labelled temporary reviewer, a reviewer allowlist row and one labelled case. The flow was:
+
+1. password grant returned `200` and an `aal1` access token;
+2. TOTP factor enrolment returned `200` with a secret;
+3. `POST /auth/v1/factors/{id}/challenge` returned `200`;
+4. `POST /auth/v1/factors/{id}/verify` returned `200` and an `aal2` access token;
+5. `GET /rest/v1/case_summaries` with the exact client select returned `200`, **1 row**, the exact nine summary keys and `unanswered = 1`;
+6. the AAL1 token returned `200` with **0 rows**;
+7. `select=payload` returned `400` with `42703`;
+8. an anonymous request returned `401`.
+
+The temporary Auth row was provisioned directly because the supported sign-up endpoint was rate-limited on confirmation email; the password grant and TOTP challenge/verify were genuine GoTrue flows. The temporary user and case were deleted; the final counts are zero. Raw output: [`http-queue-verification.log`](http-queue-verification.log).
+
+## Supabase project auth configuration committed in this repo
+NO MATCH: supabase/config.toml contains no [auth] signup setting.

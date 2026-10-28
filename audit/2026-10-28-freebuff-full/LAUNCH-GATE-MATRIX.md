@@ -1,0 +1,39 @@
+# Launch-gate matrix — A7 Freebuff full audit
+
+**Baseline:** `main` @ `79e8af4f58ad74914241ef4660f765da105949c9` (28 October 2026)  
+**Source of the ten gates:** [`docs/LAUNCH-GATES.md`](../../docs/LAUNCH-GATES.md), authored by the project, re-tested here rather than accepted.  
+**Legend:** PASS = exercised in this pass and met · PARTIAL = implemented but not fully evidenced or a documented gap remains · FAIL = a scoped check contradicted the claim · NOT VERIFIED = no environment or evidence in this pass.
+
+| # | Gate | Implementation | Evidence in this pass | Status | Remaining evidence | Responsible approver |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Question coverage — every source question reconciled and approved | `src/features/interview/questionBank.ts`, `reconciliation.ts`, `sourceInventory.ts`, `scripts/check-bank.ts` | 113 source items, 92 bank rows, 85 traced, 28 recorded gaps (19 partial, 9 out of scope), 0/92 signed off, 5 held. `check:bank` and `check:docs` exit 0. Source PDF hash matches the committed text extraction; 113/113 source texts present in both. | **PARTIAL** | A named reviewer must close each of the 92 rows and the 9 out-of-scope reasons, then set `sourceVerified: true`. Structural reconciliation is not approval. | Named underwriting/clinical reviewer (not engineering) |
+| 2 | Branch coverage — applicable follow-ups, distinct windows | `questionBank.ts` `askWhen`; `engine.ts`; `useInterview.ts` | 14 branches emitted; 8/8 engine tests including nested `MIL-01 → MIL-02 → MIL-04` pruning; DB rejects branch-closed rows carrying content. 7 rows still replace a source window with a different one. | **PARTIAL** | Reviewer acceptance of the 7 replaced windows and 19 merged/partial rows. Browser walk did not traverse every branch. | Named reviewer |
+| 3 | Answer integrity — blanks/uncertainty/refusal never saved as No | `engine.ts`, `case.ts` canonical rebuild, review/portal rendering | 8/8 engine tests; server canonicalises every row, strips detail from `not_asked`/held, rejects `not_applicable`; UI copy states the rule. `check:db` confirms held rows carry no content. | **PASS — local** | Live submission of a real mixed-state case (not run). | Engineering |
+| 4 | Review and submission — corrections, invalidation, explicit action | `ReviewScreen.tsx`, `useInterview.ts`, `case.ts` acknowledgement checks | Server requires exactly one acknowledgement with the exact text/version inside the session window; Deno suite rejects stale/forged versions; edit clears acknowledgement in state. Browser review screen was **not** exercised. | **PARTIAL** | Browser: edit an answer from review, confirm the acknowledgment clears and the button disables; submit once with a stale acknowledgement against a hosted function. | Engineering |
+| 5 | Consent separation — marketing off by default, independent | `marketingConsent.ts`, `policy.generated.ts`, `LeadForm.tsx`, `PermissionStep.tsx`, `case.ts` | 7/7 consent tests; `submit-case_test.ts` drives the real handler and asserts 422 for missing or declined permission and privacy records; browser shows **no** marketing box in the default build and says none is requested; a forged marketing record is rejected with "Marketing consent is not enabled for this deployment". | **PASS — local** (separation); **pre-enable gate open** for revocation (`A7-09`) | Customer-facing revocation only if a channel is enabled. | Owner + counsel |
+| 6 | Recipient control — client/injection cannot redirect | `_shared/email.ts`, `submit-case` | Recipient constant `richardparslow@lifepolicypilot.blog`; `CASE_NOTIFY_TO` is allowlisted to the same address; subject server-built; body carries reference and portal URL only. No recipient field is read from the request. | **PASS — static; live not run** | Send one labelled message through the real provider and confirm the envelope recipient. | Engineering |
+| 7 | Secure access — forwarded email grants nothing; reviewer step-up | RLS + `is_reviewer()` + AAL2 in `0001`/`0003`/`0004`/`0005`; `useReviewerAuth.ts`; `PortalPage.tsx`; `case_summaries` | PGlite: anon and aal1 denied, aal2 reviewer reads only through the view; queue select is payload-free; individual load writes an `opened` entry. Staging package records a real GoTrue password+TOTP flow and a live AAL2 queue `200`. **In-app enrolment/challenge is absent** (`A7-04`): the portal shows a dead-end instruction. | **PARTIAL** | Build the TOTP enrol/challenge UI, enrol a real staff reviewer, re-test. Forwarded-email test still not run live. | Engineering + owner |
+| 8 | Delivery reliability — store first, retries, duplicates, honest wording | `submit-case`, `claim_case_notification`, `complete_case_notification`, `apply_email_event`, `retry-case-notifications` | Store-first insert and idempotency replay pass; lease claim passes; Svix + dedupe + monotonic **event** path passes; confirmation copy distinguishes saved/queued/accepted. **A late completion regresses a delivered case and re-queues a duplicate send** (`A7-06`, reproduced in PGlite). No live provider, scheduler or inbox. | **FAIL** | Fix `complete_case_notification` monotonicity, add `check:db` cases, then exercise a live provider with an injected late webhook. | Engineering |
+| 9 | Leak prevention — no health data in analytics, logs, URLs, email, errors | `email.ts`, `case.ts` logging, bundle checks, `vite` config | No analytics/pixels/session replay; no health data in URL; bundle has no held source wording, reviewer notes or reconciliation detail (`check:bundle`); no secret-like literal in the tree or all-commit history; build has no JWT literal; email body is a pointer only. | **PARTIAL** | Review hosting/provider logs, error reporting, provider retention and backups. No browser/network canary run. | Engineering + vendors |
+| 10 | Human review — consequential actions behind a human | `0004_reviewer_write_paths.sql`, `CaseReview.tsx`, `api.ts` | `cases.status` updates and `case_review_log` inserts are revoked from authenticated; `record_case_review` is the only write path; corrections are append-only; no eligibility/rate/carrier action exists. An access-log failure is non-blocking (documented trade-off). | **PARTIAL** | A real reviewer cannot reach the portal's AAL2 state in-app (`A7-04`), so the gate is not operable end to end. | Engineering + owner |
+
+## Gate arithmetic
+
+- **PASS:** 3, 5 (separation), 6 (static) — 3 gates.
+- **PARTIAL:** 1, 2, 4, 7, 9, 10 — 6 gates.
+- **FAIL:** 8 — 1 gate.
+- **NOT VERIFIED:** none of the ten is wholly unexamined; the live halves of 4, 6, 7, 8, 9 and 10 are unverified.
+
+The project's own summary in `docs/LAUNCH-GATES.md` marks 3, 4, 6 and 10 **Implemented**, 1, 2, 5, 7, 8 and 9 **Partly**. This audit agrees on 1, 2, 3, 5, 6, 9 and 10; it downgrades 4 and 8 (4 to PARTIAL because the browser path was not exercised, 8 to FAIL because of the reproduced regression) and treats 7 as PARTIAL for a stronger reason than "live MFA unverified": the step-up flow does not exist in the product (`A7-04`).
+
+## Sensitive-question register — independently checked
+
+| ID | Topic | In bank | Asked | Enforced server-side | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| `ID-04` | Sex / gender | yes | **no** | `held_for_review`; content rejected | `check:bank` held list; `case.ts` held branch; engine test |
+| `MED-11` | HIV / AIDS | yes | **no** | same | same |
+| `MH-06` | Suicide-attempt detail | yes | **no** | same | same |
+| `RES-04` | Immigration category | yes | **no** | same | same |
+| `RES-05` | Visa / green-card number | yes | **no** | same | same |
+
+No row asks for SSN, payment data, passport number, identity-document scans or unrelated family identifiers. The five held rows remain visible in the internal coverage record and are absent from the public bundle.

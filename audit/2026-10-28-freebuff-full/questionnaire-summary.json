@@ -1,0 +1,43 @@
+{
+  "generatedAt": "2026-10-28T08:44:24.540Z",
+  "source": {
+    "fileName": "Detialed-Life-insurance-Questions.pdf",
+    "path": "source/Detialed-Life-insurance-Questions.pdf",
+    "textPath": "source/Detialed-Life-insurance-Questions.txt",
+    "pages": 7,
+    "sha256": "afe91d876f2c9e932302267ad10d0c46b774b4161efea8d0d2ffe71e3c82cca2"
+  },
+  "questionnaireVersion": "2026.10-draft.9",
+  "counts": {
+    "sourceItems": 113,
+    "bankRows": 92,
+    "traced": 85,
+    "gaps": 28,
+    "signedOff": 0,
+    "held": 5,
+    "rowsWithFlags": 29
+  },
+  "gaps": {
+    "merge_into": 19,
+    "add_question": 0,
+    "hold": 0,
+    "out_of_scope": 9
+  },
+  "byVerdict": {
+    "matches_source": 55,
+    "split_source_compound": 3,
+    "wording_changed": 11,
+    "timeframe_changed": 7,
+    "timeframe_merged": 0,
+    "added_by_lpp": 9,
+    "not_in_source": 2,
+    "held_for_review": 5
+  },
+  "byFlag": {
+    "wording": 16,
+    "timeframe": 10,
+    "branching": 12,
+    "attribution": 10,
+    "omission": 9
+  }
+}

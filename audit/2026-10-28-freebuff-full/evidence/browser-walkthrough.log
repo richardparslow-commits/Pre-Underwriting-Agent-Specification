@@ -1,0 +1,25 @@
+=== browser walkthrough — local preview, fictitious data ===
+Environment: Vite dev server http://127.0.0.1:8080 (pid in .tmp/audit-2026-10-28/vite.pid), Chromium via Freebuff preview.
+Data: Test Noncustomer / TX / 1980-01-01 / test-case@example.com. No real customer data.
+
+[1] GET /start — step 1 of 4, contact details.
+    Fields: first, last, state, DOB, email, preferred contact (email preselected), optional help topic, collapsed optional coverage.
+    Privacy acknowledgment checkbox present. Copy states no marketing calls/texts are made and no marketing consent is requested.
+    Marketing checkbox: ABSENT (expected while channels are disabled).
+
+[2] Submit empty form — blocked.
+    Inline role=alert messages rendered for first name, last name, state, DOB and email; aria-invalid=true on each; focus moved to First name.
+    Consent errors (privacy acknowledgment, adult attestation) are evaluated only after field errors clear; adult attestation then rendered its own alert.
+
+[3] Valid fictitious values + privacy acknowledgment + adult attestation — advanced to step 2 of 4, permission.
+    Disclosure shows consent version 2026-10-b, privacy version 2026-10-a, questionnaire 2026.10-draft.9.
+    "Begin the interview" is disabled until the permission box is checked.
+    Marketing consent: ABSENT at this step as well (channels disabled).
+
+[4] Permission checked and Begin — question screen.
+    Progress: "1 / 73", progressbar "Question 1 of 73" value=1; one question per screen.
+    DOB prefilled from the lead form and flagged "PREFILLED — PLEASE CHECK".
+    Copy shown: "Not answered is recorded as not answered — never as \"No\"."
+
+Screenshots: NOT CAPTURED. preview_screenshot returned "page has not been drawn yet" because the desktop window was not visible; the accessibility tree and DOM were used instead.
+Full 73-question walk, submission, provider delivery and reviewer portal: NOT RUN in the browser (local preview has no backend configured).
