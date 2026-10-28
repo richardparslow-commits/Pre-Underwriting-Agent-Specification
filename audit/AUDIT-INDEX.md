@@ -22,6 +22,8 @@ A5 re-ran the full audit prompt at `b51ebf9`. The local suite is green, but the 
 
 [`2026-10-28-qwencloud-remediation/`](2026-10-28-qwencloud-remediation/) is the remediation pass for A5. It resolves QW2-01, QW2-02 and QW2-03 locally, including a payload-free `case_summaries` view and a server-only review-note map. Its full suite passes; the hosted deployment, live gates and legal/product blockers remain open. It is not a new audit or a legal approval.
 
+[`2026-10-28-migration-0005-staging/`](2026-10-28-migration-0005-staging/) records the hosted staging verification of migration 0005. The remote history is at `0005`; the deployed view has no payload or answer columns, `anon` is denied, AAL1 sees zero summaries and AAL2 sees one in a rolled-back test. A live AAL2 HTTP queue response is still unverified because the project has no reviewer identity. This is staging evidence only, not a production migration or launch approval.
+
 [`2026-10-28-deployment-rehearsal.md`](2026-10-28-deployment-rehearsal.md) records the attempted hosted rehearsal. It is **blocked before deployment**: no Supabase token, linked project, Docker runtime or Resend key was available. It produces no live evidence and does not close any gate.
 
 ## What each package contains
@@ -34,6 +36,7 @@ A5 re-ran the full audit prompt at `b51ebf9`. The local suite is green, but the 
 - **QwenCode remediation:** [`2026-10-27-qwencode-remediation/`](2026-10-27-qwencode-remediation/) — the 30-finding ledger, code changes and full verification logs produced after the master list.
 - **A5 Qwencloud re-audit:** [`2026-10-28-qwencloud-reaudit/`](2026-10-28-qwencloud-reaudit/) — the three-finding re-audit, full local verification log, held-note bundle probe, queue/retention evidence and hash manifest.
 - **A5 remediation:** [`2026-10-28-qwencloud-remediation/`](2026-10-28-qwencloud-remediation/) — QW2-01/02/03 fixes, red/green bundle evidence, AAL1/AAL2 queue-view checks and the final remediation ledger.
+- **Migration 0005 staging verification:** [`2026-10-28-migration-0005-staging/`](2026-10-28-migration-0005-staging/) — hosted migration history, deployed view/grants, rolled-back AAL1/AAL2 proof and cleanup evidence.
 
 ## Preservation rules
 
@@ -53,6 +56,7 @@ Each package carries its own hash manifest:
 - [`2026-10-27-qwencode-remediation/MANIFEST.sha256`](2026-10-27-qwencode-remediation/MANIFEST.sha256)
 - [`2026-10-28-qwencloud-reaudit/MANIFEST.sha256`](2026-10-28-qwencloud-reaudit/MANIFEST.sha256)
 - [`2026-10-28-qwencloud-remediation/MANIFEST.sha256`](2026-10-28-qwencloud-remediation/MANIFEST.sha256)
+- [`2026-10-28-migration-0005-staging/MANIFEST.sha256`](2026-10-28-migration-0005-staging/MANIFEST.sha256)
 
 A3 does not currently have a package-level manifest; its raw evidence is preserved under [`2026-10-27-qwencloud/evidence/`](2026-10-27-qwencloud/evidence/).
 

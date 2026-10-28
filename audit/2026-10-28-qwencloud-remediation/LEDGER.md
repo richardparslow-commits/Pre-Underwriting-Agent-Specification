@@ -39,7 +39,7 @@ QW2-01 reopens and resolves **M-11**; QW2-02 and QW2-03 are new. The prior 30-fi
 - **Status:** **Resolved** (local engineering evidence).
 - **Fix:** added `0005_case_summary_view.sql`, a `security_invoker` view exposing only reference, workflow/notification metadata, lead name/state and an unanswered count. `listCases` now reads that view and selects no payload. `getCase` remains the only full-payload path and still records `opened`.
 - **Verification:** PGlite replays 0001–0005 twice; AAL1 sees zero summaries, AAL2 sees the summary with `unanswered = 1`, anonymous is denied, the view has no payload/answer columns, and `check:docs` rejects a `listCases` source that references `payload`.
-- **Remaining risk:** migration 0005 and the client change are not deployed; hosted grants/PostgREST exposure must be verified on staging before real reviewer use.
+- **Remaining risk:** migration 0005 is applied on staging and the hosted view/grants/AAL1/AAL2 boundary are verified; the hosted client build has not been inspected, and a live AAL2 HTTP queue response still needs a real reviewer identity. See [`../2026-10-28-migration-0005-staging/README.md`](../2026-10-28-migration-0005-staging/README.md).
 
 ### QW2-03 — retention claim without a schedule
 
@@ -89,7 +89,7 @@ All commands were run on 28 October 2026. Raw output is in [`logs/full-verificat
 
 ### What is not verified
 
-- No hosted migration of 0005, hosted grant inspection or PostgREST view exposure.
+- The hosted 0005 migration, grant inspection and AAL1/AAL2 RLS boundary are recorded in the staging package. No live AAL2 PostgREST response was captured because the project has no reviewer identity.
 - No rebuilt hosted bundle; the local production build is clean, but the deployed artifact was not inspected.
 - No live MFA enrolment/step-up, provider send, signed webhook or scheduler tick.
 - No approved retention period or schedule; M-14 remains blocked.
@@ -98,4 +98,4 @@ All commands were run on 28 October 2026. Raw output is in [`logs/full-verificat
 
 ### Deploy note
 
-Migrations 0001–0005 must be applied in order on a staging project before the reviewer queue can use `case_summaries`. Do not apply 0005 to a production project as a rehearsal; first verify AAL1/AAL2/anonymous behavior and PostgREST exposure on staging.
+Migrations 0001–0005 are applied on the staging project and the AAL1/AAL2/anonymous behavior is verified there. Do not treat that as production evidence; apply them to production only after separate approval and capture a live AAL2 HTTP queue response with a real reviewer.

@@ -1,0 +1,28 @@
+=== migration history ===
+Connecting to remote database...
+
+
+   Local  | Remote | Time (UTC)
+  --------|--------|------------
+   `0001` | `0001` | `0001`
+   `0002` | `0002` | `0002`
+   `0003` | `0003` | `0003`
+   `0004` | `0004` | `0004`
+   `0005` | `0005` | `0005`
+
+=== hosted view and RLS checks ===
+migration_versions=["0001","0002","0003","0004","0005"]
+view_columns=["reference","submitted_at","status","notification_state","notification_attempts","notification_detail","notification_updated_at","crisis_disclosure","first_name","last_name","residence_state","unanswered"]
+forbidden_columns_present=[]
+view_reloptions=["security_invoker=true"]
+view_security_invoker=true
+grants={"anon_select":false,"authenticated_select":true}
+table_state={"case_count":0,"reviewer_count":0,"cases_rls":true}
+payload_column_query={"ok":false,"code":"42703"}
+anonymous={"ok":false,"code":"42501","denied":true}
+reviewer_available=false
+aal1={"ok":true,"count":0,"referenceCreated":true}
+aal2={"ok":true,"count":0,"referenceCreated":true}
+=== rolled-back reviewer AAL proof ===
+temporary_reviewer={"created":true,"aal1":0,"aal2":1}
+after_rollback={"case_count":0,"reviewer_count":0,"temp_user_count":0}
