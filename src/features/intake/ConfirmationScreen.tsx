@@ -16,6 +16,10 @@ export function ConfirmationScreen({
   onStartOver: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const notificationSent = ["queued", "accepted", "delivered"].includes(
+    receipt.notification.state,
+  );
+  const notificationFailed = receipt.notification.state === "failed";
 
   async function copyReference() {
     try {
@@ -34,10 +38,15 @@ export function ConfirmationScreen({
           <Badge tone="ok">Submitted for review</Badge>
           <span className="text-xs text-muted-foreground">{formatDate(receipt.submittedAt)}</span>
         </div>
-        <h1 className="text-3xl leading-tight sm:text-4xl">Your case is with {SITE.owner}</h1>
+        <h1 className="text-3xl leading-tight sm:text-4xl">
+          {notificationSent ? `Your case is with ${SITE.owner}` : "Your answers are saved"}
+        </h1>
         <p className="prose-note max-w-2xl">
-          Your answers are saved and queued for review. This is a preliminary review request, not an
-          application, an offer, or an approval — and no coverage exists until a policy is issued.
+          {notificationSent
+            ? "Your answers are saved and queued for review. This is a preliminary review request, not an application, an offer, or an approval — and no coverage exists until a policy is issued."
+            : notificationFailed
+              ? `Your answers are saved, but the notification to ${SITE.owner} failed. He can still see the case in the secure review portal; no action is needed from you. This is a preliminary review request, not an application, an offer, or an approval.`
+              : `Your answers are saved in the review portal, but no notification was sent to ${SITE.owner} because the email service is not configured. This is a preliminary review request, not an application, an offer, or an approval.`}
         </p>
       </header>
 

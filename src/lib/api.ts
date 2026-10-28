@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { buildConsentRecords, SUBMISSION_ACKNOWLEDGEMENT_TEXT, CONSENT_VERSION } from "@/features/consent/consentTexts";
 import { buildDraftSummary } from "@/features/interview/engine";
 import { QUESTION_BY_ID } from "@/features/interview/questionBank";
+import { QUESTIONNAIRE_VERSION } from "@/features/interview/types";
 import type {
   Answers,
   CaseDraft,
@@ -229,6 +230,8 @@ function buildSampleCase(): CaseRecord {
     state: "TX",
     email: "test-case@example.com",
     preferredContact: "email" as const,
+    dateOfBirth: "1979-04-12",
+    adultAttested: true,
     assistance: "Health-history review",
     coverageAmount: "$500,000",
     coveragePurpose: "Family protection",
@@ -238,7 +241,7 @@ function buildSampleCase(): CaseRecord {
   return {
     reference: "LPP-2026-SAMPLE",
     submittedAt,
-    questionnaireVersion: "2026.10-draft.1",
+    questionnaireVersion: QUESTIONNAIRE_VERSION,
     startedAt: new Date(Date.parse(submittedAt) - 1000 * 60 * 14).toISOString(),
     completedAt: submittedAt,
     lead,
@@ -256,6 +259,7 @@ function buildSampleCase(): CaseRecord {
         timestamp: submittedAt,
       },
     ],
+    adultAttested: true,
     flags: [
       {
         id: "sample",
@@ -302,7 +306,7 @@ function ensurePreviewSeed(): void {
 // Submission
 // ---------------------------------------------------------------------------
 
-async function submitLive(draft: CaseDraft): Promise<SubmissionReceipt> {
+async function submitLive(draft: CaseDraft, submissionKey: string): Promise<SubmissionReceipt> {
   if (!SUBMIT_CASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error("The submission service is not configured.");
   }
@@ -313,6 +317,7 @@ async function submitLive(draft: CaseDraft): Promise<SubmissionReceipt> {
       "Content-Type": "application/json",
       apikey: SUPABASE_ANON_KEY,
       Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      "Idempotency-Key": submissionKey,
     },
     body: JSON.stringify(draft),
   });
@@ -334,8 +339,11 @@ async function submitLive(draft: CaseDraft): Promise<SubmissionReceipt> {
   return body as SubmissionReceipt;
 }
 
-export async function submitCase(draft: CaseDraft): Promise<SubmissionReceipt> {
-  if (!PREVIEW_MODE) return submitLive(draft);
+export async function submitCase(
+  draft: CaseDraft,
+  submissionKey: string,
+): Promise<SubmissionReceipt> {
+  if (!PREVIEW_MODE) return submitLive(draft, submissionKey);
 
   ensurePreviewSeed();
 
@@ -435,6 +443,18 @@ export async function getCase(reference: string): Promise<CaseRecord | null> {
   if (!data) return null;
 
   const record = fromRow(data as CaseRow);
+
+  // Opening a sensitive case is an access event. The RPC deduplicates repeated
+  // loads by the same reviewer within eight hours, so a refresh does not spam
+  // the log. A logging failure must not block legitimate review.
+  const { error: accessLogError } = await supabase.rpc("record_case_review", {
+    p_reference: reference,
+    p_action: "opened",
+    p_note: null,
+  });
+  if (accessLogError) {
+    console.warn("Access log write failed", accessLogError.code);
+  }
 
   const { data: log } = await supabase
     .from("case_review_log")

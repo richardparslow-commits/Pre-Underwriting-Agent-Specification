@@ -1,0 +1,18 @@
+bank 92
+visible-empty 73
+unanswered-empty 73
+askWhen 14
+MH-02<-MH-01:yes
+NIC-04<-NIC-01:no/unknown
+AVI-03<-AVI-02:yes
+AVO-02<-AVO-01:climbing
+AVO-03<-AVO-01:racing
+AVO-04<-AVO-01:scuba
+AVO-05<-AVO-01:skydiving
+AVO-06<-AVO-01:climbing
+AVO-07<-AVO-01:scuba
+FIN-02<-FIN-01:yes/unknown
+FIN-03<-FIN-01:yes/unknown
+MIL-02<-MIL-01:yes
+MIL-03<-MIL-01:yes
+MIL-04<-MIL-02:yes

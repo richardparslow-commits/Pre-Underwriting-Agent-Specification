@@ -31,7 +31,7 @@ export default function IntakePage() {
     setError(null);
 
     try {
-      const receipt = await submitCase(interview.draft);
+      const receipt = await submitCase(interview.draft, interview.submissionKey);
       interview.markSubmitted(receipt);
     } catch (submitError) {
       setError(
@@ -52,6 +52,7 @@ export default function IntakePage() {
             lead={interview.lead}
             consent={interview.consent}
             onField={interview.setLeadField}
+            onAdultAttested={interview.setAdultAttested}
             onConsent={interview.setConsent}
             onContinue={interview.begin}
           />

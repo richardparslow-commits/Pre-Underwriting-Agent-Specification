@@ -90,7 +90,7 @@ export default function LandingPage() {
             <dl className="mt-10 grid max-w-lg grid-cols-3 gap-6 border-t border-border pt-6">
               <div>
                 <dt className="text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground">
-                  Source questions
+                  Core questions
                 </dt>
                 <dd className="mt-1 font-display text-2xl">{ANSWERED}</dd>
               </div>

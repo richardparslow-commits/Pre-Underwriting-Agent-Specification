@@ -1,0 +1,18 @@
+Audit date: 2026-10-27
+Repository: richardparslow-commits/Pre-Underwriting-Agent-Specification (local checkout)
+Branch: main
+Commit: 07fdbfe632d48ef363caac086e82b8c2f13277a2
+Commit date: 2026-10-27 12:39:09 -0500
+Commit subject: Guard marketing consent evidence behind enabled channels
+Working tree (tracked changes):
+Status (untracked audit workspace only):
+?? .tmp/
+?? audit/
+Node: v24.16.0
+npm: 11.13.0
+Git: git version 2.54.0 (Apple Git-157)
+Deno: deno 2.9.6 (stable, release, aarch64-apple-darwin)
+macOS: 27.0.1
+History commits: 5
+Prompt:       53 lines,     2296 bytes
+Prompt final line: → human review

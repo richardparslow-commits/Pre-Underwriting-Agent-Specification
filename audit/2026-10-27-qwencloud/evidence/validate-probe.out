@@ -1,0 +1,22 @@
+AS EXPECTED | valid baseline | accept | 1 answers
+AS EXPECTED | held HIV row marked approved | accept | 1 answers
+AS EXPECTED | held visa number row | accept | 1 answers
+AS EXPECTED | invented question and source | accept | 1 answers
+AS EXPECTED | zero-answer submission | accept | 0 answers
+AS EXPECTED | marketing consent with no channel policy | accept | 1 answers
+AS EXPECTED | duplicate and unknown consent IDs | accept | 1 answers
+AS EXPECTED | substituted privacy version and text | accept | 1 answers
+AS EXPECTED | future consent and reversed chronology | accept | 1 answers
+AS EXPECTED | arbitrary acknowledgement id/version | accept | 1 answers
+AS EXPECTED | non-US state value | accept | 1 answers
+AS EXPECTED | invented questionnaire version | accept | 1 answers
+AS EXPECTED | client-invented not-applicable disposition | accept | 1 answers
+AS EXPECTED | marketing number does not match lead phone | accept | 1 answers
+AS EXPECTED | MH-05 yes with suppressed crisis flag | accept | 1 answers
+AS EXPECTED | missing intake permission | reject | Intake permission is required to submit
+AS EXPECTED | missing privacy acknowledgement | reject | Privacy practices acknowledgement is required to submit
+AS EXPECTED | marketing without phone | reject | A telephone number is required for call or text consent
+AS EXPECTED | duplicate question | reject | Duplicate question
+AS EXPECTED | 401 answers | reject | Too many answers
+AS EXPECTED | non-self relationship | reject | This interview only accepts an adult answering for themselves. Ask us about the separate authority process.
+SUMMARY unexpected=0 total=21

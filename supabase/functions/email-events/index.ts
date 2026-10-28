@@ -1,28 +1,29 @@
 /**
  * POST /functions/v1/email-events — provider delivery webhook.
  *
- * This is a machine-to-machine endpoint, so it must be deployed with JWT
- * verification OFF and authenticated by the shared secret header instead:
+ * Deploy with JWT verification OFF:
  *
  *   [functions.email-events]
  *   verify_jwt = false
  *
- * Set EMAIL_WEBHOOK_SECRET in the project's function secrets and configure the
- * provider to send the same value in `x-webhook-secret`.
+ * Authentication is the provider's Svix signature over the raw body, not a
+ * shared secret header. EMAIL_WEBHOOK_SECRET must be the `whsec_…` signing
+ * secret. A missing or malformed secret fails closed (503), because accepting
+ * unsigned delivery claims would make the portal's evidence untrustworthy.
  *
- * Replace the shared-secret check with the provider's signature verification
- * (for example Svix signatures) if the provider supports it. A shared secret
- * over TLS is the minimum, not the ideal.
- *
- * Only non-clinical state is touched: delivered / accepted / failed.
+ * Events are deduplicated by svix-id and applied through a monotonic SQL
+ * function: delivered cannot regress, and a late "sent" cannot overwrite a
+ * bounce. Only non-clinical state is stored.
  */
 
-import { jsonResponse, serviceClient } from "../_shared/case.ts";
+import { jsonResponse, readBodyWithLimit, serviceClient } from "../_shared/case.ts";
+import { verifySvixSignature } from "../_shared/svix.ts";
 
 type NotificationState = "accepted" | "delivered" | "failed";
 
 const MESSAGE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 const CASE_REFERENCE_PATTERN = /^LPP-\d{4}-[0-9A-Z]{6}$/;
+const MAX_WEBHOOK_BYTES = 64 * 1024;
 
 function mapEvent(type: string): NotificationState | null {
   switch (type) {
@@ -40,22 +41,51 @@ function mapEvent(type: string): NotificationState | null {
   }
 }
 
+function extractTag(tags: unknown): string | null {
+  if (typeof tags !== "object" || tags === null) return null;
+  const value = (tags as Record<string, unknown>)["case_reference"];
+  return typeof value === "string" && CASE_REFERENCE_PATTERN.test(value) ? value : null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") {
     return jsonResponse({ error: "Method not allowed" }, 405, null);
   }
 
-  const expected = Deno.env.get("EMAIL_WEBHOOK_SECRET");
-  const provided = req.headers.get("x-webhook-secret");
+  const secret = Deno.env.get("EMAIL_WEBHOOK_SECRET") ?? "";
+  if (!secret.startsWith("whsec_")) {
+    // Configuration error, not an authentication failure. Do not process.
+    return jsonResponse({ error: "Webhook verification is not configured" }, 503, null);
+  }
 
-  if (!expected || !provided || provided !== expected) {
-    // Fail closed when the secret is missing, and never echo either value.
-    return jsonResponse({ error: "Unauthorized" }, 401, null);
+  const bodyResult = await readBodyWithLimit(req, MAX_WEBHOOK_BYTES);
+  if (!bodyResult.ok) {
+    return jsonResponse(
+      { error: bodyResult.reason === "too_large" ? "Event too large" : "Invalid event" },
+      bodyResult.reason === "too_large" ? 413 : 400,
+      null,
+    );
+  }
+
+  const rawBody = bodyResult.text;
+
+  const verified = await verifySvixSignature({
+    secret,
+    headers: {
+      id: req.headers.get("svix-id"),
+      timestamp: req.headers.get("svix-timestamp"),
+      signature: req.headers.get("svix-signature"),
+    },
+    rawBody,
+  });
+
+  if (!verified) {
+    return jsonResponse({ error: "Invalid signature" }, 401, null);
   }
 
   let body: unknown;
   try {
-    body = await req.json();
+    body = JSON.parse(rawBody);
   } catch {
     return jsonResponse({ error: "Invalid event" }, 400, null);
   }
@@ -81,9 +111,7 @@ Deno.serve(async (req: Request) => {
   const caseReference =
     typeof data.case_reference === "string" && CASE_REFERENCE_PATTERN.test(data.case_reference)
       ? data.case_reference
-      : typeof data.tags === "object" && data.tags !== null
-        ? extractTag(data.tags as Record<string, unknown>)
-        : null;
+      : extractTag(data.tags);
 
   const messageId =
     typeof data.email_id === "string" && MESSAGE_ID_PATTERN.test(data.email_id)
@@ -93,36 +121,24 @@ Deno.serve(async (req: Request) => {
         : null;
 
   if (!caseReference && !messageId) {
-    // Nothing safe to reconcile against.
     return jsonResponse({ ok: true, ignored: true }, 200, null);
   }
 
+  const eventId = req.headers.get("svix-id") ?? "";
   const supabase = serviceClient();
 
-  let query = supabase.from("cases").update({
-    notification_state: state,
-    notification_updated_at: new Date().toISOString(),
+  const { data: result, error } = await supabase.rpc("apply_email_event", {
+    p_event_id: eventId,
+    p_event_type: type,
+    p_reference: caseReference,
+    p_message_id: messageId,
+    p_state: state,
   });
-
-  if (caseReference) {
-    query = query.eq("reference", caseReference);
-  } else {
-    // notification_detail is generated by this service as JSON:
-    // {"provider":"resend","messageId":"…","note":"…"}
-    query = query.like("notification_detail", `%"messageId":"${messageId}"%`);
-  }
-
-  const { error, count } = await query.select("reference", { count: "exact" });
 
   if (error) {
     console.error("Email event could not be recorded", error.code);
     return jsonResponse({ error: "Could not record event" }, 500, null);
   }
 
-  return jsonResponse({ ok: true, matched: count ?? 0 }, 200, null);
+  return jsonResponse({ ok: true, result }, 200, null);
 });
-
-function extractTag(tags: Record<string, unknown>): string | null {
-  const value = tags["case_reference"];
-  return typeof value === "string" && CASE_REFERENCE_PATTERN.test(value) ? value : null;
-}

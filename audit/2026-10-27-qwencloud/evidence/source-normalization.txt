@@ -1,0 +1,12 @@
+Source PDF: source/Detialed-Life-insurance-Questions.pdf
+SHA-256: afe91d876f2c9e932302267ad10d0c46b774b4161efea8d0d2ffe71e3c82cca2
+Inventory hash: afe91d876f2c9e932302267ad10d0c46b774b4161efea8d0d2ffe71e3c82cca2
+PDF pages: 7
+Committed extraction bullets: 113
+Fresh extraction bullets: 113
+Inventory items: 113
+
+Normalized committed words: 2568
+Normalized fresh words: 2568
+Normalized text identical: False
+Only normalized difference: the fresh PDF extraction places the Bankruptcy bullet 'If Chapter 7, was this personal or business?' before the general bankruptcy bullet; the committed extraction places it after. The words and punctuation are otherwise identical.

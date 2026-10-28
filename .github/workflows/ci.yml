@@ -17,27 +17,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v4
+        # v4.3.1 — pinned to a commit, not a movable tag.
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        # v4.4.0 — pinned to a commit, not a movable tag.
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
 
+      # Install without lifecycle scripts: no dependency in this tree needs a
+      # postinstall to build, so an unreviewed install hook cannot execute in CI.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
+
+      - name: Dependency audit
+        run: npm audit --audit-level=high
 
       - name: Set up Deno
-        uses: denoland/setup-deno@v2
+        # v2.0.5 — pinned to a commit, not a movable tag.
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
         with:
-          deno-version: v2.x
+          deno-version: v2.9.6
 
       # The public intake is the security boundary: a draft that omits either
       # required consent must be rejected before a case is written, even when
       # the browser form is bypassed. This drives the real submit-case handler.
-      - name: Server consent regression test
-        run: deno test --allow-env --no-lock supabase/functions/tests/
+      - name: Server regression tests
+        run: deno test --allow-env --lock=deno.lock supabase/functions/tests/
 
       # Consent evidence is generated from build-time channel flags. A
       # placeholder seller or a disabled channel must never produce a
@@ -45,10 +53,25 @@ jobs:
       - name: Marketing consent regression test
         run: npm run test:consent
 
+      - name: Interview engine regression test
+        run: npm run test:engine
+
       # Fails if a bank row loses its reconciliation record, a source question
       # stops being acknowledged, or the crisis question is gated again.
       - name: Question bank reconciliation
         run: npm run check:bank
+
+      # The server must use exactly the same bank and consent wording as the
+      # browser. Drift here would make a valid customer submission fail closed
+      # or, worse, let an old row through.
+      - name: Server bank and consent policy are current
+        run: |
+          npm run check:server-bank
+          npm run check:server-policy
+
+      # Counts and claims in customer/reviewer docs must match the audited data.
+      - name: Documentation counts are current
+        run: npm run check:docs
 
       # The review document is generated, so a bank change that was not followed
       # by `npm run report:reconciliation` would leave reviewers reading stale

@@ -10,7 +10,13 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "check:bank": "tsx scripts/check-bank.ts",
+    "check:docs": "tsx scripts/check-docs.ts",
+    "check:server-bank": "tsx scripts/check-server-bank.ts",
+    "check:server-policy": "tsx scripts/check-server-policy.ts",
+    "generate:server-bank": "tsx scripts/generate-server-bank.ts",
+    "generate:server-policy": "tsx scripts/generate-server-policy.ts",
     "test:consent": "tsx --test src/features/consent/marketingConsent.test.ts",
+    "test:engine": "tsx --test src/features/interview/engine.test.ts",
     "report:reconciliation": "tsx scripts/report-reconciliation.ts"
   },
   "dependencies": {
@@ -21,14 +27,14 @@
     "lucide-react": "^0.462.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.30.0",
+    "react-router-dom": "^7.18.5",
     "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
-    "@vitejs/plugin-react-swc": "^3.7.2",
+    "@vitejs/plugin-react-swc": "^4.3.3",
     "autoprefixer": "^10.4.20",
     "lovable-tagger": "^1.1.7",
     "postcss": "^8.4.49",
@@ -36,6 +42,6 @@
     "tailwindcss-animate": "^1.0.7",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vite": "^5.4.19"
+    "vite": "^8.3.5"
   }
 }

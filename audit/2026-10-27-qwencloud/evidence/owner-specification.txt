@@ -1,0 +1,670 @@
+Life Policy Pilot: Pre-Underwriting Agent
+Speciﬁcation
+
+Purpose and status
+
+Proposed product requirement: The AI Customer Health Agent conducts a guided pre-
+
+underwriting interview using the uploaded Detialed-Life-insurance-Questions.pdf as its
+
+controlled source questionnaire. Aer the customer reviews and expressly submits the
+
+responses, the system creates a structured case for Richard Parslow and sends a notiﬁcation to
+
+richardparslow@lifepolicypilot.blog. The uploaded questionnaire covers medical history,
+
+mental health, nicotine, alcohol, avocations, driving, criminal history, bankruptcy, drugs,
+
+residency and travel, occupation and ﬁnances, and military service.[^1]
+
+This document deﬁnes a proposed implementation, not an operating integration. No website,
+secure case store, email sender, or mailbox connection has been deployed or veriﬁed. The
+destination address is speciﬁed by the business owner; its ownership, security conﬁguration,
+and ability to receive notiﬁcations still require veriﬁcation.
+
+The default delivery design should send a secure case notiﬁcation, not expose the completed
+medical interview in an ordinary email body. Full-report delivery by email can be supported
+through a separately approved secure-message or encrypted-delivery workﬂow. This is a
+security design recommendation, not a statement that all health-information email is illegal:
+HHS permits email of electronic protected health information when the applicable access,
+integrity, and transmission safeguards are satisﬁed.[^2]
+
+Customer interview ﬂow
+
+The proposed workﬂow is introduction → lead form → intake permission → questionnaire →
+conditional follow-ups → review and correction → aﬃrmative submission → secure storage →
+email notiﬁcation → human review. The customer must be able to ﬁnish an intake without
+agreeing to optional marketing calls or texts.
+
+Stage
+
+Introduction
+
+Required behavior
+
+Identify the assistant as AI; identify Life Policy Pilot; explain that this is preliminary information collection, not a
+
+carrier application, diagnosis, oﬀer, or approval.
+
+Collect name, current state of residence, email, contact preference, and telephone number only when relevant
+
+Lead form
+
+to the requested contact method. Keep any desired coverage amount, coverage purpose, and term preference
+clearly labeled as additional intake fields rather than questions extracted from the PDF.
+
+Intake
+permission
+
+Present the actual purpose, recipient, privacy practices, and handling arrangements before sensitive
+questioning. Record aﬀirmative permission and the displayed text version.
+
+Interview
+
+Ask one manageable question at a time, with visible section progress. Preserve every applicable source
+question and its time window.
+
+Stage
+
+Follow-ups
+
+Review
+
+Required behavior
+
+Ask applicable PDF follow-ups and approved clarifying questions. Clearly distinguish supplemental questions
+from the PDF's original questions.
+
+Display the customer's recorded answers, unresolved items, and consent choices. Allow corrections before
+submission.
+
+Submission
+
+Require an explicit “Submit for Richard's Review” action; do not treat completion of the last question as
+permission to send.
+
+Confirmation
+
+Show a case reference and accurate status. Separate “saved,” “notification queued,” “provider accepted,” and
+“delivery failed”; never claim inbox delivery without supporting evidence.
+
+Agent review
+
+Give Richard authenticated access to the complete answers, source references, and an AI-generated dra
+summary.
+
+For the initial release, an adult answering for themselves is the simplest supported workﬂow.
+
+Third-party or minor-insured submissions should go through a separate authority-and-consent
+
+process rather than assuming that a spouse, parent, or other visitor may disclose any person's
+
+information.
+
+PDF question coverage
+
+The source PDF contains overlapping questions with diﬀerent lookback periods and
+conditional detail requests. For example, it includes several nicotine windows, several
+criminal-history windows, and medical questions covering distinct periods; these should not
+be silently reduced to one generic yes/no question.[^1]
+
+The table below is an implementation map, not a replacement questionnaire. The production
+question bank must be reconciled against the entire PDF and retain a traceable record for every
+source question.[^1]
+
+Interview area
+
+Source coverage to retain
+
+Branching requirement
+
+Identity and
+
+demographics
+
+Birth date, age, birthplace, and sex/gender wording.[^1]
+
+Recent testing, surgery, hospitalizations, pending
+
+Medical history
+
+recommendations/results, cardiovascular and circulatory
+conditions, diabetes, cancer, respiratory and digestive conditions,
+
+kidney and other disorders, disability, care needs, transplant
+history, family history, and medications.[^1]
+
+Mental health
+
+Diagnoses, treatment, medication, timing, hospital care, work
+impact, suicidal thoughts, and attempts.[^1]
+
+Nicotine
+
+Product categories, use across specified periods, and last-use
+details.[^1]
+
+Add current residence separately for
+routing; do not confuse it with
+
+birthplace. Flag the source
+sex/gender field for jurisdiction and
+
+carrier review.
+
+Retain each lookback period,
+
+exclusions, and compound-question
+meaning; collect condition-specific
+
+details when relevant.
+
+Use approved, respectful language;
+distinguish historical disclosures
+
+from present danger.
+
+Preserve diﬀering cigar/pipe
+
+exclusions; record product,
+frequency, and dates rather than
+
+assuming a tobacco class.
+
+Interview area
+
+Source coverage to retain
+
+Branching requirement
+
+Alcohol
+
+Aviation
+
+Other
+
+avocations
+
+Driving
+
+Use-related concerns, professional advice, counseling/treatment,
+and alcohol-related infractions across the source periods.[^1]
+
+Distinguish current use, historical
+treatment, advice to stop, and legal
+
+events.
+
+Recent and planned flying, certification, experience, flight
+
+Open detailed aviation questions
+
+schedules, aircra types, and aviation incidents.[^1]
+
+only when applicable.
+
+Climbing, racing, diving, and other specified hazardous pursuits,
+
+including activity-specific details.[^1]
+
+Apply separate climbing, racing, and
+
+diving branches; do not ask diving-
+equipment questions of a non-diver.
+
+License status, suspension/revocation, violations, DUI/DWI,
+reckless driving, and accidents.[^1]
+
+Preserve distinct periods and event
+types.
+
+Criminal history
+
+Convictions, pleas, pending matters, incarceration, probation,
+parole, and release dates.[^1]
+
+Bankruptcy
+
+Personal/spousal history, type, business/personal distinction,
+
+discharge, and pending status.[^1]
+
+Drug use
+
+Non-prescribed use, treatment, professional advice, cannabis, and
+historical substance-related questions.[^1]
+
+Residency and
+travel
+
+Citizenship/residency, immigration category, U.S. residence
+history, and past/planned international travel.[^1]
+
+Occupation and
+
+Occupation, salary, employment hours/history, weapon use, and
+
+finances
+
+listed occupational concerns.[^1]
+
+Military service
+
+Active-duty status, deployment questions, military aviation, and
+
+aircra duties.[^1]
+
+Record events accurately without
+treating an arrest, charge, and
+
+conviction as interchangeable.
+
+Branch to relevant details; avoid
+
+collecting unrelated information
+about a spouse.
+
+Preserve prescribed-use exceptions
+and separate cannabis details; do not
+
+infer legal status from a generic label.
+
+Maintain dates, places, and duration.
+
+Flag identity-document numbers
+and static country lists for review
+
+before collection.
+
+Collect specific duties where needed
+
+rather than assuming risk from a job
+title.
+
+Ask only approved, necessary
+insurance questions; do not request
+
+classified details or precise
+operational information.
+
+Controlled questioning rules
+
+Use the PDF as a versioned question bank—not merely as a document the model searches from
+
+memory. Each question should have a stable ID, source location, exact original text, approved
+
+customer-facing text, timeframe, answer format, applicability rule, and follow-up links.
+
+Preserve an immutable copy of the approved questionnaire version used in each submitted
+
+case.
+
+The conversation layer may explain unfamiliar words, request clariﬁcation, and make the
+
+interview more approachable. It must not drop exclusions, change “ever” into “recently,” turn a
+
+ﬁve-year question into a seven-year question, or silently substitute a diﬀerent question. Any
+
+proposed change should enter an approval queue before it aﬀects customers.
+
+For long multi-part questions, the interface may collect the components separately, then obtain
+
+conﬁrmation of the complete source question and its combined response. Reusing previously
+
+supplied facts is acceptable only when those facts cover the same scope; the customer should
+
+conﬁrm any proposed answer. Missing information must remain missing, rather than being
+
+converted to “No.”
+
+Recommended answer states are Yes; No; Unknown; Prefer not to answer; Not applicable
+
+under an approved rule; and Not asked. “All applicable questions answered” and “submitted
+
+with unresolved items” must be diﬀerent statuses. A customer who withholds sensitive
+
+information should be oﬀered a human handoﬀ, not coerced into an answer or automatically
+
+rejected.
+
+Supplemental follow-ups may capture diagnosis date, latest treatment, medication details,
+
+hospitalizations, current status, complications, and pending tests when relevant. These
+
+additions must be labeled separately from the source questionnaire. Do not infer a diagnosis
+
+from a medication or represent customer-entered values as independently veriﬁed medical
+
+records.
+
+Required source review
+
+The source includes particularly sensitive questions about HIV/AIDS, mental health and
+suicide, substance use, reproductive/sexual health, immigration status, and criminal history; it
+also requests a visa or green-card identiﬁcation number in one residency question. It includes
+dated terminology and static geographic lists that warrant review before customer-facing
+deployment.[^1]
+
+Preserve these items in the internal source inventory, but do not interpret the customer's
+instruction to use the PDF as approval to deploy every item unchanged. The recommended
+launch gate is documented legal/compliance and underwriting review of sensitive questions,
+authorized wording, applicable state/carrier restrictions, and data necessity. If a question
+cannot be approved for automated collection, mark it “human review required” with a reason;
+do not silently remove it from the coverage audit.
+
+For initial pre-underwriting, the recommended default is not to collect Social Security
+numbers, payment details, passport numbers, visa/green-card numbers, identity-document
+scans, or unrelated family identiﬁers. If any such information is later necessary, obtain it in an
+
+approved downstream workﬂow rather than casual chat. Height/weight and other useful
+
+underwriting ﬁelds absent from the PDF may be added only as explicitly identiﬁed
+
+supplemental questions.
+
+Because the PDF asks about suicidal thoughts and attempts, distinguish a historical answer
+
+from a disclosure suggesting current crisis. For present crisis, pause the sales interview and
+
+present approved support information; NIMH directs people experiencing suicidal thoughts to
+
+call or text 988, and to call 911 in life-threatening situations. The agent must not claim to
+
+provide emergency monitoring or to have dispatched help.[ 1]
+
+3][
+
+Consent and disclosures
+
+The proposed consent design has separate purposes: permission for the preliminary intake
+
+and submission; acknowledgment of privacy practices; optional marketing-call consent;
+
+optional marketing-text consent; and any later medical-record release. Do not use one
+
+checkbox as a universal authorization for all of these activities.
+
+A short product-level intake acknowledgment could read:
+
+This AI assistant collects information for a preliminary life-insurance review by
+
+Richard Parslow at Life Policy Pilot. It does not diagnose medical conditions or decide
+
+insurance eligibility. Before submission, you can review and correct your answers. By
+
+selecting “Submit for Richard's Review,” you ask Life Policy Pilot to securely provide
+
+your responses to Richard for this review. Submitting this questionnaire does not create
+
+insurance coverage or automatically authorize release of medical records or submission
+
+to an insurer.
+
+This is dra interface language, not a complete legal authorization or substitute for a privacy
+
+notice. Any applicable authorization must identify the actual legal business entity, relevant
+information and recipients, purpose, duration, revocation process, and other required
+elements. Texas Insurance Code Chapter 602 includes insurance agents and requires speciﬁed
+authorization elements where authorization is needed, while also providing exceptions for
+necessary insurance functions including underwriting and placement; counsel must assess the
+actual workﬂow rather than assume every disclosure always needs a new authorization.[^4]
+
+Maintain the optional, unchecked call and text controls and TCPA disclosure developed for the
+lead form. The authorized seller must be the actual legal entity; the disclosure must describe
+the methods actually used. Federal written-consent rules require clear authorization for
+covered telemarketing technologies, the relevant telephone number, a qualifying signature,
+and a disclosure that agreement is not a condition of purchase.[^5]
+
+The customer's instruction to send the submitted case to Richard is not, by itself, permission to
+launch automated marketing calls or texts. The product must enforce selected contact
+permissions, applicable suppression rules, local-time/state restrictions, and reasonable
+revocation requests outside the language model. Permission to provide a requested response
+
+should be recorded separately from ongoing marketing consent, with counsel reviewing the
+
+actual content and technology.[^5]
+
+Email delivery design
+
+Notiﬁcation recipient: richardparslow@lifepolicypilot.blog. Conﬁgure this destination on the
+
+server as an approved recipient. The visitor and language model must not be able to replace it,
+
+add arbitrary recipients, or change mail routing through conversational instructions.
+
+The recommended notiﬁcation template is deliberately minimal:
+
+Subject: New Life Policy Pilot pre-underwriting submission — Case [reference]
+
+A customer has submitted a pre-underwriting questionnaire for your review.
+
+Sign in to the secure review portal to view the submitted answers and case summary.
+
+Case reference: [reference]
+
+Submission time: [timestamp]
+
+Status: Submitted for review
+
+Keep names, birth dates, diagnoses, medications, criminal details, and questionnaire
+
+attachments out of the default notiﬁcation. The portal link should lead to authentication;
+
+possession of a forwarded email alone must not grant case access. Require an authorized
+
+account, preferably with multifactor authentication, and check case access permissions on
+
+every request.
+
+If full-report email delivery is required, use an approved secure-message or encrypted-delivery
+
+service and review mailbox access, forwarding, retention, recovery, and vendor arrangements.
+
+Do not assume a password-protected attachment sent with its password in the same email is
+adequate. HHS does not categorically prohibit email of ePHI, but it requires covered entities to
+
+assess the safeguards and document the transmission-security decision.[^2]
+
+Submission should ﬁrst create the case successfully in the secure store, then queue the
+notiﬁcation. Record provider acceptance, delivery events where available, failures, and retries
+without writing the questionnaire into ordinary email-provider logs. Retries must not create
+duplicate cases. When email fails, preserve the case and show an honest notiﬁcation status
+rather than claiming successful delivery.
+
+Richard's review package
+
+Provide both the complete question-and-answer record and a clearly labeled AI-generated
+dra summary. The summary is a navigation aid, not a replacement for the source responses
+or an underwriting decision. Each summarized fact should link back to the customer's answer.
+
+Package
+component
+
+Required content
+
+Case header
+
+Reference, submission time, questionnaire version, customer identity/contact fields, residence, and
+requested contact method.
+
+Question record
+
+Every source question's disposition: answered, unknown, declined, not applicable, held for human review,
+or not asked. Include exact question ID and timeframe.
+
+Health-history
+summary
+
+Customer-reported conditions, dates, medications, treatment, hospitalizations, and unresolved testing,
+without invented conclusions.
+
+Lifestyle and other
+details
+
+Nicotine, alcohol/drugs, avocations, driving, criminal/financial history, residency/travel, occupation, and
+military responses where applicable.
+
+Review flags
+
+Inconsistencies, approximate dates, uncertain answers, incomplete branches, and necessary clarification.
+Use neutral labels, not an opaque “bad risk” score.
+
+Consent evidence
+
+Submitted acknowledgment, displayed versions, signature/action evidence, channel permissions, and
+later revocations.
+
+Package
+
+component
+
+Customer
+
+verification
+
+Workflow status
+
+Required content
+
+Original statements, corrections, review confirmation, and submitted snapshot.
+
+Dra, ready for review, submitted, notification queued, or notification failed; record Richard's subsequent
+
+human review separately.
+
+Carrier-speciﬁc screening, if later added, should be a separate, source-controlled feature
+
+showing carrier/product, jurisdiction, underwriting-guide version, assumptions, and
+unresolved information. This intake alone must not assign ﬁnal rate classes, quote guaranteed
+
+premiums, declare approval/decline, select a product autonomously, or submit applications to
+carriers. Texas's AI bulletin speciﬁcally expects human review and agreement before action on
+
+consequential AI decisions and also highlights licensing boundaries.[^6]
+
+Privacy and security checks
+
+Determine legal applicability before making a HIPAA-compliance claim. HHS lists life insurers
+
+among organizations generally outside the HIPAA Privacy and Security Rules; covered-entity or
+business-associate status depends on the actual role and relationship, not merely on collecting
+
+health answers. Texas also has insurance-speciﬁc health-information protections that expressly
+include agents and interact with other state requirements.[ 4]
+
+7][
+
+Regardless of HIPAA applicability, the proposed production requirements are encrypted
+
+transport and storage, restricted administrative access, multifactor authentication,
+documented retention/deletion schedules, audit trails, incident procedures, and vendor review.
+
+Exclude health responses from advertising pixels, session-replay tools, ordinary analytics
+events, URL query strings, public document links, and unapproved general-purpose model
+
+training. Prevent cross-customer retrieval and remove health-content payloads from routine
+application and monitoring logs.
+
+Where HIPAA applies, assess vendors and business associate arrangements as part of the actual
+
+data ﬂow; business associates and their relevant subcontractors have speciﬁc contractual and
+safeguard obligations. Security requirements must cover the model provider, hosting,
+
+database, backups, forms/chat service, email service, and every integration that receives the
+data—not only the chat widget.[^7]
+
+Production acceptance tests
+
+The following are proposed launch criteria, not proof that a system has already passed them.
+
+1. Question coverage: Reconcile every PDF question against the approved bank; document
+
+sensitive-item restrictions and every intentional revision.
+
+2. Branch coverage: Verify that applicable follow-ups are asked, irrelevant conditional
+
+questions are skipped, and repeated timeframes/exclusions remain distinct.
+
+3. Answer integrity: Conﬁrm that blanks, uncertainty, and refusal are never saved as “No,”
+
+and that the bot does not invent medical facts.
+
+4. Review and submission: Prove that the customer can correct answers, changes invalidate
+
+the prior review conﬁrmation, and no case notiﬁcation is sent without aﬃrmative
+submission.
+
+5. Consent separation: Completing the questionnaire with marketing boxes unchecked
+
+creates no marketing enrollment; selected permissions and later withdrawals propagate
+correctly.
+
+6. Recipient control: Prove that prompt injection and client-side changes cannot alter the
+
+approved email recipient or expose another case.
+
+7. Secure access: Verify that a forwarded notiﬁcation does not provide access without
+
+authentication and authorization.
+
+8. Delivery reliability: Test secure-store failure, notiﬁcation failure, retry handling, duplicate
+
+prevention, and accurate conﬁrmation wording.
+
+9. Leak prevention: Check analytics, logs, error reports, email bodies, and browser URLs for
+
+sensitive-data exposure.
+
+10. Human review: Verify that consequential recommendations and any carrier-facing actions
+
+remain behind an authorized human approval step.
+
+Launch dependencies
+
+Before implementation is treated as production-ready, conﬁrm the actual legal operating entity,
+
+licensed service states, approved questionnaire version, sensitive-question rules, privacy
+notice, authorization forms, TCPA disclosure, hosting/model vendors, secure intake store,
+
+authenticated review portal, retention schedule, and email-provider conﬁguration. Verify
+access to the speciﬁed recipient mailbox without sharing its password in chat.
+
+An end-to-end test should use clearly labeled non-customer test inputs to conﬁrm that an
+
+interview can be reviewed, submitted, securely stored, and notiﬁed to the intended mailbox. A
+written speciﬁcation or system prompt alone cannot provide these backend controls, establish
+
+legal compliance, or send real submissions.
+
+References
+
+1. Detialed-Life-insurance-Questions.pdf
+
+2. Does the Security Rule allow for sending e-PHI in an email or over ... - The Security Rule does not
+
+expressly prohibit the use of email for sending e-PHI.
+
+3. My Mental Health: Do I Need Help? - ## If you are having thoughts of suicide or urges to hurt
+
+yourself, get immediate help.
+...
+
+**Call 9...
+
+4. chapter 602. privacy of health information - INSURANCE CODE CHAPTER 602. Courier ... This
+
+chapter does not apply to a covered entity that is requ...
+
+5. 47 CFR 64.1200 -- Delivery restrictions. - (9) The term prior express written consent means an
+
+agreement, in writing, bearing the signature of ...
+
+6. Commissioner's Bulletin # B-0003-26 - This bulletin sets forth TDI's expectations as to how
+
+regulated entities will govern the development...
+
+7. Your Rights Under HIPAA - Examples of organizations that do not have to follow the Privacy
+
+and Security Rules include: Life in...
+
+

@@ -9,12 +9,20 @@
 import { resolveLegalEntity } from "./legalEntity";
 
 /**
+ * Vite replaces `import.meta.env` at build time. The fallback keeps this
+ * module importable by the Node scripts that generate the server-side policy
+ * and question bank, where a bundler is not present.
+ */
+const ENV: Record<string, string | undefined> =
+  (import.meta as { env?: Record<string, string | undefined> }).env ?? {};
+
+/**
  * The actual legal operating entity. Supplied at build time so no placeholder
  * can reach a customer. While it is empty, no marketing consent is requested:
  * a TCPA disclosure cannot name an authorised seller that has not been
  * confirmed. Blank and bracket-wrapped values are both treated as unset.
  */
-const LEGAL_ENTITY = resolveLegalEntity(import.meta.env.VITE_LEGAL_ENTITY);
+const LEGAL_ENTITY = resolveLegalEntity(ENV.VITE_LEGAL_ENTITY);
 const LEGAL_ENTITY_CONFIGURED = LEGAL_ENTITY.length > 0;
 
 /**
@@ -23,12 +31,12 @@ const LEGAL_ENTITY_CONFIGURED = LEGAL_ENTITY.length > 0;
  * that are switched on here.
  */
 export const MARKETING = {
-  calls: import.meta.env.VITE_MARKETING_CALLS === "true",
-  texts: import.meta.env.VITE_MARKETING_TEXTS === "true",
+  calls: ENV.VITE_MARKETING_CALLS === "true",
+  texts: ENV.VITE_MARKETING_TEXTS === "true",
   /** Only claim auto-dialing if the calls actually use it. */
-  autodialer: import.meta.env.VITE_MARKETING_AUTODIALER === "true",
+  autodialer: ENV.VITE_MARKETING_AUTODIALER === "true",
   /** Only mention AI voice if calls actually use it. */
-  aiVoice: import.meta.env.VITE_MARKETING_AI_VOICE === "true",
+  aiVoice: ENV.VITE_MARKETING_AI_VOICE === "true",
 } as const;
 
 /** Marketing consent is offered only for a named seller and a live channel. */
@@ -66,23 +74,23 @@ export const FEATURES = {
   bankReconciled: true,
   /**
    * No row has been signed off by a reviewer yet (sourceVerified is false on
-   * all 56 rows), so the public site must not imply the bank is final.
+   * all 92 rows), so the public site must not imply the bank is final.
    */
   bankSignedOff: false,
 } as const;
 
-export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "") ?? "";
+export const SUPABASE_URL = ENV.VITE_SUPABASE_URL?.replace(/\/$/, "") ?? "";
 /** Lovable Cloud names this the publishable key; older projects call it the anon key. */
 export const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
+  ENV.VITE_SUPABASE_PUBLISHABLE_KEY ?? ENV.VITE_SUPABASE_ANON_KEY ?? "";
 
 /**
  * Preview mode runs entirely in the browser with no backend. It is the default
  * so a fresh Lovable import works before Supabase is connected.
  */
 export const PREVIEW_MODE =
-  import.meta.env.VITE_APP_MODE !== "live" || !SUPABASE_URL || !SUPABASE_ANON_KEY;
+  ENV.VITE_APP_MODE !== "live" || !SUPABASE_URL || !SUPABASE_ANON_KEY;
 
 export const SUBMIT_CASE_URL =
-  import.meta.env.VITE_SUBMIT_CASE_URL?.replace(/\/$/, "") ||
+  ENV.VITE_SUBMIT_CASE_URL?.replace(/\/$/, "") ||
   (SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/submit-case` : "");

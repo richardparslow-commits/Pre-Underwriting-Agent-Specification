@@ -1,0 +1,22 @@
+CASE_NOTIFY_TO is not in the approved recipient allowlist; using the default
+resolved recipient: richardparslow@lifepolicypilot.blog
+allowlist enforced: true
+CASE_NOTIFY_TO is not in the approved recipient allowlist; using the default
+to: richardparslow@lifepolicypilot.blog
+subject: New Life Policy Pilot pre-underwriting submission — Case LPP-2026-TEST01
+text:
+A customer has submitted a pre-underwriting questionnaire for your review.
+
+Sign in to the secure review portal to view the submitted answers and case summary.
+
+Case reference: LPP-2026-TEST01
+Submission time: 2026-10-27T12:00:00Z (UTC)
+Status: Submitted for review
+
+Portal: https://example.test/portal
+
+---
+This message contains no health information, names or dates of birth.
+The portal requires an authorised sign-in. A forwarded copy of this email does not grant access.
+Life Policy Pilot
+forbidden content found: none
