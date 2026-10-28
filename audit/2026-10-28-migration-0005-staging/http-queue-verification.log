@@ -1,0 +1,13 @@
+db_user_check={"confirmed":true,"hash_ok":true,"aud":"authenticated","role":"authenticated","instance_id":"00000000-0000-0000-0000-000000000000","identities":1}
+sign_in={"status":200,"ok":true}
+aal1_claim={"aal":"aal1"}
+factor_enrollment={"status":200,"ok":true,"has_secret":true,"keys":["id","type","friendly_name","totp"]}
+factor_challenge={"status":200,"ok":true,"has_id":true}
+factor_verify={"status":200,"ok":true}
+aal2_claim={"aal":"aal2"}
+aal1_queue={"status":200,"rows":0}
+aal2_queue={"status":200,"rows":1,"keys":["crisis_disclosure","first_name","last_name","notification_state","reference","residence_state","status","submitted_at","unanswered"],"keys_match":true,"unanswered":1}
+payload_probe={"status":400,"rejected":true,"code":"42703"}
+anonymous_queue={"status":401,"denied":true}
+cleanup={"case_deleted":true,"user_deleted":true}
+after_cleanup={"case_count":0,"reviewer_count":0,"auth_user_count":0}

@@ -411,7 +411,8 @@ is the reviewer's signature in the report.
   verification. A separate hosted check of migration 0005's view and AAL1/AAL2
   RLS boundary is recorded in
   [audit/2026-10-28-migration-0005-staging/README.md](audit/2026-10-28-migration-0005-staging/README.md);
-  it did not exercise the functions or a live AAL2 HTTP session.
+  it exercised a live AAL2 HTTP session with a labelled temporary reviewer, but
+  did not exercise the edge functions or a real staff reviewer account.
 
 ## Regulatory note
 
