@@ -4,10 +4,11 @@
 # does not silently leave the public endpoint behind JWT verification or expose
 # a reviewer-only function to anonymous callers.
 #
-# submit-case is the only customer-facing function. It is public by design and
-# is protected by origin allowlisting, a byte cap, durable rate limiting and
-# server-side validation. email-events and retry-case-notifications are
-# machine-facing and authenticate with a provider signature or cron secret.
+# submit-case and revoke-marketing are the customer-facing functions. Both are
+# public by design and are protected by origin allowlisting, a byte cap,
+# durable rate limiting and server-side validation. email-events,
+# retry-case-notifications and sync-marketing-suppressions are machine-facing
+# and authenticate with a provider signature or cron secret.
 
 project_id = "lifepolicypilot"
 
@@ -20,10 +21,28 @@ project_id = "lifepolicypilot"
 enable_signup = false
 enable_anonymous_sign_ins = false
 
+# The reviewer portal enrols and challenges a TOTP factor in-app. The local
+# defaults for these two switches are false, so leaving them unset would make a
+# project started from this file reject the portal's MFA calls even though the
+# UI offers them. Hosted projects must also have TOTP enabled under
+# Authentication -> Providers -> Multi-Factor Authentication.
+[auth.mfa]
+max_enrolled_factors = 1
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
 [functions.submit-case]
 verify_jwt = false
 
+[functions.revoke-marketing]
+verify_jwt = false
+
 [functions.email-events]
+verify_jwt = false
+
+[functions.sync-marketing-suppressions]
 verify_jwt = false
 
 [functions.retry-case-notifications]

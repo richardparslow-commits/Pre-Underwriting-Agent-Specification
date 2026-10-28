@@ -25,7 +25,8 @@ service. The following are deliberate, visible gaps:
 | Legal wording (intake acknowledgment, TCPA disclosure) | Draft, pending counsel. `SITE.legalEntity` is supplied by `VITE_LEGAL_ENTITY`; marketing consent and the TCPA disclosure appear only when a seller and at least one channel are configured. `SITE.legalReviewPending` is `true`. |
 | Language-model explainer | **Not wired.** The interview engine is deterministic. `FEATURES.aiExplainerEnabled = false`, so the customer copy does not claim an AI assistant is active. |
 | Email notification | Implemented against Resend in a Supabase edge function; no provider key is configured here, so the UI reports `not_sent` honestly. |
-| Supabase deployment | Applied and exercised on a non-production staging project on 28 Oct 2026: migrations 0001–0005 and the edge functions were deployed and probed with labelled data. No production project, live provider delivery, scheduler run or retention execution exists yet. |
+| Marketing revocation | A customer form at `/marketing-opt-out` matches the case reference plus the email or phone on file, writes the suppression and audit rows immediately, and queues a vendor-sync row. The scheduler worker is implemented, but no vendor endpoint is configured and no outbound marketing sender exists, so every channel remains disabled. |
+| Supabase deployment | Applied and exercised on a non-production staging project on 28 Oct 2026: migrations 0001–0005 are applied; the 0005 `case_summaries` view, its grants and the AAL1/AAL2 boundary were verified; and a live AAL2 queue response was captured with a labelled temporary reviewer. No edge-function or production deployment is recorded, and no live provider delivery, scheduler run or retention execution exists. Forward migrations 0006 (terminal notification state) and 0007 (marketing revocation) are not applied there. |
 | Retention / deletion job | Deletion and expiry functions are implemented in `0003_reliability_and_access.sql`; the schedule stays unset (`retention_months = null`) until counsel approves it. |
 | Carrier screening, quoting, rate classes | Intentionally absent. |
 
@@ -53,6 +54,7 @@ Routes:
 | `/start` | Lead form → permission → interview → review → confirmation |
 | `/privacy` | Privacy practices (draft pending counsel) |
 | `/messaging-terms` | Optional marketing call/text program and its current channels |
+| `/marketing-opt-out` | Customer withdrawal of marketing calls/texts; matches reference plus contact on file |
 | `/portal` | Reviewer sign-in and case queue |
 | `/portal/:reference` | Complete case record, draft summary, consents, review actions, recorded corrections |
 
@@ -98,14 +100,18 @@ supabase/
   migrations/0003_reliability_and_access.sql
   migrations/0004_reviewer_write_paths.sql
   migrations/0005_case_summary_view.sql
+  migrations/0006_notification_terminal_state.sql
+  migrations/0007_marketing_revocation.sql
   ops/retry-schedule.sql         operator-applied pg_cron schedule
   functions/submit-case/         public intake, server-generated reference
+  functions/revoke-marketing/    public opt-out, reference plus contact match
   functions/_shared/case.ts      validation, byte cap, rate limit, service client
   functions/_shared/bank.generated.ts    canonical server question bank
   functions/_shared/policy.generated.ts  canonical consent wording/versions
   functions/_shared/svix.ts      provider signature verification
   functions/_shared/email.ts     minimal notification, fixed recipient, Resend
   functions/email-events/        delivery webhook → notification state
+  functions/sync-marketing-suppressions/  vendor suppression webhook worker
   functions/retry-case-notifications/
 source/Detialed-Life-insurance-Questions.pdf   controlled source questionnaire
 source/Detialed-Life-insurance-Questions.txt   verbatim text extraction
@@ -175,6 +181,13 @@ acknowledgement. A phone number, chat session or questionnaire submission never
 sets marketing consent. When a channel is enabled, the exact displayed TCPA text
 is stored as evidence. Medical-record release is **not** collected in this intake.
 
+Marketing withdrawal is independent of the case. [`/marketing-opt-out`](src/pages/MarketingOptOutPage.tsx)
+matches the case reference plus the email or phone on file, then writes an
+audited suppression. It does not edit the submitted case, its consent evidence or
+the review. A phone suppression covers both calls and texts to that number. The
+vendor-sync outbox and server-only send guard are in
+[`0007_marketing_revocation.sql`](supabase/migrations/0007_marketing_revocation.sql).
+
 ## Security decisions
 
 - The customer-facing app never holds a service-role key. Submission goes through
@@ -215,14 +228,20 @@ In Supabase (or Lovable Cloud) run the migrations in order:
 [`0001_pre_underwriting.sql`](supabase/migrations/0001_pre_underwriting.sql),
 [`0002_case_corrections.sql`](supabase/migrations/0002_case_corrections.sql),
 [`0003_reliability_and_access.sql`](supabase/migrations/0003_reliability_and_access.sql),
-[`0004_reviewer_write_paths.sql`](supabase/migrations/0004_reviewer_write_paths.sql) and
-[`0005_case_summary_view.sql`](supabase/migrations/0005_case_summary_view.sql).
+[`0004_reviewer_write_paths.sql`](supabase/migrations/0004_reviewer_write_paths.sql),
+[`0005_case_summary_view.sql`](supabase/migrations/0005_case_summary_view.sql),
+[`0006_notification_terminal_state.sql`](supabase/migrations/0006_notification_terminal_state.sql) and
+[`0007_marketing_revocation.sql`](supabase/migrations/0007_marketing_revocation.sql).
 They create the reviewer allowlist, immutable cases, review log, corrections,
 suppressions, idempotency, notification leases, delivery-event dedupe, durable
 rate limiting, AAL2 reviewer policies, RPC-only reviewer writes, a payload-free
-queue summary view, audited deletion and the opt-in retention job. Do not stop
-after 0001: the portal's correction
-action needs 0002 and the reliability controls need 0003 and 0004.
+queue summary view, audited deletion, the opt-in retention job, a terminal
+delivery state enforced by both the completion RPC and a table trigger, and a
+customer marketing-revocation path with a vendor-sync outbox and an outbound
+send guard. Do not stop after 0001: the portal's correction
+action needs 0002, the reliability controls need 0003 and 0004, a database
+that already ran 0003 still needs 0006 because editing an applied migration
+does not change it, and the customer opt-out needs 0007.
 
 ### 2. Create the reviewer
 
@@ -243,9 +262,15 @@ so a magic link can never create an account. Mirror that in the hosted project
 
 Reviewing requires an AAL2 session. After the email link, `/portal` enrols a TOTP
 authenticator in-app when the account has none (QR code plus setup key), then
-challenges and verifies the six-digit code before it calls `listCases()`. The
-portal refuses a password-only session, and every reviewer RLS policy
-independently requires `aal2`. A forwarded notification email grants nothing
+challenges and verifies the six-digit code before it calls `listCases()`.
+`supabase/config.toml` explicitly enables TOTP enrolment and verification
+(`[auth.mfa.totp]`), because the local defaults are off; the hosted project must
+also have TOTP enabled under Authentication → Providers → Multi-Factor
+Authentication. The portal refuses a password-only session, and every reviewer
+RLS policy independently requires `aal2`. Add the site origin and its `/portal`
+callback to the hosted Auth redirect allowlist (`http://localhost:8080/portal`
+for local live mode, or `https://<site>/portal` in production); otherwise the
+magic link falls back to the project site URL. A forwarded notification email grants nothing
 without that session. If a reviewer loses the authenticator, an operator must
 remove the factor before a replacement can be enrolled.
 
@@ -271,7 +296,7 @@ ENVIRONMENT=production
 public function returns 503 and writes nothing. Do not set it while
 `sourceVerified` is false on any row.
 
-The three function JWT settings are committed in
+The five function JWT settings are committed in
 [`supabase/config.toml`](supabase/config.toml); a clean deployment no longer
 relies on an operator remembering them. Apply
 [`supabase/ops/retry-schedule.sql`](supabase/ops/retry-schedule.sql) after
@@ -309,6 +334,17 @@ verifies the Svix signature over the raw body, rejects timestamps outside five
 minutes, deduplicates by `svix-id`, and applies a monotonic state transition.
 Only a verified `delivered` event moves the case to `delivered`; a late “sent”
 or a bounce cannot move it backwards.
+
+### 6. Suppression propagation (optional until a vendor is configured)
+
+Set `MARKETING_SUPPRESSION_WEBHOOK_URL` and
+`MARKETING_SUPPRESSION_WEBHOOK_SECRET`, then schedule
+`POST /functions/v1/sync-marketing-suppressions` with the `x-cron-secret`
+header. The worker sends only the normalised channel and address, uses an
+idempotency key, marks each row synced on a 2xx response, and records a bounded
+failure otherwise. Without both values it reports `not_configured` and changes
+nothing. A vendor endpoint and a live non-customer suppression test are still
+required before any marketing channel is enabled.
 
 ---
 
@@ -392,12 +428,14 @@ is the reviewer's signature in the report.
   questions, driving its separate 24-month, 5-year and ever questions, and the
   newly added rows branched only where the source branches (solo climbing,
   salvage diving, bankruptcy discharge date, military mission type).
-- `deno test --allow-env --lock=deno.lock supabase/functions/tests/` — 46 tests:
+- `deno test --allow-env --lock=deno.lock supabase/functions/tests/` — 60 tests:
   handler-level launch lock, required consent, fail-closed rate limiting and
   byte-cap checks; canonical snapshot/consent/crisis/age/branch rejection tests;
   identity cross-checks (lead date of birth and state versus `ID-01`/`ID-03`),
   structured-value/prose agreement, acknowledgement ordering, detail and
-  timeframe flags, phone/text contact rules; and Svix signature tests for valid,
+  timeframe flags, phone/text contact rules; marketing opt-out validation,
+  origin, body-cap and fail-closed limiter tests; suppression-worker
+  authentication and not-configured tests; and Svix signature tests for valid,
   replayed, tampered and rotating-key events. This runs in CI with Deno 2.
 - `npm run test:consent` — 7 tests over the pure consent builder: only enabled
   marketing channels produce a record, each enabled channel appears once, an
@@ -413,16 +451,19 @@ is the reviewer's signature in the report.
   server’s canonical bank or consent wording drifts from the client source.
 - `npm run check:portal` — fails if the portal loses in-app TOTP
   enrolment/challenge/verify, if a magic link can create an account, if
-  self-service sign-up is re-enabled in config, or if the reviewer queue stops
-  paginating with an exact count.
+  self-service sign-up is re-enabled in config, if the reviewer queue stops
+  paginating with an exact count, or if marketing withdrawal evidence disappears
+  from the case view.
 - `npm run report:reconciliation` — regenerates the review document from the
   data (92 rows, 28 gaps).
 - `npm run check:db` — isolated PostgreSQL (PGlite) replay of migrations
-  0001–0005, including AAL2 denial, the payload-free queue summary, RPC-only
+  0001–0007, including AAL2 denial, the payload-free queue summary, RPC-only
   reviewer writes, opened-log dedupe, immutable triage columns, duplicate
   idempotency key rejection, notification claim races, monotonic delivery
-  events, unmatched-event retry, durable rate limits, revocation, retention and
-  audited deletion — 0 failures.
+  events, terminal delivery through both the RPC and a direct-write trigger,
+  unmatched-event retry, durable rate limits, customer marketing revocation,
+  outbound suppression denial, vendor-sync queueing, retention and audited
+deletion — 0 failures.
 - **Not run during this remediation:** a fresh browser walkthrough of the
   changed screens. The manual script is in [docs/LAUNCH-GATES.md](docs/LAUNCH-GATES.md);
   earlier preview-mode observations are not treated as evidence for these edits.

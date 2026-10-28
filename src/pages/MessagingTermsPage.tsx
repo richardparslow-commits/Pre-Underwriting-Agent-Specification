@@ -113,6 +113,13 @@ export default function MessagingTermsPage() {
               <p className="text-sm leading-relaxed text-muted-foreground">{section.body}</p>
             </section>
           ))}
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            You can also record a stop request online with the{" "}
+            <Link to="/marketing-opt-out" className="link-quiet">
+              marketing opt-out form
+            </Link>
+            .
+          </p>
         </div>
       ) : null}
 

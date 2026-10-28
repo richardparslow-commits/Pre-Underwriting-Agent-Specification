@@ -38,9 +38,14 @@ be imported, edited and deployed from Lovable without restructuring.
 2. Open the Supabase SQL editor and run, in order,
    `supabase/migrations/0001_pre_underwriting.sql`,
    `0002_case_corrections.sql`, `0003_reliability_and_access.sql`,
-   `0004_reviewer_write_paths.sql` and `0005_case_summary_view.sql` top to bottom.
-3. Auth → Users: create the reviewer account, enrol MFA, then register it. An
-   AAL2 session is required by the policies, not merely recommended:
+   `0004_reviewer_write_paths.sql`, `0005_case_summary_view.sql` and
+   `0006_notification_terminal_state.sql` top to bottom.
+3. Auth → Providers → Multi-Factor Authentication: enable TOTP. The reviewer
+   portal enrols and challenges the factor in-app; `supabase/config.toml` already
+   sets `[auth.mfa.totp] enroll_enabled = true` and `verify_enabled = true` for a
+   project started from this file. Then Auth → Users: create the reviewer
+   account and register it. An AAL2 session is required by the policies, not
+   merely recommended:
 
    ```sql
    insert into public.reviewers (user_id, email, display_name)
