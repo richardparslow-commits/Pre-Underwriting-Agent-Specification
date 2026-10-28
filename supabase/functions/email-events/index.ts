@@ -140,5 +140,12 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "Could not record event" }, 500, null);
   }
 
+  // An event can precede storage of the provider message id. Acknowledge it
+  // only after correlation; a non-2xx response asks the provider to retry the
+  // signed event. The ledger retains the unmatched event for reprocessing.
+  if (result === "unmatched") {
+    return jsonResponse({ error: "Event not yet correlated" }, 503, null);
+  }
+
   return jsonResponse({ ok: true, result }, 200, null);
 });

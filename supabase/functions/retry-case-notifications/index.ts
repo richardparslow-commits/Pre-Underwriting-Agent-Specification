@@ -10,8 +10,8 @@
  * Reliability rules:
  *   * the worker claims a row with `claim_case_notification` before sending;
  *     an overlapping invocation gets no row and sends nothing,
- *   * the provider idempotency key is the stable case reference, so a crash
- *     after provider acceptance cannot create a second email on retry,
+ *   * the provider idempotency key is the stable case reference; the provider's
+ *     24-hour deduplication window does not cover this worker's seven-day range,
  *   * `not_sent` is eligible once a provider is configured, which recovers
  *     cases submitted before email was set up,
  *   * attempts and backoff are persisted; no state is kept in memory.

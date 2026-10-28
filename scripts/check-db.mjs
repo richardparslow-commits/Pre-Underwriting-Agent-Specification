@@ -75,6 +75,8 @@ const migrations = [
   "0005_case_summary_view.sql",
   "0006_notification_terminal_state.sql",
   "0007_marketing_revocation.sql",
+  "0008_marketing_revocation_idempotency.sql",
+  "0009_audited_case_access.sql",
 ].map((name) => readFileSync(`supabase/migrations/${name}`, "utf8"));
 
 // Every migration must be safe to re-run.
@@ -144,7 +146,8 @@ await pass(
 // ------------------------------------------------------------------ AAL2
 await claims("aal1");
 await exec("set role authenticated;");
-await pass("aal1 reviewer sees zero cases", () => query("select count(*)::int n from public.cases"), (rows) => rows[0].n === 0);
+await expectError("aal1 reviewer cannot read cases directly", () => query("select count(*)::int n from public.cases"), "permission denied");
+await expectError("aal1 reviewer cannot open a case", () => query("select public.open_case_for_review('LPP-2026-TEST01')"), "Not authorised");
 await pass(
   "aal1 reviewer sees zero case summaries",
   () => query("select count(*)::int n from public.case_summaries"),
@@ -159,7 +162,11 @@ await exec("reset role;");
 
 await claims("aal2");
 await exec("set role authenticated;");
-await pass("aal2 reviewer sees the case", () => query("select count(*)::int n from public.cases"), (rows) => rows[0].n === 1);
+await expectError("aal2 reviewer cannot read a case directly", () => query("select payload from public.cases"), "permission denied");
+await expectError("aal2 reviewer cannot read corrections directly", () => query("select detail from public.case_corrections"), "permission denied");
+await expectError("aal2 reviewer cannot read review log directly", () => query("select note from public.case_review_log"), "permission denied");
+await expectError("aal2 reviewer cannot read marketing revocations directly", () => query("select reason from public.marketing_revocations"), "permission denied");
+await expectError("aal2 reviewer cannot select all case columns", () => query("select * from public.cases"), "permission denied");
 await pass(
   "aal2 reviewer sees the queue summary without a payload",
   () =>
@@ -187,9 +194,11 @@ await expectError(
   () => query("select payload from public.case_summaries limit 1"),
   "does not exist",
 );
-await pass("aal2 reviewer can record opened", () => query("select public.record_case_review('LPP-2026-TEST01','opened')"), () => true);
-await pass("opened is deduplicated within the session window", () => query("select public.record_case_review('LPP-2026-TEST01','opened')"), () => true);
-await pass("exactly one opened entry exists", () => query("select count(*)::int n from public.case_review_log where action='opened'"), (rows) => rows[0].n === 1);
+await pass("aal2 reviewer opens a case through the audited RPC", () => query("select public.open_case_for_review('LPP-2026-TEST01') result"), (rows) => rows[0].result?.case?.reference === "LPP-2026-TEST01" && rows[0].result?.review_log?.[0]?.action === "opened");
+await pass("missing case returns no payload", () => query("select public.open_case_for_review('LPP-2026-MISSING') result"), (rows) => rows[0].result === null);
+await pass("second open is also audited", () => query("select public.open_case_for_review('LPP-2026-TEST01') result"), (rows) => rows[0].result?.review_log?.filter((entry) => entry.action === "opened").length === 2);
+await pass("reviewer can add a correction through its RPC", () => query("select public.record_case_correction('LPP-2026-TEST01','Test correction')"), () => true);
+await pass("audited case read includes the correction", () => query("select public.open_case_for_review('LPP-2026-TEST01') result"), (rows) => rows[0].result?.corrections?.[0]?.detail === "Test correction");
 
 await expectError(
   "reviewer cannot update workflow status directly",
@@ -201,23 +210,38 @@ await expectError(
   () => query("insert into public.case_review_log (case_id, action, actor, note) select id, 'marked_reviewed', 'reviewer@example.com', 'direct insert' from public.cases where reference = 'LPP-2026-TEST01' returning id"),
   "permission denied",
 );
+await exec("reset role;");
 await pass(
   "direct writes left the status and log unchanged",
   () => query("select c.status, count(l.id)::int n from public.cases c left join public.case_review_log l on l.case_id = c.id and l.action = 'marked_reviewed' where c.reference = 'LPP-2026-TEST01' group by c.status"),
   (rows) => rows[0].status === "submitted" && rows[0].n === 0,
 );
+await exec("set role authenticated;");
 
 await pass(
   "reviewer can still mark reviewed through the RPC",
   () => query("select public.record_case_review('LPP-2026-TEST01','marked_reviewed','Reviewed the full record')"),
   () => true,
 );
+await exec("reset role;");
 await pass(
   "the RPC updates status and log atomically",
   () => query("select c.status, count(l.id)::int n from public.cases c left join public.case_review_log l on l.case_id = c.id and l.action = 'marked_reviewed' where c.reference = 'LPP-2026-TEST01' group by c.status"),
   (rows) => rows[0].status === "reviewed" && rows[0].n === 1,
 );
+
+await claims("aal2", other, "other@example.com");
+await exec("set role authenticated;");
+await pass("non-reviewer sees no summaries", () => query("select count(*)::int n from public.case_summaries"), (rows) => rows[0].n === 0);
+await expectError("non-reviewer cannot open case", () => query("select public.open_case_for_review('LPP-2026-TEST01')"), "Not authorised");
 await exec("reset role;");
+await claims("aal2");
+
+await exec(`create function public.test_reject_open() returns trigger language plpgsql as $$ begin raise exception 'test log unavailable'; end $$;
+  create trigger test_reject_open before insert on public.case_review_log for each row execute function public.test_reject_open();`);
+await exec("set role authenticated;");
+await expectError("case is not returned when the access log fails", () => query("select public.open_case_for_review('LPP-2026-TEST01')"), "test log unavailable");
+await exec("reset role; drop trigger test_reject_open on public.case_review_log; drop function public.test_reject_open();");
 
 await exec("set role anon;");
 await expectError(
@@ -225,6 +249,7 @@ await expectError(
   () => query("select count(*)::int n from public.case_summaries"),
   "permission denied",
 );
+await expectError("anonymous caller cannot open a case", () => query("select public.open_case_for_review('LPP-2026-TEST01')"), "permission denied");
 await exec("reset role;");
 
 // ------------------------------------------------------- immutable snapshot
@@ -492,6 +517,55 @@ await pass(
       "select count(*)::int n from public.pending_marketing_suppressions(100) where channel='phone' and address_normalized='15125550199'",
     ),
   (rows) => rows[0].n === 0,
+);
+await pass(
+  "replaying the same customer revocation is accepted",
+  () =>
+    query(
+      "select public.request_marketing_revocation('LPP-2026-OPTOUT','(512) 555-0199',null,'Stop calls','customer_web','44444444-4444-4444-8444-444444444445') result",
+    ),
+  (rows) =>
+    rows[0].result?.recorded === true &&
+    Array.isArray(rows[0].result?.channels) &&
+    rows[0].result.channels.includes("phone"),
+);
+await pass(
+  "replay does not duplicate the revocation evidence",
+  () =>
+    query(
+      "select count(*)::int n from public.marketing_revocations where request_id='44444444-4444-4444-8444-444444444445'",
+    ),
+  (rows) => rows[0].n === 1,
+);
+await pass(
+  "replay does not re-open the synced outbox row",
+  () =>
+    query(
+      "select status, request_id from public.marketing_suppression_sync where channel='phone' and address_normalized='15125550199'",
+    ),
+  (rows) =>
+    rows.length === 1 &&
+    rows[0].status === "synced" &&
+    rows[0].request_id === "44444444-4444-4444-8444-444444444445",
+);
+await pass(
+  "a genuinely new withdrawal can re-queue a synced contact",
+  () =>
+    query(
+      "select public.request_marketing_revocation('LPP-2026-OPTOUT','+15125550199',null,'Second request','customer_web','44444444-4444-4444-8444-444444444447') result",
+    ),
+  (rows) => rows[0].result?.recorded === true,
+);
+await pass(
+  "the new request re-opens propagation",
+  () =>
+    query(
+      "select status, request_id from public.marketing_suppression_sync where channel='phone' and address_normalized='15125550199'",
+    ),
+  (rows) =>
+    rows.length === 1 &&
+    rows[0].status === "pending" &&
+    rows[0].request_id === "44444444-4444-4444-8444-444444444447",
 );
 await pass(
   "customer opt-out can suppress the email on the case",

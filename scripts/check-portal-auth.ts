@@ -53,8 +53,8 @@ requireMarker("src/lib/api.ts", api, ".limit(QUEUE_PAGE_SIZE + 1)", "the queue m
 requireMarker(
   "src/lib/api.ts",
   api,
-  ".from(\"marketing_revocations\")",
-  "the case view must load the append-only marketing withdrawal evidence",
+  ".rpc(\"open_case_for_review\"",
+  "sensitive case and marketing withdrawal evidence must load through the audited RPC",
 );
 
 const caseReview = read("src/features/portal/CaseReview.tsx");

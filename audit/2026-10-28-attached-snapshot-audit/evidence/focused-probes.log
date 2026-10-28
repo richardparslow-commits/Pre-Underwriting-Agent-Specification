@@ -1,0 +1,41 @@
+Focused probes run against isolated attached ZIP snapshot. Synthetic inputs only.
+
+$ npx --yes --package=deno@2.9.6 deno run --allow-env --lock=deno.lock audit-probe-preflight.ts
+{
+  "status": 204,
+  "requested": "authorization,content-type,apikey,idempotency-key",
+  "allowed": "authorization, x-client-info, apikey, content-type",
+  "idempotencyAllowed": false,
+  "browserCrossOriginConsequence": "preflight rejects requested header"
+}
+EXIT STATUS: 0
+
+$ node audit-probe-marketing.mjs
+{
+  "revocation": {
+    "channels": [
+      "email"
+    ],
+    "recorded": true
+  },
+  "email_suppressed": true,
+  "phone_suppressed": false,
+  "phone_send_allowed": true
+}
+EXIT STATUS: 0
+
+$ node audit-probe-access-log.mjs
+{
+  "aal": "aal2",
+  "caseRowsReturned": 1,
+  "openedEvents": 0
+}
+EXIT STATUS: 0
+
+$ node audit-probe-revocation-replay.mjs
+{
+  "sameRequestReplayed": true,
+  "audit_rows": 1,
+  "status": "pending"
+}
+EXIT STATUS: 0

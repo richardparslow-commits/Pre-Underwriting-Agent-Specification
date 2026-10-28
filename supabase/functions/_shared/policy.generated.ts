@@ -6,7 +6,7 @@
 export const CONSENT_POLICY = {
   "consentVersion": "2026-10-b",
   "disclosureVersion": "2026-10-b",
-  "privacyVersion": "2026-10-a",
+  "privacyVersion": "2026-10-b",
   "intakePermissionText": "This guided interview collects information for a preliminary life-insurance review by Richard Parslow at Life Policy Pilot. It does not diagnose medical conditions or decide insurance eligibility. Before submission, you can review and correct your answers. By selecting \"Submit for Richard's Review,\" you ask Life Policy Pilot to securely provide your responses to Richard Parslow for this review. Submitting this questionnaire does not create insurance coverage or automatically authorize release of medical records or submission to an insurer.",
   "privacyAcknowledgementText": "I have read the privacy practices explained in this interview. I understand what is collected, who reads it, how it is stored, and how to ask for correction or deletion.",
   "marketingCallLabel": "I agree to receive marketing telephone calls as described below.",

@@ -1,0 +1,15 @@
+import { PGlite } from '@electric-sql/pglite';
+import { readFileSync } from 'node:fs';
+const db = new PGlite();
+await db.exec(`create schema auth; create table auth.users (id uuid primary key, email text); create function auth.uid() returns uuid language sql stable as $$ select (nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub')::uuid $$; create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims',true),'')::jsonb,'{}'::jsonb) $$; create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls; grant usage on schema public to anon, authenticated, service_role;`);
+for (const name of ['0001_pre_underwriting.sql','0002_case_corrections.sql','0003_reliability_and_access.sql','0004_reviewer_write_paths.sql','0005_case_summary_view.sql','0006_notification_terminal_state.sql','0007_marketing_revocation.sql']) await db.exec(readFileSync(`supabase/migrations/${name}`,'utf8'));
+const user='11111111-1111-4111-8111-111111111111';
+await db.query('insert into auth.users(id,email) values ($1,$2)',[user,'reviewer@example.com']);
+await db.query('insert into public.reviewers(user_id,email) values ($1,$2)',[user,'reviewer@example.com']);
+await db.query('insert into public.cases(reference,questionnaire_version,payload) values ($1,$2,$3::jsonb)', ['LPP-2026-TEST01','test',JSON.stringify({answers:[]})]);
+await db.exec(`set role authenticated; select set_config('request.jwt.claims', '{"sub":"${user}","email":"reviewer@example.com","aal":"aal2"}',false);`);
+const read = await db.query("select reference,payload from public.cases where reference = 'LPP-2026-TEST01'");
+const logs = await db.query("select count(*)::int as opened_count from public.case_review_log where action = 'opened'");
+console.log(JSON.stringify({aal:'aal2',caseRowsReturned:read.rows.length,openedEvents:logs.rows[0].opened_count},null,2));
+if (read.rows.length !== 1 || logs.rows[0].opened_count !== 0) throw new Error('Snapshot differs from expected direct-read finding');
+await db.close();

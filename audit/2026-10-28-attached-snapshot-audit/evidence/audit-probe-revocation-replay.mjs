@@ -1,0 +1,15 @@
+import { PGlite } from '@electric-sql/pglite';
+import { readFileSync } from 'node:fs';
+const db = new PGlite();
+await db.exec(`create schema auth; create table auth.users (id uuid primary key, email text); create function auth.uid() returns uuid language sql stable as $$ select null::uuid $$; create function auth.jwt() returns jsonb language sql stable as $$ select '{}'::jsonb $$; create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls; grant usage on schema public to anon, authenticated, service_role;`);
+for (const name of ['0001_pre_underwriting.sql','0002_case_corrections.sql','0003_reliability_and_access.sql','0004_reviewer_write_paths.sql','0005_case_summary_view.sql','0006_notification_terminal_state.sql','0007_marketing_revocation.sql']) await db.exec(readFileSync(`supabase/migrations/${name}`, 'utf8'));
+await db.query(`insert into public.cases(reference,questionnaire_version,payload) values ($1,$2,$3::jsonb)`, ['LPP-2026-TEST01','test',JSON.stringify({lead:{email:'sample@example.com',phone:'+15125550134'}})]);
+const args=['LPP-2026-TEST01','sample@example.com','44444444-4444-4444-8444-444444444445'];
+const sql=`select public.request_marketing_revocation($1, null, $2, null, 'customer_web', $3::uuid)`;
+await db.query(sql,args);
+await db.query(`select public.mark_marketing_suppression_synced('email',$1,'example-vendor')`,[args[1]]);
+await db.query(sql,args);
+const result=await db.query(`select (select count(*)::int from public.marketing_revocations where request_id = $1::uuid) as audit_rows, status from public.marketing_suppression_sync where channel='email' and address_normalized=$2`, [args[2],args[1]]);
+console.log(JSON.stringify({sameRequestReplayed:true,...result.rows[0]},null,2));
+if(result.rows[0].audit_rows !== 1 || result.rows[0].status !== 'pending') throw new Error('Snapshot differs from expected replay result');
+await db.close();

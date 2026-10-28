@@ -1,0 +1,7 @@
+# SC-01 issue hash record — 28 October 2026
+# Verify from the repository root:
+#   shasum -a 256 -c audit/2026-10-28-sc-01-issue.sha256
+#
+# This file records the issued artefacts. It is not a digital signature.
+0b3d609931c8902e5e0c1996bd49ae16be113053d0ac5e758b1e471f4e79ebf3  audit/2026-10-28-sc-01-specification-v1.1.md
+d257fea889269438cdfcfc5900fdbf6bbaf7d08c3677b11e29829047d5b3f0aa  audit/2026-10-28-sc-01-decision-record.md

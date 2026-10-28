@@ -84,6 +84,12 @@ jobs:
       - name: Reviewer access guard
         run: npm run check:portal
 
+      # Marketing must fail closed: every state has a zone, the licensed list
+      # defaults to empty, and the sender checks policy and suppression before
+      # it can call a provider.
+      - name: Marketing control guard
+        run: npm run check:marketing
+
       # Counts and claims in customer/reviewer docs must match the audited data.
       - name: Documentation counts are current
         run: npm run check:docs
