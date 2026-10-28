@@ -28,6 +28,6 @@ The full raw log is [`logs/full-verification.log`](logs/full-verification.log).
 
 - **M-02 / M-03 / M-14 / M-12** remain legal, product or operations blockers. No `sourceVerified` row was set, no held question was approved, no marketing channel was enabled and no retention schedule was created.
 - **M-09 / M-13 / M-17 / M-18** still need hosted deployment, live MFA, provider, webhook and scheduler evidence.
-- Migration 0005 and the client build are **not deployed**. Apply them on staging first, then verify the view’s hosted grants and the queue’s network response.
+- Migration 0005 is **applied on staging** (project `mndgqpoxfupiuqlojpoe`), and the hosted view, grants, `security_invoker` and AAL1/AAL2 RLS boundary are verified in [`../2026-10-28-migration-0005-staging/README.md`](../2026-10-28-migration-0005-staging/README.md). The hosted client build has **not been inspected**, and a live AAL2 HTTP queue response has not been captured because the project has no reviewer identity.
 
 No secrets were added. The Supabase database password supplied in chat was not written to this package or used for a migration. Treat it as exposed and **rotate it now**; use a separate staging project and a local secret file for the rehearsal, never chat.

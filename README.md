@@ -405,10 +405,13 @@ is the reviewer's signature in the report.
   changed screens. The manual script is in [docs/LAUNCH-GATES.md](docs/LAUNCH-GATES.md);
   earlier preview-mode observations are not treated as evidence for these edits.
 - **Not run:** the functions against a live Supabase project, real email
-  delivery or inbox receipt, live RLS/MFA step-up, provider signature
+  delivery or inbox receipt, live MFA step-up, provider signature
   compatibility, cron execution, backups, retention execution or a production
   accessibility/load pass. The isolated PGlite replay is not a hosted-database
-  verification.
+  verification. A separate hosted check of migration 0005's view and AAL1/AAL2
+  RLS boundary is recorded in
+  [audit/2026-10-28-migration-0005-staging/README.md](audit/2026-10-28-migration-0005-staging/README.md);
+  it did not exercise the functions or a live AAL2 HTTP session.
 
 ## Regulatory note
 

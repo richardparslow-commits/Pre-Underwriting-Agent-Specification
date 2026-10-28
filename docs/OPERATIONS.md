@@ -68,7 +68,7 @@ Before enabling a channel:
 
 ## Deployment checklist
 
-- [ ] Apply migrations 0001–0005 and record the applied versions.
+- [ ] Apply migrations 0001–0005 and record the applied versions. **Staging:** 0001–0005 applied and verified on 28 Oct 2026; **production:** not applied.
 - [ ] Keep `QUESTIONNAIRE_APPROVED=false` until 0/92 rows become 92/92 signed off.
 - [ ] Set `RATE_LIMIT_SALT` to a random value and confirm the durable limiter is active; without it production returns 503 (fail closed). Only `ENVIRONMENT=test` uses the in-memory guard.
 - [ ] Store `project_url` and `cron_secret` in Vault, apply `supabase/ops/retry-schedule.sql`, and verify one scheduler tick.
