@@ -8,10 +8,10 @@ import {
   SOURCE_GAPS,
   sourceIdsFor,
   sourceRefFor,
-  sourceTextFor,
   unacknowledgedSourceIds,
 } from "./reconciliation";
-import { SOURCE_BY_ID } from "./sourceInventory";
+import { SOURCE_BY_ID } from "./sourceIndex";
+import { sourceTextFor } from "./sourceText";
 
 /**
  * Structural checks for the question bank. Run in development and by the
@@ -37,6 +37,29 @@ export function validateQuestionBank(bank: Question[] = QUESTION_BANK): string[]
 
     if (question.reviewStatus === "human_review_required" && !question.reviewNote) {
       issues.push(`${question.id}: held-for-review question needs a reviewNote`);
+    }
+
+    // Held rows are never rendered. Their customer label must not name the
+    // withheld topic in the public bundle; the reviewer-facing reviewNote and
+    // the internal reconciliation record carry the detail.
+    if (question.reviewStatus === "human_review_required") {
+      const label = question.customerText.toLowerCase();
+      for (const term of [
+        "hiv",
+        "aids",
+        "suicid",
+        "sex",
+        "gender",
+        "visa",
+        "green card",
+        "green-card",
+        "immigration",
+        "naturaliz",
+      ]) {
+        if (label.includes(term)) {
+          issues.push(`${question.id}: held customer label names a withheld topic ("${term}")`);
+        }
+      }
     }
 
     if (question.compound && (!question.fields || question.fields.length === 0)) {
@@ -159,19 +182,19 @@ export function validateReconciliation(bank: Question[] = QUESTION_BANK): string
       issues.push(`${record.questionId}: held status and reconciliation verdict disagree`);
     }
 
-    if (!question.sourceRef || !question.sourceText) {
-      issues.push(`${record.questionId}: empty source reference or source text`);
+    if (!question.sourceRef) {
+      issues.push(`${record.questionId}: empty source reference`);
     }
     if (sourceRefFor(record.questionId) !== question.sourceRef) {
       issues.push(`${record.questionId}: sourceRef is not derived from the reconciliation record`);
     }
-    if (sourceTextFor(record.questionId) !== question.sourceText) {
-      issues.push(`${record.questionId}: sourceText is not derived from the source inventory`);
+    const sourceText = sourceTextFor(record.questionId);
+    if (!sourceText) {
+      issues.push(`${record.questionId}: empty source text`);
     }
     if (sourceIdsFor(record.questionId).length > 0) {
-      const text = question.sourceText;
       for (const sourceId of record.sourceIds) {
-        if (!text.includes(sourceId)) {
+        if (!sourceText.includes(sourceId)) {
           issues.push(`${record.questionId}: sourceText omits ${sourceId}`);
         }
       }

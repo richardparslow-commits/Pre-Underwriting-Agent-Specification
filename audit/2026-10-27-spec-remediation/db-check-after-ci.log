@@ -1,0 +1,55 @@
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:db
+> node scripts/check-db.mjs
+
+PASS | migration 1 run 1 | undefined
+PASS | migration 2 run 1 | undefined
+PASS | migration 3 run 1 | undefined
+PASS | migration 4 run 1 | undefined
+PASS | migration 1 run 2 | undefined
+PASS | migration 2 run 2 | undefined
+PASS | migration 3 run 2 | undefined
+PASS | migration 4 run 2 | undefined
+PASS | RLS enabled on sensitive tables | [{"relname":"app_settings","relrowsecurity":true},{"relname":"case_deletions","relrowsecurity":true},{"relname":"case_review_log","relrowsecurity":true},{"relname":"cases","relrowsecurity":true},{"relname":"email_events","relrowsecurity":true},{"relname":"marketing_revocations","relrowsecurity":true},{"relname":"submission_rate_limits","relrowsecurity":true}]
+PASS | aal1 reviewer sees zero cases | [{"n":0}]
+PASS | aal1 reviewer cannot record a review | error=Not authorised
+PASS | aal2 reviewer sees the case | [{"n":1}]
+PASS | aal2 reviewer can record opened | [{"record_case_review":""}]
+PASS | opened is deduplicated within the session window | [{"record_case_review":""}]
+PASS | exactly one opened entry exists | [{"n":1}]
+PASS | reviewer cannot update workflow status directly | error=permission denied for table cases
+PASS | reviewer cannot insert a review-log entry directly | error=permission denied for table case_review_log
+PASS | direct writes left the status and log unchanged | [{"status":"submitted","n":0}]
+PASS | reviewer can still mark reviewed through the RPC | [{"record_case_review":""}]
+PASS | the RPC updates status and log atomically | [{"status":"reviewed","n":1}]
+PASS | service role cannot change crisis triage evidence | error=Submitted case snapshots and triage evidence are immutable
+PASS | service role cannot change residence state | error=Submitted case snapshots and triage evidence are immutable
+PASS | service role cannot rewrite the idempotency key | error=Submitted case snapshots and triage evidence are immutable
+PASS | duplicate idempotency key is rejected | error=duplicate key value violates unique constraint "cases_idempotency_key_idx"
+PASS | first claim wins | [{"reference":"LPP-2026-TEST01","submitted_at":"2026-10-27T12:00:00.000Z","notification_attempts":1}]
+PASS | second concurrent claim gets no row | []
+PASS | acceptance completes the lease | [{"complete_case_notification":""}]
+PASS | accepted case cannot be claimed again | []
+PASS | accepted event applies to a queued case | [{"apply_email_event":"applied"}]
+PASS | duplicate event is ignored by id | [{"apply_email_event":"duplicate"}]
+PASS | delivered event applies | [{"apply_email_event":"applied"}]
+PASS | late accepted event cannot regress delivered | [{"apply_email_event":"ignored"}]
+PASS | bounce after delivery cannot regress | [{"apply_email_event":"ignored"}]
+PASS | case remains delivered | [{"notification_state":"delivered"}]
+PASS | message-id-only event reconciles | [{"apply_email_event":"applied"}]
+PASS | event before message-id correlation is unmatched, not lost | [{"apply_email_event":"unmatched"}]
+PASS | retry of the same event applies after correlation | [{"apply_email_event":"applied"}]
+PASS | the raced case records delivered | [{"notification_state":"delivered"}]
+PASS | a later duplicate of the correlated race event is ignored | [{"apply_email_event":"duplicate"}]
+PASS | rate limit allows the first two | [true,true]
+PASS | rate limit rejects the third | [{"allowed":false}]
+PASS | reviewer records a phone revocation | [{"record_marketing_revocation":""}]
+PASS | suppression is queryable | [{"suppressed":true}]
+PASS | revocation is audited | [{"n":1}]
+PASS | retention is disabled while no schedule is approved | [{"n":0}]
+PASS | approved retention deletes the expired case | [{"n":1}]
+PASS | retention deletion is audited | [{"n":1}]
+PASS | reviewer deletes a case with a reason | [{"delete_case":""}]
+PASS | case is gone | [{"n":0}]
+PASS | deletion is audited | [{"n":1}]
+SUMMARY failures=0

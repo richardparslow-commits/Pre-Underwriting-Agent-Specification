@@ -1,0 +1,50 @@
+[0m[32mCheck[0m supabase/functions/tests/email_test.ts
+[0m[32mCheck[0m supabase/functions/tests/submit-case_test.ts
+[0m[32mCheck[0m supabase/functions/tests/svix_test.ts
+[0m[32mCheck[0m supabase/functions/tests/validate-draft_test.ts
+[0m[38;5;245mrunning 5 tests from ./supabase/functions/tests/email_test.ts[0m
+notification carries a reference and portal link, never health data ... [0m[32mok[0m [0m[38;5;245m(2ms)[0m
+provider acceptance is never reported as delivered ... [0m[32mok[0m [0m[38;5;245m(564µs)[0m
+no provider key produces not_sent and makes no request ... [0m[32mok[0m [0m[38;5;245m(134µs)[0m
+retries reuse the case reference as the provider idempotency key ... [0m[32mok[0m [0m[38;5;245m(13ms)[0m
+a provider rejection is failed, not accepted ...
+[0m[38;5;245m------- output -------[0m
+Case notification rejected 422
+[0m[38;5;245m----- output end -----[0m
+a provider rejection is failed, not accepted ... [0m[32mok[0m [0m[38;5;245m(2ms)[0m
+[0m[38;5;245mrunning 6 tests from ./supabase/functions/tests/submit-case_test.ts[0m
+refuses live intake until the questionnaire is explicitly approved ... [0m[32mok[0m [0m[38;5;245m(11ms)[0m
+rejects a draft with no consent records ... [0m[32mok[0m [0m[38;5;245m(1ms)[0m
+rejects a draft missing the intake permission ... [0m[32mok[0m [0m[38;5;245m(383µs)[0m
+rejects a declined intake permission ... [0m[32mok[0m [0m[38;5;245m(319µs)[0m
+rejects a draft missing the privacy acknowledgement ... [0m[32mok[0m [0m[38;5;245m(258µs)[0m
+rejects a multibyte body above the 512 KiB byte budget with 413 ... [0m[32mok[0m [0m[38;5;245m(615µs)[0m
+[0m[38;5;245mrunning 5 tests from ./supabase/functions/tests/svix_test.ts[0m
+accepts a correctly signed Svix event ... [0m[32mok[0m [0m[38;5;245m(3ms)[0m
+rejects a replayed event outside the timestamp window ... [0m[32mok[0m [0m[38;5;245m(126µs)[0m
+rejects a body changed after signing ... [0m[32mok[0m [0m[38;5;245m(7ms)[0m
+rejects a missing or malformed secret/header ... [0m[32mok[0m [0m[38;5;245m(93µs)[0m
+accepts a valid signature during key rotation ... [0m[32mok[0m [0m[38;5;245m(115µs)[0m
+[0m[38;5;245mrunning 19 tests from ./supabase/functions/tests/validate-draft_test.ts[0m
+accepts a complete canonical draft and rebuilds source rows ... [0m[32mok[0m [0m[38;5;245m(10ms)[0m
+rejects a held HIV row presented as answered ... [0m[32mok[0m [0m[38;5;245m(337µs)[0m
+rejects an invented question id ... [0m[32mok[0m [0m[38;5;245m(94µs)[0m
+rejects a zero-answer payload ... [0m[32mok[0m [0m[38;5;245m(53µs)[0m
+ignores client-invented source wording and restores the canonical row ... [0m[32mok[0m [0m[38;5;245m(214µs)[0m
+rejects marketing consent when the server has no enabled channel ... [0m[32mok[0m [0m[38;5;245m(108µs)[0m
+rejects a privacy record with the wrong notice version ... [0m[32mok[0m [0m[38;5;245m(66µs)[0m
+rejects duplicate consent records ... [0m[32mok[0m [0m[38;5;245m(64µs)[0m
+rejects a consent timestamp after the submission ... [0m[32mok[0m [0m[38;5;245m(66µs)[0m
+rejects a stale submission acknowledgement ... [0m[32mok[0m [0m[38;5;245m(100µs)[0m
+derives crisis disclosure and an urgent flag from MH-05 yes ... [0m[32mok[0m [0m[38;5;245m(181µs)[0m
+rejects a 17-year-old applicant ... [0m[32mok[0m [0m[38;5;245m(49µs)[0m
+rejects a non-US or invented state code ... [0m[32mok[0m [0m[38;5;245m(44µs)[0m
+rejects fields attached to a branch-closed row ... [0m[32mok[0m [0m[38;5;245m(151µs)[0m
+rejects a non-self relationship even when the flag says self ... [0m[32mok[0m [0m[38;5;245m(48µs)[0m
+rejects phone and text contact preferences without a phone number ... [0m[32mok[0m [0m[38;5;245m(79µs)[0m
+rejects a junk or unusable supplied phone number ... [0m[32mok[0m [0m[38;5;245m(191µs)[0m
+normalises a valid ten-digit phone number ... [0m[32mok[0m [0m[38;5;245m(161µs)[0m
+rejects a forged questionnaire version ... [0m[32mok[0m [0m[38;5;245m(33µs)[0m
+
+[0m[32mok[0m | 35 passed | 0 failed [0m[38;5;245m(231ms)[0m
+

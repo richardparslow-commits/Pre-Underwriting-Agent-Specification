@@ -1,0 +1,24 @@
+
+> lifepolicypilot-pre-underwriting@0.1.0 generate:server-bank
+> tsx scripts/generate-server-bank.ts
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: Transform failed with 1 error:
+/Users/richardparslow/.config/freebuff-desktop/local-projects/63e542bb-916b-480d-ae0c-3cf2709f03f7/threads/21116134370fef0acaacd3c35c93f2677f707f0dc911a97dd3065f3d4dc0d950/src/features/interview/questionBank.ts:186:4: ERROR: Expected "}" but found "reviewNote"
+    at failureErrorWithLog (/Users/richardparslow/.config/freebuff-desktop/local-projects/63e542bb-916b-480d-ae0c-3cf2709f03f7/threads/21116134370fef0acaacd3c35c93f2677f707f0dc911a97dd3065f3d4dc0d950/node_modules/esbuild/lib/main.js:1752:15)
+    at /Users/richardparslow/.config/freebuff-desktop/local-projects/63e542bb-916b-480d-ae0c-3cf2709f03f7/threads/21116134370fef0acaacd3c35c93f2677f707f0dc911a97dd3065f3d4dc0d950/node_modules/esbuild/lib/main.js:1019:50
+    at responseCallbacks.<computed> (/Users/richardparslow/.config/freebuff-desktop/local-projects/63e542bb-916b-480d-ae0c-3cf2709f03f7/threads/21116134370fef0acaacd3c35c93f2677f707f0dc911a97dd3065f3d4dc0d950/node_modules/esbuild/lib/main.js:886:9)
+    at handleIncomingPacket (/Users/richardparslow/.config/freebuff-desktop/local-projects/63e542bb-916b-480d-ae0c-3cf2709f03f7/threads/21116134370fef0acaacd3c35c93f2677f707f0dc911a97dd3065f3d4dc0d950/node_modules/esbuild/lib/main.js:941:12)
+    at Socket.readFromStdout (/Users/richardparslow/.config/freebuff-desktop/local-projects/63e542bb-916b-480d-ae0c-3cf2709f03f7/threads/21116134370fef0acaacd3c35c93f2677f707f0dc911a97dd3065f3d4dc0d950/node_modules/esbuild/lib/main.js:864:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23) {
+  name: 'TransformError'
+}
+
+Node.js v24.16.0

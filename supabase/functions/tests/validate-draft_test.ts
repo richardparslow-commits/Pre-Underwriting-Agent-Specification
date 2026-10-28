@@ -223,6 +223,62 @@ Deno.test("rejects a non-self relationship even when the flag says self", () => 
   );
 });
 
+Deno.test("rejects phone and text contact preferences without a phone number", () => {
+  for (const preferredContact of ["phone", "text"] as const) {
+    const body = buildValidDraft({
+      lead: {
+        firstName: "Test",
+        lastName: "Non-customer",
+        state: "TX",
+        email: "test-case@example.com",
+        preferredContact,
+        dateOfBirth: "1980-01-01",
+      },
+    });
+
+    assertEquals(
+      rejected(body),
+      "A telephone number is required for the contact method you chose",
+    );
+  }
+});
+
+Deno.test("rejects a junk or unusable supplied phone number", () => {
+  for (const phone of ["abc", "512", "+44 20 7946 0958", "25125550134"]) {
+    const body = buildValidDraft({
+      lead: {
+        firstName: "Test",
+        lastName: "Non-customer",
+        state: "TX",
+        email: "test-case@example.com",
+        preferredContact: "phone",
+        dateOfBirth: "1980-01-01",
+        phone,
+      },
+    });
+
+    assertEquals(rejected(body), "Enter a valid telephone number");
+  }
+});
+
+Deno.test("normalises a valid ten-digit phone number", () => {
+  const draft = accepted(
+    buildValidDraft({
+      lead: {
+        firstName: "Test",
+        lastName: "Non-customer",
+        state: "TX",
+        email: "test-case@example.com",
+        preferredContact: "phone",
+        dateOfBirth: "1980-01-01",
+        phone: "(512) 555-0134",
+      },
+    }),
+  );
+
+  assertEquals(draft.lead.phone, "+15125550134");
+});
+
 Deno.test("rejects a forged questionnaire version", () => {
   assertEquals(
     rejected(buildValidDraft({ questionnaireVersion: "2026.10-draft.1" })),

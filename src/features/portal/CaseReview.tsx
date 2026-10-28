@@ -123,7 +123,7 @@ function AnswerRow({ answer }: { answer: SubmittedAnswer }) {
               </p>
               <p>
                 <span className="font-medium text-foreground">Source text: </span>
-                {answer.sourceText}
+                {answer.sourceText ?? "Not included in this preview sample."}
               </p>
             </div>
           </details>

@@ -1,0 +1,19 @@
+
+> lifepolicypilot-pre-underwriting@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v8.3.5 building client environment for production...
+transforming...
+✓ 1655 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.07 kB │ gzip:   0.57 kB
+dist/assets/index-COduzQzM.css   23.10 kB │ gzip:   5.60 kB
+dist/assets/index-l3vRgGxf.js   616.80 kB │ gzip: 171.21 kB
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 693ms

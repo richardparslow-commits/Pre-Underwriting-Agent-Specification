@@ -1,0 +1,104 @@
+=== pwd ===
+/Users/richardparslow/.config/freebuff-desktop/local-projects/63e542bb-916b-480d-ae0c-3cf2709f03f7/threads/21116134370fef0acaacd3c35c93f2677f707f0dc911a97dd3065f3d4dc0d950
+=== ls -la ===
+total 376
+drwxr-xr-x@  26 richardparslow  staff     832 Oct 27 23:19 .
+drwxr-xr-x@   3 richardparslow  staff      96 Oct 26 22:38 ..
+-rw-r--r--@   1 richardparslow  staff    2149 Oct 27 23:34 .env.example
+drwxr-xr-x@  14 richardparslow  staff     448 Oct 27 23:43 .git
+drwxr-xr-x@   3 richardparslow  staff      96 Oct 27 06:43 .github
+-rw-r--r--@   1 richardparslow  staff     341 Oct 26 23:08 .gitignore
+drwxr-xr-x@   9 richardparslow  staff     288 Oct 27 23:21 .tmp
+-rw-r--r--@   1 richardparslow  staff    5934 Oct 27 23:19 LOVABLE.md
+-rw-r--r--@   1 richardparslow  staff   23325 Oct 27 23:43 README.md
+drwxr-xr-x@  21 richardparslow  staff     672 Oct 27 23:38 audit
+-rw-r--r--@   1 richardparslow  staff     442 Oct 26 23:02 components.json
+-rw-r--r--@   1 richardparslow  staff    1330 Oct 27 23:19 deno.lock
+drwxr-xr-x@   4 richardparslow  staff     128 Oct 27 23:41 dist
+drwxr-xr-x@   5 richardparslow  staff     160 Oct 27 22:30 docs
+-rw-r--r--@   1 richardparslow  staff     977 Oct 27 12:51 index.html
+drwxr-xr-x@ 114 richardparslow  staff    3648 Oct 27 23:39 node_modules
+-rw-r--r--@   1 richardparslow  staff  115725 Oct 27 23:17 package-lock.json
+-rw-r--r--@   1 richardparslow  staff    1929 Oct 27 23:36 package.json
+-rw-r--r--@   1 richardparslow  staff      81 Oct 26 22:44 postcss.config.js
+drwxr-xr-x@  13 richardparslow  staff     416 Oct 27 23:36 scripts
+drwxr-xr-x@   4 richardparslow  staff     128 Oct 27 05:14 source
+drwxr-xr-x@  12 richardparslow  staff     384 Oct 27 12:51 src
+drwxr-xr-x@   6 richardparslow  staff     192 Oct 27 22:27 supabase
+-rw-r--r--@   1 richardparslow  staff    2346 Oct 26 22:44 tailwind.config.ts
+-rw-r--r--@   1 richardparslow  staff     715 Oct 26 23:09 tsconfig.json
+-rw-r--r--@   1 richardparslow  staff     798 Oct 27 22:32 vite.config.ts
+=== git status ===
+On branch main
+Your branch is ahead of 'origin/main' by 2 commits.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .env.example
+	modified:   .github/workflows/ci.yml
+	modified:   README.md
+	modified:   audit/2026-10-27-remediation-ledger.md
+	modified:   audit/AUDIT-INDEX.md
+	modified:   audit/MASTER-ISSUE-LIST.md
+	modified:   docs/LAUNCH-GATES.md
+	modified:   docs/OPERATIONS.md
+	modified:   package.json
+	modified:   scripts/check-bank.ts
+	modified:   scripts/check-docs.ts
+	modified:   scripts/generate-server-bank.ts
+	modified:   src/features/interview/engine.ts
+	modified:   src/features/interview/questionBank.ts
+	modified:   src/features/interview/reconciliation.ts
+	modified:   src/features/interview/sourceInventory.ts
+	modified:   src/features/interview/types.ts
+	modified:   src/features/interview/validateQuestionBank.ts
+	modified:   src/features/portal/CaseReview.tsx
+	modified:   src/lib/api.ts
+	modified:   src/main.tsx
+	modified:   src/pages/PrivacyPage.tsx
+	modified:   supabase/functions/submit-case/index.ts
+	modified:   supabase/functions/tests/submit-case_test.ts
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.tmp/
+	audit/2026-10-27-master-issue-list.md
+	audit/2026-10-27-qwencode-remediation/
+	scripts/check-bundle.ts
+	scripts/generate-question-refs.ts
+	scripts/generate-source-index.ts
+	src/features/interview/questionSourceRefs.ts
+	src/features/interview/sourceIndex.ts
+	src/features/interview/sourceText.ts
+
+no changes added to commit (use "git add" and/or "git commit -a")
+=== git diff --stat ===
+ .env.example                                   |   2 +-
+ .github/workflows/ci.yml                       |   5 ++
+ README.md                                      |  35 +++++----
+ audit/2026-10-27-remediation-ledger.md         |   2 +
+ audit/AUDIT-INDEX.md                           |  18 +++--
+ audit/MASTER-ISSUE-LIST.md                     |   8 +-
+ docs/LAUNCH-GATES.md                           |   6 +-
+ docs/OPERATIONS.md                             |   3 +-
+ package.json                                   |   3 +
+ scripts/check-bank.ts                          |  26 +++++++
+ scripts/check-docs.ts                          |   5 ++
+ scripts/generate-server-bank.ts                |   3 +-
+ src/features/interview/engine.ts               |   1 -
+ src/features/interview/questionBank.ts         | 102 ++-----------------------
+ src/features/interview/reconciliation.ts       |  26 ++-----
+ src/features/interview/sourceInventory.ts      |   5 ++
+ src/features/interview/types.ts                |   5 +-
+ src/features/interview/validateQuestionBank.ts |  16 ++--
+ src/features/portal/CaseReview.tsx             |   2 +-
+ src/lib/api.ts                                 |   2 -
+ src/main.tsx                                   |  16 ++--
+ src/pages/PrivacyPage.tsx                      |   2 +-
+ supabase/functions/submit-case/index.ts        |  33 ++++++--
+ supabase/functions/tests/submit-case_test.ts   |  18 ++++-
+ 24 files changed, 171 insertions(+), 173 deletions(-)
+=== baseline ===
+96446f9 Enforce reviewer RPC writes and close validation gaps

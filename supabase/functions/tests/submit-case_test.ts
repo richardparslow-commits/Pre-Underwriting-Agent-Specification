@@ -26,7 +26,12 @@ await import("../submit-case/index.ts");
 
 (Deno as unknown as { serve: unknown }).serve = originalServe;
 
-async function submit(body: unknown, key = "test-key-0001"): Promise<Response> {
+async function submit(
+  body: unknown,
+  key = "test-key-0001",
+  environment = "test",
+): Promise<Response> {
+  Deno.env.set("ENVIRONMENT", environment);
   if (!handler) throw new Error("submit-case handler was not captured");
   return await handler(
     new Request("http://localhost/submit-case", {
@@ -54,6 +59,17 @@ Deno.test("refuses live intake until the questionnaire is explicitly approved", 
   assertEquals(
     await errorFrom(response),
     "This questionnaire is not yet approved for live submissions. No case was saved and nothing was sent.",
+  );
+});
+
+Deno.test("fails closed when the durable rate limiter is unavailable", async () => {
+  Deno.env.set("QUESTIONNAIRE_APPROVED", "true");
+  const response = await submit(buildValidDraft(), "rate-limit-0001", "production");
+
+  assertEquals(response.status, 503);
+  assertEquals(
+    await errorFrom(response),
+    "Submissions are temporarily unavailable. Nothing was saved and nothing was sent.",
   );
 });
 

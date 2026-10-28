@@ -97,8 +97,6 @@ export interface Question {
   section: SectionId;
   /** "Detialed-Life-insurance-Questions.pdf, p.2 — medical history block" */
   sourceRef: string;
-  /** The source PDF wording, preserved for audit. */
-  sourceText: string;
   /** Approved customer-facing wording. Must not widen or narrow the source. */
   customerText: string;
   helpText?: string;
@@ -206,7 +204,8 @@ export interface SubmittedAnswer {
   questionId: string;
   section: SectionId;
   sourceRef: string;
-  sourceText: string;
+  /** Attached by the server from its canonical bank; absent in preview samples. */
+  sourceText?: string;
   customerText: string;
   timeframe?: string;
   status: "core" | "supplemental";

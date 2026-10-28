@@ -1,0 +1,5 @@
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:docs
+> tsx scripts/check-docs.ts
+
+Documentation matches the data: 92 rows, 87 approved, 5 held, 0 signed off; 113 source items, 85 traced, 28 gaps (19 partial, 9 out of scope).

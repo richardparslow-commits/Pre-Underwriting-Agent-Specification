@@ -68,9 +68,11 @@ Before enabling a channel:
 
 ## Deployment checklist
 
-- [ ] Apply migrations 0001–0003 and record the applied versions.
+- [ ] Apply migrations 0001–0004 and record the applied versions.
 - [ ] Keep `QUESTIONNAIRE_APPROVED=false` until 0/92 rows become 92/92 signed off.
+- [ ] Set `RATE_LIMIT_SALT` to a random value and confirm the durable limiter is active; without it production returns 503 (fail closed). Only `ENVIRONMENT=test` uses the in-memory guard.
 - [ ] Store `project_url` and `cron_secret` in Vault, apply `supabase/ops/retry-schedule.sql`, and verify one scheduler tick.
 - [ ] Configure `EMAIL_WEBHOOK_SECRET` with the provider's `whsec_…` secret and send one signed test event.
 - [ ] Confirm reviewer MFA enrolment and an aal1 → aal2 step-up on a non-customer account.
 - [ ] Decide and record `retention_months`, backup expiry and the incident contact path.
+- [ ] Confirm database at-rest encryption, backup encryption and key management in the provider console; do not restore the privacy-page at-rest claim until that evidence is recorded.

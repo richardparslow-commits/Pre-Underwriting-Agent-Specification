@@ -1,0 +1,17 @@
+
+> lifepolicypilot-pre-underwriting@0.1.0 test:validation
+> tsx --test src/features/intake/validation.test.ts
+
+✔ a phone or text preference requires a reachable number (0.608958ms)
+✔ a phone preference rejects letters, short numbers and wrong country codes (0.178ms)
+✔ a phone preference accepts a normal 10-digit US number (0.082583ms)
+✔ a supplied number is validated even when email or chat is preferred (0.066084ms)
+✔ an 11-digit number is accepted only with the US country code (0.062708ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 80.433042

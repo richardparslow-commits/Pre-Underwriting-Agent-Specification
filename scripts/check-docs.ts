@@ -86,6 +86,7 @@ requireText("README.md", [
   "0 of 92",
   "QUESTIONNAIRE_APPROVED",
   "0003_reliability_and_access.sql",
+  "0004_reviewer_write_paths.sql",
 ]);
 forbidText("README.md", [
   "45 source questions",
@@ -112,11 +113,19 @@ requireText("docs/OPERATIONS.md", [
   "delete_case",
   "record_marketing_revocation",
   "BLOCKED",
+  "0001–0004",
 ]);
+
+requireText(".env.example", ["RATE_LIMIT_SALT", "QUESTIONNAIRE_APPROVED"]);
 
 forbidText("src/config/site.ts", ["all 56 rows"]);
 forbidText("src/features/interview/reconciliation.ts", ["56-row"]);
 forbidText("src/pages/LandingPage.tsx", ["Source questions"]);
+forbidText("src/pages/PrivacyPage.tsx", [
+  "encryption in transit and at rest",
+  "encrypted at rest",
+]);
+requireText("src/pages/PrivacyPage.tsx", ["transmitted over TLS", "provider controls"]);
 
 requireText("src/pages/LandingPage.tsx", ["Core questions"]);
 

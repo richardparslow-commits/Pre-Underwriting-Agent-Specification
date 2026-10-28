@@ -36,6 +36,30 @@ test("closing a parent branch removes the descendant answer and its details", ()
   assert.equal(pruned["MH-01"]?.state, "no");
 });
 
+test("closing a nested branch removes descendants that are only visible through it", () => {
+  let answers: Answers = {};
+  answers = withAnswer(answers, "MIL-01", { state: "yes" });
+  answers = withAnswer(answers, "MIL-02", { state: "yes" });
+  answers = withAnswer(answers, "MIL-04", { values: ["proficiency"] });
+
+  assert.equal(answers["MIL-04"]?.values?.[0], "proficiency");
+
+  const closed = withAnswer(answers, "MIL-01", { state: "no" });
+  const pruned = pruneBranchClosedAnswers(closed);
+
+  assert.equal(pruned["MIL-02"], undefined);
+  assert.equal(pruned["MIL-04"], undefined);
+  assert.equal(pruned["MIL-01"]?.state, "no");
+
+  const reopened = withAnswer(
+    withAnswer(pruned, "MIL-01", { state: "yes" }),
+    "MIL-02",
+    { state: "yes" },
+  );
+
+  assert.equal(reopened["MIL-04"], undefined);
+});
+
 test("a branch-closed row never emits fields or supplemental detail", () => {
   const answers: Answers = {
     "MH-01": { state: "no", updatedAt: AT },

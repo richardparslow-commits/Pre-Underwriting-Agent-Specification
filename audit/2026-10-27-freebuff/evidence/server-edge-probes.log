@@ -1,0 +1,29 @@
+ACCEPTED: phone contact with no phone number {
+  preferredContact: "phone",
+  phone: null,
+  consentIds: [ "intake_permission", "privacy_acknowledgement" ],
+  id01: "2020-01-01",
+  id03: "Test answer"
+}
+ACCEPTED: text contact with a one-digit phone number {
+  preferredContact: "text",
+  phone: "+5",
+  consentIds: [ "intake_permission", "privacy_acknowledgement" ],
+  id01: "2020-01-01",
+  id03: "Test answer"
+}
+ACCEPTED: lead DOB and ID-01 answer conflict {
+  preferredContact: "email",
+  phone: null,
+  consentIds: [ "intake_permission", "privacy_acknowledgement" ],
+  id01: "2010-01-01",
+  id03: "Test answer"
+}
+ACCEPTED: lead state and ID-03 answer conflict {
+  preferredContact: "email",
+  phone: null,
+  consentIds: [ "intake_permission", "privacy_acknowledgement" ],
+  id01: "2020-01-01",
+  id03: "CA"
+}
+REJECTED: marketing record left unchecked while a channel is enabled -> Marketing consent is not enabled for this deployment

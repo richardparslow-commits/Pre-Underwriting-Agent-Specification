@@ -180,12 +180,12 @@ The bank was built from the specification's coverage map rather than from the PD
   - **Attribution:** Labelled a source question, but the PDF never asks for current state of residence. The specification asks for it separately for routing. Status corrected to supplemental.
 - **Decision:** Confirm the routing field stays supplemental and keeps its own label; it must not be counted as source coverage.
 
-### ID-04 — Held for review: the source questionnaire asks for sex or gender.
+### ID-04 — Held for review: a source question requiring jurisdiction and carrier approval.
 
 - **Verdict:** Held for review
 - **Source:** `SRC-002` (p.1, no window)
 - **Source wording:** What is your Gender/Sex?
-- **Bank wording:** Held for review: the source questionnaire asks for sex or gender.
+- **Bank wording:** Held for review: a source question requiring jurisdiction and carrier approval.
 - **Window asked:** No window stated
 - **Flags:**
   - **Wording:** The source asks 'What is your Gender/Sex?'. No answer set or approved wording exists yet, so the row asks nothing.
@@ -369,12 +369,12 @@ The bank was built from the specification's coverage map rather than from the PD
   - **Branching:** Disability benefits and current confinement have different follow-ups but share one answer.
 - **Decision:** Separate current disability/confinement from the 5-year work-impact question, and restore the 30-hour and benefits wording.
 
-### MED-11 — Held for review: the source questionnaire asks about HIV or AIDS.
+### MED-11 — Held for review: a sensitive medical question requiring legal and clinical approval.
 
 - **Verdict:** Held for review
 - **Source:** `SRC-009` (p.1, Ever)
 - **Source wording:** Have you ever been diagnosed, treated, tested positive for, or received medical advice for Human Immunodeficiency Virus (HIV) or Acquired Immune Deficiency Syndrome (AIDS)?
-- **Bank wording:** Held for review: the source questionnaire asks about HIV or AIDS.
+- **Bank wording:** Held for review: a sensitive medical question requiring legal and clinical approval.
 - **Window asked:** No window stated
 - **Flags:**
   - None.
@@ -513,12 +513,12 @@ The bank was built from the specification's coverage map rather than from the PD
   - None.
 - **Decision:** Confirm the crisis question is asked of every customer, whatever the answer to MH-04. It is no longer gated on a Yes, and `npm run check:bank` now fails if it is gated again.
 
-### MH-06 — Held for review: the source questionnaire asks for detail about any attempt.
+### MH-06 — Held for review: a sensitive mental-health detail requiring clinical approval.
 
 - **Verdict:** Held for review
 - **Source:** `SRC-039` (p.3, no window)
 - **Source wording:** Have you attempted suicide? (If yes, provide details, including date and follow-up treatment).
-- **Bank wording:** Held for review: the source questionnaire asks for detail about any attempt.
+- **Bank wording:** Held for review: a sensitive mental-health detail requiring clinical approval.
 - **Window asked:** No window stated
 - **Flags:**
   - None.
@@ -1071,23 +1071,23 @@ The bank was built from the specification's coverage map rather than from the PD
   - **Wording:** The named-country list, the 30-day trip threshold and the 180-day residence threshold are all absent, as is the source's 'where?' follow-up.
 - **Decision:** Restore the 2-year window and the 30/180-day thresholds. The country list also needs review before it is shown to customers.
 
-### RES-04 — Held for review: the source questionnaire asks for an immigration category.
+### RES-04 — Held for review: a source question requiring legal approval.
 
 - **Verdict:** Held for review
 - **Source:** `SRC-098` (p.6, Current)
 - **Source wording:** If not a U.S. citizen, what is their immigration status or visa type?
-- **Bank wording:** Held for review: the source questionnaire asks for an immigration category.
+- **Bank wording:** Held for review: a source question requiring legal approval.
 - **Window asked:** No window stated
 - **Flags:**
   - None.
 - **Decision:** Obtain legal review of whether immigration status is necessary, and approve the answer set and wording if it is.
 
-### RES-05 — Held for review: the source questionnaire asks for a visa or green-card number.
+### RES-05 — Held for review: an identity-document question not collected in this intake.
 
 - **Verdict:** Held for review
 - **Source:** `SRC-097` (p.6, Current)
 - **Source wording:** Is the Proposed Insured a U.S. Citizen or Permanent Resident? (If Permanent Resident, provide Visa or Green Card ID Number).
-- **Bank wording:** Held for review: the source questionnaire asks for a visa or green-card number.
+- **Bank wording:** Held for review: an identity-document question not collected in this intake.
 - **Window asked:** No window stated
 - **Flags:**
   - None.

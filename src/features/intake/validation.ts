@@ -8,6 +8,21 @@ export function phoneDigits(value: string): string {
   return value.replace(/\D/g, "");
 }
 
+/**
+ * Normalises a US telephone number for the client-side form. The server
+ * repeats this check; this helper only prevents an obviously unusable value
+ * from reaching the review step.
+ */
+export function normaliseUsPhone(value: string): string | null {
+  const trimmed = value.trim();
+  if (!/^\+?[\d\s().-]+$/.test(trimmed)) return null;
+
+  const digits = phoneDigits(trimmed);
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  if (digits.length === 10) return `+1${digits}`;
+  return null;
+}
+
 /** Age in whole years on a given date, computed in UTC. */
 export function ageOn(dateOfBirth: string, onDate = new Date()): number {
   const birth = new Date(`${dateOfBirth}T00:00:00.000Z`);
@@ -58,11 +73,11 @@ export function validateLead(lead: Partial<LeadDetails>): LeadErrors {
   }
 
   const needsPhone = lead.preferredContact === "phone" || lead.preferredContact === "text";
-  if (needsPhone) {
-    const digits = phoneDigits(lead.phone ?? "");
-    if (digits.length < 10) {
-      errors.phone = "A phone number is needed for the contact method you chose.";
-    }
+  const suppliedPhone = lead.phone?.trim() ?? "";
+  if (suppliedPhone && !normaliseUsPhone(suppliedPhone)) {
+    errors.phone = "Enter a valid 10-digit telephone number.";
+  } else if (needsPhone && !suppliedPhone) {
+    errors.phone = "A phone number is needed for the contact method you chose.";
   }
 
   return errors;

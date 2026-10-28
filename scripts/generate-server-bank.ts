@@ -13,6 +13,7 @@ import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { QUESTION_BANK } from "../src/features/interview/questionBank";
+import { sourceTextFor } from "../src/features/interview/sourceText";
 import { QUESTIONNAIRE_VERSION } from "../src/features/interview/types";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -23,7 +24,7 @@ export function renderServerBank(): string {
     id: question.id,
     section: question.section,
     sourceRef: question.sourceRef,
-    sourceText: question.sourceText,
+    sourceText: sourceTextFor(question.id),
     customerText: question.customerText,
     timeframe: question.timeframe ?? null,
     kind: question.kind,

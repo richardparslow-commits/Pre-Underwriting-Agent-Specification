@@ -240,11 +240,15 @@ function looksLikeEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value) && value.length <= 254;
 }
 
-function normalisePhone(value: string): string {
-  const digits = value.replace(/\D/g, "");
+function normalisePhone(value: string): string | null {
+  const trimmed = value.trim();
+  // Accept common US punctuation, but not letters or arbitrary trailing text.
+  if (!/^\+?[\d\s().-]+$/.test(trimmed)) return null;
+
+  const digits = trimmed.replace(/\D/g, "");
   if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
   if (digits.length === 10) return `+1${digits}`;
-  return `+${digits}`;
+  return null;
 }
 
 // -----------------------------------------------------------------------------
@@ -564,7 +568,18 @@ export function validateDraft(body: unknown): ValidationResult {
     return { ok: false, reason: "Invalid contact preference" };
   }
 
-  const phone = optionalText(leadInput.phone, 40);
+  const suppliedPhone = optionalText(leadInput.phone, 40);
+  const phone = suppliedPhone ? normalisePhone(suppliedPhone) : null;
+
+  if (suppliedPhone && !phone) {
+    return { ok: false, reason: "Enter a valid telephone number" };
+  }
+  if ((preferredContact === "phone" || preferredContact === "text") && !phone) {
+    return {
+      ok: false,
+      reason: "A telephone number is required for the contact method you chose",
+    };
+  }
 
   // ---- Consent evidence is compared with the exact server-owned wording ----
   if (!Array.isArray(body.consents)) {
@@ -906,7 +921,7 @@ export function validateDraft(body: unknown): ValidationResult {
       email,
       dateOfBirth,
       preferredContact,
-      phone: phone ? normalisePhone(phone) : undefined,
+      phone: phone ?? undefined,
       preferredContactTime: optionalText(leadInput.preferredContactTime, 120),
       timeZone: optionalText(leadInput.timeZone, 80),
       assistance: optionalText(leadInput.assistance, 200),
