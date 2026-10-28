@@ -11,9 +11,11 @@ This file is the entry point for the preserved audit corpus. It records what was
 | A3 — Qwencloud audit | 27 Oct 2026 | `07fdbfe632d48ef363caac086e82b8c2f13277a2` | [`2026-10-27-qwencloud/qwencloud-audit.md`](2026-10-27-qwencloud/qwencloud-audit.md) | `QW-01`–`QW-24` (24) | **NOT READY** for real customer health information |
 | A4 — Freebuff independent remediation audit | 27 Oct 2026 | `173b0a0da8c72c7c3ff859a5a441da79e3fed234` | [`2026-10-27-freebuff/REPORT.md`](2026-10-27-freebuff/REPORT.md) | `F-01`–`F-12` (12), plus 24-row master crosswalk | **CONDITIONALLY READY** for a labelled, non-customer preview; **NOT READY** for real customer health information |
 
-The current state of the repository is described by **A4**. A1–A3 are historical evidence at the earlier baseline and must not be read as current status. [`MASTER-ISSUE-LIST.md`](MASTER-ISSUE-LIST.md) is a 24-finding consolidation at the earlier baseline; it does not include A4's new findings F-03, F-05, F-09, F-10, F-11 or F-12, or the reopened nested case under M-05.
+The current state of the repository is described by **A4**. A1–A3 are historical evidence at the earlier baseline and must not be read as current status. The current 30-finding combined list is [`2026-10-27-master-issue-list.md`](2026-10-27-master-issue-list.md), which includes A4's new findings M-25–M-30 and the reopened nested case under M-05. [`MASTER-ISSUE-LIST.md`](MASTER-ISSUE-LIST.md) is the earlier 24-finding A1–A3 consolidation, retained as historical evidence.
 
 [`2026-10-27-spec-remediation/`](2026-10-27-spec-remediation/) is not another audit. It records the code changes and verification logs produced after A4 while following the product specification. It links the fixed local controls and the gates that remain blocked.
+
+[`2026-10-27-qwencode-remediation/`](2026-10-27-qwencode-remediation/) is the later 30-finding remediation pass. Its [ledger](2026-10-27-qwencode-remediation/LEDGER.md) covers every finding in the current master list, records the three remaining engineering changes (M-11 bundle redaction, M-17 fail-closed rate limiting, M-30 privacy copy) and preserves the full verification logs. It is not another audit.
 
 ## What each package contains
 
@@ -21,6 +23,8 @@ The current state of the repository is described by **A4**. A1–A3 are historic
 - **A2:** frozen archive of the two prior lists and their supporting evidence, plus `MANIFEST.sha256`. It is explicitly marked “do not edit”.
 - **A3:** full 24-finding report, issue register in Markdown/JSON/CSV, gate matrix, questionnaire matrix, prior-list preservation and raw evidence.
 - **A4:** full 12-finding report, master crosswalk, raw command logs, targeted SQL/branch/phone probe outputs, probe sources and `MANIFEST.sha256`.
+- **Combined master list:** [`2026-10-27-master-issue-list.md`](2026-10-27-master-issue-list.md) — 30 deduplicated findings across A1, A3 and A4, the A4 crosswalk, consolidated launch conditions and the current local-versus-live status.
+- **QwenCode remediation:** [`2026-10-27-qwencode-remediation/`](2026-10-27-qwencode-remediation/) — the 30-finding ledger, code changes and full verification logs produced after the master list.
 
 ## Preservation rules
 
@@ -37,13 +41,16 @@ Each package carries its own hash manifest:
 
 - [`archive/2026-10-27-pre-qwencloud/MANIFEST.sha256`](archive/2026-10-27-pre-qwencloud/MANIFEST.sha256)
 - [`2026-10-27-freebuff/MANIFEST.sha256`](2026-10-27-freebuff/MANIFEST.sha256)
+- [`2026-10-27-qwencode-remediation/MANIFEST.sha256`](2026-10-27-qwencode-remediation/MANIFEST.sha256)
 
 A3 does not currently have a package-level manifest; its raw evidence is preserved under [`2026-10-27-qwencloud/evidence/`](2026-10-27-qwencloud/evidence/).
 
 ## Reading order
 
-1. **A4 report** — current post-remediation assessment and the conditions that remain open.
-2. **A4 README** — finding index, verification table and evidence map.
-3. **A3 issue register** — historical detail for the 24 master findings.
-4. **A1 report and register** — original baseline findings.
-5. **A2 archive** — frozen prior lists and conditions.
+1. **Current combined master list** — 30 findings, A4 crosswalk, consolidated conditions and current local status.
+2. **QwenCode remediation ledger** — current status and evidence for every finding after the latest pass.
+3. **A4 report** — current post-remediation assessment and the conditions that remain open.
+4. **A4 README** — finding index, verification table and evidence map.
+5. **A3 issue register** — historical detail for the 24 master findings.
+6. **A1 report and register** — original baseline findings.
+7. **A2 archive** — frozen prior lists and conditions.

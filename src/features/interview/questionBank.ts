@@ -1,5 +1,5 @@
 import type { DetailPrompt, Question, QuestionOption } from "./types";
-import { sourceRefFor, sourceTextFor } from "./reconciliation";
+import { sourceRefFor } from "./questionSourceRefs";
 
 /**
  * Shared prompts for questions split from one source item. The source asks for
@@ -131,10 +131,10 @@ const CONDITION_DETAIL: DetailPrompt[] = [
 /**
  * Versioned question bank for the pre-underwriting interview.
  *
- * Provenance is not hand-written here. `sourceRef` and `sourceText` are derived
- * from reconciliation.ts, which traces each row to the verbatim source
- * inventory in sourceInventory.ts. That keeps the locator, the source wording
- * and the mismatch flags in one place instead of three.
+ * Provenance is not hand-written here. `sourceRef` is derived from
+ * reconciliation.ts, which traces each row to the source index. The verbatim
+ * source wording is build/audit-only and is attached server-side, so held
+ * wording is not shipped in the customer bundle.
  *
  * Every row is reconciled but not yet signed off: `sourceVerified` stays false
  * until a named reviewer accepts the record and the decisions its `action`
@@ -146,7 +146,6 @@ export const QUESTION_BANK: Question[] = [
     id: "ID-01",
     section: "identity",
     sourceRef: sourceRefFor("ID-01"),
-    sourceText: sourceTextFor("ID-01"),
     customerText: "What is your date of birth?",
     helpText: "Used to route your review to the right age band. It is not used to look you up anywhere.",
     kind: "date",
@@ -158,7 +157,6 @@ export const QUESTION_BANK: Question[] = [
     id: "ID-02",
     section: "identity",
     sourceRef: sourceRefFor("ID-02"),
-    sourceText: sourceTextFor("ID-02"),
     customerText: "Where were you born?",
     helpText: "City and country is enough. This is not a citizenship question.",
     kind: "short_text",
@@ -171,7 +169,6 @@ export const QUESTION_BANK: Question[] = [
     id: "ID-03",
     section: "identity",
     sourceRef: sourceRefFor("ID-03"),
-    sourceText: sourceTextFor("ID-03"),
     customerText: "Which state do you currently live in?",
     helpText: "Residence decides which state rules and licensed agents apply to your review.",
     kind: "short_text",
@@ -185,8 +182,7 @@ export const QUESTION_BANK: Question[] = [
     id: "ID-04",
     section: "identity",
     sourceRef: sourceRefFor("ID-04"),
-    sourceText: sourceTextFor("ID-04"),
-    customerText: "Held for review: the source questionnaire asks for sex or gender.",
+    customerText: "Held for review: a source question requiring jurisdiction and carrier approval.",
     reviewNote:
       "Collection of sex/gender needs jurisdiction and carrier review, including whether the question is permissible at all and which answer set is authorized. Not asked until that review is documented.",
     sensitive: true,
@@ -204,7 +200,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-01",
     section: "medical",
     sourceRef: sourceRefFor("MED-01"),
-    sourceText: sourceTextFor("MED-01"),
     customerText:
       "In the past 12 months, have you had surgical treatment for morbid obesity, been declined for life insurance coverage, or had diagnostic testing (excluding HIV/AIDS tests), surgery or a hospital stay recommended by a medical professional that has not been completed or for which the results have not been received?",
     timeframe: "Past 12 months",
@@ -231,7 +226,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-02",
     section: "medical",
     sourceRef: sourceRefFor("MED-02"),
-    sourceText: sourceTextFor("MED-02"),
     customerText:
       "In the past 12 months, have you consulted a medical professional, had surgery or been hospitalized, or had diagnostic tests (excluding HIV/AIDS) such as an EKG, X-ray, MRI or CAT scan?",
     timeframe: "Past 12 months",
@@ -248,7 +242,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-03",
     section: "medical",
     sourceRef: sourceRefFor("MED-03"),
-    sourceText: sourceTextFor("MED-03"),
     customerText:
       "In the past 2 years, have you been medically diagnosed with or treated for angina (chest pain), a stroke or TIA, cardiomyopathy, systemic lupus (SLE), cirrhosis, hepatitis C or chronic hepatitis, chronic pancreatitis, chronic obstructive pulmonary disease (COPD), emphysema or chronic bronchitis, or have you required oxygen equipment to help you breathe?",
     timeframe: "Past 2 years",
@@ -262,7 +255,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-04",
     section: "medical",
     sourceRef: sourceRefFor("MED-04"),
-    sourceText: sourceTextFor("MED-04"),
     customerText:
       "In the past 2 years, have you had a heart attack or aneurysm, or had — or been medically advised to have — any type of heart, brain or circulatory surgery, including a pacemaker or defibrillator, or any procedure to improve circulation?",
     timeframe: "Past 2 years",
@@ -276,7 +268,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-06",
     section: "medical",
     sourceRef: sourceRefFor("MED-06"),
-    sourceText: sourceTextFor("MED-06"),
     customerText:
       "In the past 3 years, have you been treated for, diagnosed with, or prescribed medication for chronic bronchitis, emphysema, COPD, an irregular heartbeat, seizures, a blood clot or an aneurysm?",
     timeframe: "Past 3 years",
@@ -292,7 +283,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-08",
     section: "medical",
     sourceRef: sourceRefFor("MED-08"),
-    sourceText: sourceTextFor("MED-08"),
     customerText:
       "In the past 5 years, have you been treated for, diagnosed with, or prescribed medication for internal cancer, melanoma, Hodgkin's disease or lymphoma?",
     timeframe: "Past 5 years",
@@ -306,7 +296,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-12",
     section: "medical",
     sourceRef: sourceRefFor("MED-12"),
-    sourceText: sourceTextFor("MED-12"),
     customerText:
       "In the past 7 years, have you been diagnosed with, treated for, or prescribed medication for high blood pressure, a heart attack, angina, an arrhythmia, a stroke, an aneurysm, or any heart or circulatory disease or disorder?",
     timeframe: "Past 7 years",
@@ -320,7 +309,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-13",
     section: "medical",
     sourceRef: sourceRefFor("MED-13"),
-    sourceText: sourceTextFor("MED-13"),
     customerText:
       "In the past 7 years, have you been diagnosed with, treated for, or prescribed medication for diabetes, cirrhosis, hepatitis, pancreatitis, Crohn's disease, ulcerative colitis, or any digestive or liver disease or disorder?",
     timeframe: "Past 7 years",
@@ -334,7 +322,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-14",
     section: "medical",
     sourceRef: sourceRefFor("MED-14"),
-    sourceText: sourceTextFor("MED-14"),
     customerText:
       "In the past 7 years, have you been diagnosed with, treated for, or prescribed medication for asthma, emphysema, COPD, sleep apnea, or any respiratory disease or disorder?",
     timeframe: "Past 7 years",
@@ -348,7 +335,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-20",
     section: "medical",
     sourceRef: sourceRefFor("MED-20"),
-    sourceText: sourceTextFor("MED-20"),
     customerText:
       "Have you ever been diagnosed with sleep apnoea within the last 6 months, or with sleep apnoea that is not being treated?",
     timeframe: "Last 6 months, or untreated",
@@ -376,7 +362,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-15",
     section: "medical",
     sourceRef: sourceRefFor("MED-15"),
-    sourceText: sourceTextFor("MED-15"),
     customerText:
       "In the past 7 years, have you been diagnosed with, treated for, or prescribed medication for cancer in any form, anemia, seizures, bipolar disorder, schizophrenia, Alzheimer's, dementia, or a mental or nervous disorder?",
     timeframe: "Past 7 years",
@@ -392,7 +377,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-16",
     section: "medical",
     sourceRef: sourceRefFor("MED-16"),
-    sourceText: sourceTextFor("MED-16"),
     customerText:
       "In the past 7 years, have you been diagnosed with, treated for, or prescribed medication for any disease or disorder of the kidneys, urinary bladder, prostate or reproductive organs, or a sexually transmitted disease?",
     timeframe: "Past 7 years",
@@ -407,7 +391,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-17",
     section: "medical",
     sourceRef: sourceRefFor("MED-17"),
-    sourceText: sourceTextFor("MED-17"),
     customerText:
       "In the past 7 years, have you been diagnosed with, treated for, or prescribed medication for a connective tissue disease, systemic lupus (SLE), arthritis, or any disorder of the back, joints, muscles or nervous system?",
     timeframe: "Past 7 years",
@@ -421,7 +404,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-18",
     section: "medical",
     sourceRef: sourceRefFor("MED-18"),
-    sourceText: sourceTextFor("MED-18"),
     customerText:
       "In the past 10 years, have you taken medication to treat high blood pressure or an elevated cholesterol level?",
     timeframe: "Past 10 years",
@@ -439,7 +421,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-19",
     section: "medical",
     sourceRef: sourceRefFor("MED-19"),
-    sourceText: sourceTextFor("MED-19"),
     customerText:
       "In the past 10 years, have you been medically diagnosed with, tested for, or received treatment for diabetes, cancer, or cardiac disease (heart attack, myocardial infarction, angina, cardiac insufficiency, cerebral thrombosis or coronary artery disease)?",
     timeframe: "Past 10 years",
@@ -454,7 +435,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-21",
     section: "medical",
     sourceRef: sourceRefFor("MED-21"),
-    sourceText: sourceTextFor("MED-21"),
     customerText:
       "Have you been treated, diagnosed or prescribed medication for diabetes before age 21, do you currently take insulin, or has diabetes been diagnosed together with retinopathy, nephropathy, neuropathy, insulin shock or diabetic coma?",
     timeframe: "Ever / current",
@@ -481,7 +461,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-22",
     section: "medical",
     sourceRef: sourceRefFor("MED-22"),
-    sourceText: sourceTextFor("MED-22"),
     customerText:
       "In the past 12 months, have you used a walker, wheelchair, electric scooter, supplemental oxygen, or catheter?",
     timeframe: "Past 12 months",
@@ -509,7 +488,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-23",
     section: "medical",
     sourceRef: sourceRefFor("MED-23"),
-    sourceText: sourceTextFor("MED-23"),
     customerText: "Have you ever received an organ transplant?",
     timeframe: "Ever",
     kind: "yesno",
@@ -525,7 +503,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-24",
     section: "medical",
     sourceRef: sourceRefFor("MED-24"),
-    sourceText: sourceTextFor("MED-24"),
     customerText:
       "Are you currently confined to a hospital, or to a medical or rehabilitation facility?",
     timeframe: "Currently",
@@ -543,7 +520,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-25",
     section: "medical",
     sourceRef: sourceRefFor("MED-25"),
-    sourceText: sourceTextFor("MED-25"),
     customerText:
       "Has a parent, brother or sister ever had kidney disease, needed a major organ transplant, or been diagnosed with heart disease, cerebrovascular disease, or internal cancer before age 60?",
     timeframe: "Ever, before age 60",
@@ -571,7 +547,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-26",
     section: "medical",
     sourceRef: sourceRefFor("MED-26"),
-    sourceText: sourceTextFor("MED-26"),
     customerText:
       "Have more than one member of your family — father, mother, brother or sister — died before age 60 from breast, colon, intestinal or prostate cancer, or from cardiovascular disease?",
     timeframe: "Ever, before age 60",
@@ -589,7 +564,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-09",
     section: "medical",
     sourceRef: sourceRefFor("MED-09"),
-    sourceText: sourceTextFor("MED-09"),
     customerText: "Which prescription medications do you take regularly today?",
     helpText:
       "Include anything prescribed for you, even if you take it only occasionally. Write none if you take nothing regularly.",
@@ -603,7 +577,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-10",
     section: "medical",
     sourceRef: sourceRefFor("MED-10"),
-    sourceText: sourceTextFor("MED-10"),
     customerText:
       "In the past 5 years, have you been unable to work, or needed help with daily activities because of your health?",
     timeframe: "Past 5 years",
@@ -630,8 +603,7 @@ export const QUESTION_BANK: Question[] = [
     id: "MED-11",
     section: "medical",
     sourceRef: sourceRefFor("MED-11"),
-    sourceText: sourceTextFor("MED-11"),
-    customerText: "Held for review: the source questionnaire asks about HIV or AIDS.",
+    customerText: "Held for review: a sensitive medical question requiring legal and clinical approval.",
     reviewNote:
       "Requires documented legal, clinical and underwriting review of necessity, wording, confidentiality and state restrictions before any automated collection. Do not deploy this row unchanged.",
     sensitive: true,
@@ -646,7 +618,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MH-01",
     section: "mental",
     sourceRef: sourceRefFor("MH-01"),
-    sourceText: sourceTextFor("MH-01"),
     customerText:
       "Have you ever been diagnosed with or treated for a mental health condition, such as anxiety or depression?",
     timeframe: "Ever",
@@ -660,7 +631,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MH-02",
     section: "mental",
     sourceRef: sourceRefFor("MH-02"),
-    sourceText: sourceTextFor("MH-02"),
     customerText: "A little about the condition and the care you received.",
     timeframe: "Ever",
     kind: "short_text",
@@ -709,7 +679,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MH-03",
     section: "mental",
     sourceRef: sourceRefFor("MH-03"),
-    sourceText: sourceTextFor("MH-03"),
     customerText:
       "In the past 5 years, has a mental health condition caused you to miss work or stop working?",
     timeframe: "Past 5 years",
@@ -745,7 +714,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MH-04",
     section: "mental",
     sourceRef: sourceRefFor("MH-04"),
-    sourceText: sourceTextFor("MH-04"),
     customerText:
       "Have you ever had thoughts of ending your life, or made a suicide attempt?",
     timeframe: "Ever",
@@ -774,7 +742,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MH-05",
     section: "mental",
     sourceRef: sourceRefFor("MH-05"),
-    sourceText: sourceTextFor("MH-05"),
     customerText: "Are you having thoughts of harming yourself right now?",
     helpText:
       "If you are, please stop here and call or text 988, or call 911 if your life is in immediate danger. This site does not monitor emergencies.",
@@ -793,8 +760,7 @@ export const QUESTION_BANK: Question[] = [
     id: "MH-06",
     section: "mental",
     sourceRef: sourceRefFor("MH-06"),
-    sourceText: sourceTextFor("MH-06"),
-    customerText: "Held for review: the source questionnaire asks for detail about any attempt.",
+    customerText: "Held for review: a sensitive mental-health detail requiring clinical approval.",
     reviewNote:
       "Detail-level suicide questions need clinical and legal review for wording, necessity and crisis support before automated collection. The approved screening question and current-safety question cover the immediate need.",
     sensitive: true,
@@ -808,7 +774,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MH-07",
     section: "mental",
     sourceRef: sourceRefFor("MH-07"),
-    sourceText: sourceTextFor("MH-07"),
     customerText:
       "In the past 5 years, have you seen a psychiatrist, or had treatment as a hospital outpatient, for a mental health condition?",
     timeframe: "Past 5 years",
@@ -829,7 +794,6 @@ export const QUESTION_BANK: Question[] = [
     id: "NIC-01",
     section: "nicotine",
     sourceRef: sourceRefFor("NIC-01"),
-    sourceText: sourceTextFor("NIC-01"),
     customerText:
       "In the past 12 months, have you used tobacco or any nicotine product in any form?",
     timeframe: "Past 12 months",
@@ -845,7 +809,6 @@ export const QUESTION_BANK: Question[] = [
     id: "NIC-02",
     section: "nicotine",
     sourceRef: sourceRefFor("NIC-02"),
-    sourceText: sourceTextFor("NIC-02"),
     customerText:
       "In the past 36 months, have you used tobacco or nicotine products in any form?",
     timeframe: "Past 36 months",
@@ -861,7 +824,6 @@ export const QUESTION_BANK: Question[] = [
     id: "NIC-03",
     section: "nicotine",
     sourceRef: sourceRefFor("NIC-03"),
-    sourceText: sourceTextFor("NIC-03"),
     customerText:
       "In the past 5 years, have you used nicotine, tobacco, vaping or e-cigarettes in any form?",
     timeframe: "Past 5 years",
@@ -877,7 +839,6 @@ export const QUESTION_BANK: Question[] = [
     id: "NIC-04",
     section: "nicotine",
     sourceRef: sourceRefFor("NIC-04"),
-    sourceText: sourceTextFor("NIC-04"),
     customerText: "When did you last use any tobacco or nicotine product?",
     timeframe: "Most recent use",
     helpText:
@@ -896,7 +857,6 @@ export const QUESTION_BANK: Question[] = [
     id: "ALC-01",
     section: "alcohol",
     sourceRef: sourceRefFor("ALC-01"),
-    sourceText: sourceTextFor("ALC-01"),
     customerText: "In the past 12 months, have you drunk alcohol?",
     timeframe: "Past 12 months",
     kind: "yesno",
@@ -923,7 +883,6 @@ export const QUESTION_BANK: Question[] = [
     id: "ALC-02",
     section: "alcohol",
     sourceRef: sourceRefFor("ALC-02"),
-    sourceText: sourceTextFor("ALC-02"),
     customerText:
       "In the past 7 years, have you abused alcohol, had or been recommended to have treatment or counseling for alcohol use, or been advised to discontinue the use of alcohol?",
     timeframe: "Past 7 years",
@@ -938,7 +897,6 @@ export const QUESTION_BANK: Question[] = [
     id: "ALC-04",
     section: "alcohol",
     sourceRef: sourceRefFor("ALC-04"),
-    sourceText: sourceTextFor("ALC-04"),
     customerText:
       "In the past 5 years, have you abused alcohol or drugs, or had or been recommended by a medical professional or a licensed counselor to discontinue the use of alcohol or to have treatment or counseling for alcohol?",
     timeframe: "Past 5 years",
@@ -952,7 +910,6 @@ export const QUESTION_BANK: Question[] = [
     id: "ALC-05",
     section: "alcohol",
     sourceRef: sourceRefFor("ALC-05"),
-    sourceText: sourceTextFor("ALC-05"),
     customerText: "In the past 10 years, have you been treated for alcohol abuse?",
     timeframe: "Past 10 years",
     kind: "yesno",
@@ -965,7 +922,6 @@ export const QUESTION_BANK: Question[] = [
     id: "ALC-06",
     section: "alcohol",
     sourceRef: sourceRefFor("ALC-06"),
-    sourceText: sourceTextFor("ALC-06"),
     customerText:
       "Do you have any history of alcohol abuse or misuse, treatment or counseling, or of being advised to discontinue the use of alcohol?",
     timeframe: "Ever",
@@ -979,7 +935,6 @@ export const QUESTION_BANK: Question[] = [
     id: "ALC-03",
     section: "alcohol",
     sourceRef: sourceRefFor("ALC-03"),
-    sourceText: sourceTextFor("ALC-03"),
     customerText:
       "Have you ever had any alcohol- or drug-related infractions, including a history of excessive alcohol use, or an admitted DWI or DUI within the last three years?",
     timeframe: "Ever; DWI or DUI within 3 years",
@@ -1014,7 +969,6 @@ export const QUESTION_BANK: Question[] = [
     id: "AVI-01",
     section: "aviation",
     sourceRef: sourceRefFor("AVI-01"),
-    sourceText: sourceTextFor("AVI-01"),
     customerText:
       "In the past 12 months, have you made any flights as a pilot, student pilot, or crew member of any aircraft?",
     timeframe: "Past 12 months",
@@ -1028,7 +982,6 @@ export const QUESTION_BANK: Question[] = [
     id: "AVI-02",
     section: "aviation",
     sourceRef: sourceRefFor("AVI-02"),
-    sourceText: sourceTextFor("AVI-02"),
     customerText:
       "In the past 24 months, have you made, or contemplated making, any flights as a pilot, student pilot, or crew member of any aircraft?",
     timeframe: "Past 24 months",
@@ -1043,7 +996,6 @@ export const QUESTION_BANK: Question[] = [
     id: "AVI-03",
     section: "aviation",
     sourceRef: sourceRefFor("AVI-03"),
-    sourceText: sourceTextFor("AVI-03"),
     customerText: "A few details about your flying.",
     timeframe: "Past 24 months",
     kind: "short_text",
@@ -1080,7 +1032,6 @@ export const QUESTION_BANK: Question[] = [
     id: "AVI-04",
     section: "aviation",
     sourceRef: sourceRefFor("AVI-04"),
-    sourceText: sourceTextFor("AVI-04"),
     customerText: "Do you plan to fly as a pilot or crew member in the next 12 months?",
     timeframe: "Next 12 months",
     kind: "yesno",
@@ -1108,7 +1059,6 @@ export const QUESTION_BANK: Question[] = [
     id: "AVO-01",
     section: "avocations",
     sourceRef: sourceRefFor("AVO-01"),
-    sourceText: sourceTextFor("AVO-01"),
     customerText: "In the past 5 years, which of these activities have you taken part in?",
     timeframe: "Past 5 years",
     helpText: "Select everything that applies. Each activity is followed up separately.",
@@ -1129,7 +1079,6 @@ export const QUESTION_BANK: Question[] = [
     id: "AVO-02",
     section: "avocations",
     sourceRef: sourceRefFor("AVO-02"),
-    sourceText: sourceTextFor("AVO-02"),
     customerText: "A little about your climbing.",
     timeframe: "Past 5 years",
     kind: "short_text",
@@ -1157,7 +1106,6 @@ export const QUESTION_BANK: Question[] = [
     id: "AVO-03",
     section: "avocations",
     sourceRef: sourceRefFor("AVO-03"),
-    sourceText: sourceTextFor("AVO-03"),
     customerText: "A little about your racing.",
     timeframe: "Past 5 years",
     kind: "short_text",
@@ -1185,7 +1133,6 @@ export const QUESTION_BANK: Question[] = [
     id: "AVO-04",
     section: "avocations",
     sourceRef: sourceRefFor("AVO-04"),
-    sourceText: sourceTextFor("AVO-04"),
     customerText: "A little about your scuba diving.",
     timeframe: "Past 5 years",
     kind: "short_text",
@@ -1214,7 +1161,6 @@ export const QUESTION_BANK: Question[] = [
     id: "AVO-05",
     section: "avocations",
     sourceRef: sourceRefFor("AVO-05"),
-    sourceText: sourceTextFor("AVO-05"),
     customerText: "A little about your skydiving or paragliding.",
     timeframe: "Past 5 years",
     kind: "short_text",
@@ -1243,7 +1189,6 @@ export const QUESTION_BANK: Question[] = [
     id: "AVO-06",
     section: "avocations",
     sourceRef: sourceRefFor("AVO-06"),
-    sourceText: sourceTextFor("AVO-06"),
     customerText: "Do you ever climb alone or without a rope?",
     timeframe: "Past 5 years",
     helpText:
@@ -1263,7 +1208,6 @@ export const QUESTION_BANK: Question[] = [
     id: "AVO-07",
     section: "avocations",
     sourceRef: sourceRefFor("AVO-07"),
-    sourceText: sourceTextFor("AVO-07"),
     customerText: "Do you dive for salvage or exploration?",
     timeframe: "Past 5 years",
     kind: "yesno",
@@ -1285,7 +1229,6 @@ export const QUESTION_BANK: Question[] = [
     id: "DRV-06",
     section: "driving",
     sourceRef: sourceRefFor("DRV-06"),
-    sourceText: sourceTextFor("DRV-06"),
     customerText: "Do you currently have a valid driver's licence?",
     timeframe: "Current",
     helpText: "The source asks this before the suspension and conviction questions.",
@@ -1298,7 +1241,6 @@ export const QUESTION_BANK: Question[] = [
     id: "DRV-01",
     section: "driving",
     sourceRef: sourceRefFor("DRV-01"),
-    sourceText: sourceTextFor("DRV-01"),
     customerText:
       "In the past 24 months, have you had your driver's licence suspended or revoked, or been convicted of driving under the influence of alcohol or drugs?",
     timeframe: "Past 24 months",
@@ -1335,7 +1277,6 @@ export const QUESTION_BANK: Question[] = [
     id: "DRV-02",
     section: "driving",
     sourceRef: sourceRefFor("DRV-02"),
-    sourceText: sourceTextFor("DRV-02"),
     customerText:
       "In the past 5 years, have you had your driver's licence suspended or revoked, or is it currently suspended or revoked?",
     timeframe: "Past 5 years",
@@ -1363,7 +1304,6 @@ export const QUESTION_BANK: Question[] = [
     id: "DRV-03",
     section: "driving",
     sourceRef: sourceRefFor("DRV-03"),
-    sourceText: sourceTextFor("DRV-03"),
     customerText:
       "In the past 5 years, have you been convicted of careless or reckless driving?",
     timeframe: "Past 5 years",
@@ -1382,7 +1322,6 @@ export const QUESTION_BANK: Question[] = [
     id: "DRV-07",
     section: "driving",
     sourceRef: sourceRefFor("DRV-07"),
-    sourceText: sourceTextFor("DRV-07"),
     customerText:
       "In the past 5 years, have you pleaded guilty to, or been convicted of, any moving violations?",
     timeframe: "Past 5 years",
@@ -1400,7 +1339,6 @@ export const QUESTION_BANK: Question[] = [
     id: "DRV-04",
     section: "driving",
     sourceRef: sourceRefFor("DRV-04"),
-    sourceText: sourceTextFor("DRV-04"),
     customerText:
       "In the past 5 years, have you had more than two moving motor vehicle violations, or any alcohol- or drug-related infractions?",
     timeframe: "Past 5 years",
@@ -1429,7 +1367,6 @@ export const QUESTION_BANK: Question[] = [
     id: "DRV-05",
     section: "driving",
     sourceRef: sourceRefFor("DRV-05"),
-    sourceText: sourceTextFor("DRV-05"),
     customerText: "Have you ever had any motor vehicle accidents?",
     timeframe: "Ever",
     helpText:
@@ -1471,7 +1408,6 @@ export const QUESTION_BANK: Question[] = [
     id: "CRM-01",
     section: "criminal",
     sourceRef: sourceRefFor("CRM-01"),
-    sourceText: sourceTextFor("CRM-01"),
     customerText:
       "Have you ever pleaded guilty to, or been convicted of, a felony or misdemeanour, or do you have such a charge currently pending?",
     timeframe: "Ever",
@@ -1487,7 +1423,6 @@ export const QUESTION_BANK: Question[] = [
     id: "CRM-02",
     section: "criminal",
     sourceRef: sourceRefFor("CRM-02"),
-    sourceText: sourceTextFor("CRM-02"),
     customerText:
       "In the past 7 years, have you been convicted of, pleaded guilty to, or entered a plea of no contest to any felony?",
     timeframe: "Past 7 years",
@@ -1501,7 +1436,6 @@ export const QUESTION_BANK: Question[] = [
     id: "CRM-03",
     section: "criminal",
     sourceRef: sourceRefFor("CRM-03"),
-    sourceText: sourceTextFor("CRM-03"),
     customerText:
       "In the past 10 years, have you been convicted of, or pleaded guilty to, a felony, or are you currently awaiting trial for one?",
     timeframe: "Past 10 years",
@@ -1516,7 +1450,6 @@ export const QUESTION_BANK: Question[] = [
     id: "CRM-04",
     section: "criminal",
     sourceRef: sourceRefFor("CRM-04"),
-    sourceText: sourceTextFor("CRM-04"),
     customerText:
       "In the past 5 years, have you pleaded guilty to or been convicted of a felony or misdemeanour, including DUI or DWI, or do you have such a charge currently pending?",
     timeframe: "Past 5 years",
@@ -1531,7 +1464,6 @@ export const QUESTION_BANK: Question[] = [
     id: "CRM-05",
     section: "criminal",
     sourceRef: sourceRefFor("CRM-05"),
-    sourceText: sourceTextFor("CRM-05"),
     customerText:
       "In the past 6 months, have you served, or been released from, incarceration, probation, parole, or other court-ordered supervision for a misdemeanour or felony conviction?",
     timeframe: "Past 6 months",
@@ -1546,7 +1478,6 @@ export const QUESTION_BANK: Question[] = [
     id: "CRM-06",
     section: "criminal",
     sourceRef: sourceRefFor("CRM-06"),
-    sourceText: sourceTextFor("CRM-06"),
     customerText:
       "In the past 10 years, have you served, or been released from, incarceration, probation, parole, or other court-ordered supervision for a misdemeanour or felony conviction?",
     timeframe: "Past 10 years",
@@ -1560,7 +1491,6 @@ export const QUESTION_BANK: Question[] = [
     id: "CRM-07",
     section: "criminal",
     sourceRef: sourceRefFor("CRM-07"),
-    sourceText: sourceTextFor("CRM-07"),
     customerText:
       "Are you currently under an order for probation, parole, or other court-ordered supervision for a misdemeanour or felony conviction?",
     timeframe: "Currently",
@@ -1576,7 +1506,6 @@ export const QUESTION_BANK: Question[] = [
     id: "FIN-01",
     section: "financial",
     sourceRef: sourceRefFor("FIN-01"),
-    sourceText: sourceTextFor("FIN-01"),
     customerText: "Have you ever filed for bankruptcy, personally or for a business you owned?",
     timeframe: "Ever",
     kind: "yesno",
@@ -1588,7 +1517,6 @@ export const QUESTION_BANK: Question[] = [
     id: "FIN-02",
     section: "financial",
     sourceRef: sourceRefFor("FIN-02"),
-    sourceText: sourceTextFor("FIN-02"),
     customerText: "A few details about the bankruptcy.",
     timeframe: "Ever",
     kind: "short_text",
@@ -1638,7 +1566,6 @@ export const QUESTION_BANK: Question[] = [
     id: "FIN-03",
     section: "financial",
     sourceRef: sourceRefFor("FIN-03"),
-    sourceText: sourceTextFor("FIN-03"),
     customerText: "What was the date of discharge, or the anticipated date?",
     timeframe: "Ever",
     helpText: "If the bankruptcy is still open, give the expected date instead.",
@@ -1656,7 +1583,6 @@ export const QUESTION_BANK: Question[] = [
     id: "DRG-01",
     section: "drugs",
     sourceRef: sourceRefFor("DRG-01"),
-    sourceText: sourceTextFor("DRG-01"),
     customerText:
       "In the past 2 years, have you used illegal drugs, abused alcohol or drugs, had or been recommended by a medical professional to have treatment or counseling for alcohol or drug use, or been advised to discontinue the use of alcohol or drugs?",
     timeframe: "Past 2 years",
@@ -1670,7 +1596,6 @@ export const QUESTION_BANK: Question[] = [
     id: "DRG-02",
     section: "drugs",
     sourceRef: sourceRefFor("DRG-02"),
-    sourceText: sourceTextFor("DRG-02"),
     customerText:
       "In the past 5 years, have you used illegal drugs or abused alcohol or drugs, or had or been recommended by a medical professional or a licensed counselor to discontinue the use of alcohol or drugs, or to have treatment or counseling for alcohol or drugs?",
     timeframe: "Past 5 years",
@@ -1684,7 +1609,6 @@ export const QUESTION_BANK: Question[] = [
     id: "DRG-03",
     section: "drugs",
     sourceRef: sourceRefFor("DRG-03"),
-    sourceText: sourceTextFor("DRG-03"),
     customerText: "In the last 24 months, have you smoked marijuana for recreational purposes?",
     timeframe: "Last 24 months",
     helpText:
@@ -1698,7 +1622,6 @@ export const QUESTION_BANK: Question[] = [
     id: "DRG-04",
     section: "drugs",
     sourceRef: sourceRefFor("DRG-04"),
-    sourceText: sourceTextFor("DRG-04"),
     customerText:
       "Have you ever used heroin, morphine, other narcotics, marijuana, cocaine, barbiturates, amphetamines, hallucinogenic drugs, or other habit-forming drugs, except as prescribed by a physician?",
     timeframe: "Ever",
@@ -1713,7 +1636,6 @@ export const QUESTION_BANK: Question[] = [
     id: "DRG-05",
     section: "drugs",
     sourceRef: sourceRefFor("DRG-05"),
-    sourceText: sourceTextFor("DRG-05"),
     customerText:
       "In the past 7 years, have you been advised by a medical professional to have treatment for, or to reduce or discontinue, the intake of prescription drugs?",
     timeframe: "Past 7 years",
@@ -1727,7 +1649,6 @@ export const QUESTION_BANK: Question[] = [
     id: "DRG-06",
     section: "drugs",
     sourceRef: sourceRefFor("DRG-06"),
-    sourceText: sourceTextFor("DRG-06"),
     customerText:
       "In the past 10 years, have you been treated for drug abuse, or used any drugs not prescribed to you?",
     timeframe: "Past 10 years",
@@ -1741,7 +1662,6 @@ export const QUESTION_BANK: Question[] = [
     id: "DRG-07",
     section: "drugs",
     sourceRef: sourceRefFor("DRG-07"),
-    sourceText: sourceTextFor("DRG-07"),
     customerText: "Do you have any history of, or current treatment for, drug abuse?",
     timeframe: "Ever / current",
     kind: "yesno",
@@ -1756,7 +1676,6 @@ export const QUESTION_BANK: Question[] = [
     id: "RES-01",
     section: "residency",
     sourceRef: sourceRefFor("RES-01"),
-    sourceText: sourceTextFor("RES-01"),
     customerText: "Which best describes your citizenship or residency status in the United States?",
     kind: "single_choice",
     options: [
@@ -1773,7 +1692,6 @@ export const QUESTION_BANK: Question[] = [
     id: "RES-02",
     section: "residency",
     sourceRef: sourceRefFor("RES-02"),
-    sourceText: sourceTextFor("RES-02"),
     customerText: "In the past 5 years, have you lived outside the United States for a month or more?",
     timeframe: "Past 5 years",
     kind: "yesno",
@@ -1799,7 +1717,6 @@ export const QUESTION_BANK: Question[] = [
     id: "RES-03",
     section: "residency",
     sourceRef: sourceRefFor("RES-03"),
-    sourceText: sourceTextFor("RES-03"),
     customerText: "Do you plan to travel outside the United States in the next 12 months?",
     timeframe: "Next 12 months",
     kind: "yesno",
@@ -1825,8 +1742,7 @@ export const QUESTION_BANK: Question[] = [
     id: "RES-04",
     section: "residency",
     sourceRef: sourceRefFor("RES-04"),
-    sourceText: sourceTextFor("RES-04"),
-    customerText: "Held for review: the source questionnaire asks for an immigration category.",
+    customerText: "Held for review: a source question requiring legal approval.",
     reviewNote:
       "Immigration-status detail is sensitive and the source wording uses static categories that may be out of date. Requires legal review of necessity and approved answer sets before collection. No document numbers are collected here.",
     sensitive: true,
@@ -1839,8 +1755,7 @@ export const QUESTION_BANK: Question[] = [
     id: "RES-05",
     section: "residency",
     sourceRef: sourceRefFor("RES-05"),
-    sourceText: sourceTextFor("RES-05"),
-    customerText: "Held for review: the source questionnaire asks for a visa or green-card number.",
+    customerText: "Held for review: an identity-document question not collected in this intake.",
     reviewNote:
       "Identity-document numbers are not collected in this intake. If ever required, collection must move to an approved downstream workflow with a documented necessity and secure handling.",
     sensitive: true,
@@ -1854,7 +1769,6 @@ export const QUESTION_BANK: Question[] = [
     id: "RES-06",
     section: "residency",
     sourceRef: sourceRefFor("RES-06"),
-    sourceText: sourceTextFor("RES-06"),
     customerText: "Do you plan to move back to your native country?",
     timeframe: "Future",
     kind: "yesno",
@@ -1871,7 +1785,6 @@ export const QUESTION_BANK: Question[] = [
     id: "OCC-01",
     section: "occupation",
     sourceRef: sourceRefFor("OCC-01"),
-    sourceText: sourceTextFor("OCC-01"),
     customerText: "Tell us about your work.",
     helpText:
       "Specific duties help more than a job title. Approximate income and hours are fine.",
@@ -1892,7 +1805,6 @@ export const QUESTION_BANK: Question[] = [
     id: "OCC-02",
     section: "occupation",
     sourceRef: sourceRefFor("OCC-02"),
-    sourceText: sourceTextFor("OCC-02"),
     customerText:
       "Does your work involve firearms, explosives, working at height, or another hazardous duty?",
     timeframe: "Right now",
@@ -1920,7 +1832,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MIL-01",
     section: "military",
     sourceRef: sourceRefFor("MIL-01"),
-    sourceText: sourceTextFor("MIL-01"),
     customerText: "Have you ever served in the armed forces?",
     timeframe: "Ever",
     helpText: "No classified or operational detail is requested at any point in this interview.",
@@ -1933,7 +1844,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MIL-02",
     section: "military",
     sourceRef: sourceRefFor("MIL-02"),
-    sourceText: sourceTextFor("MIL-02"),
     customerText: "Did your service include flying or aircraft duties?",
     timeframe: "Ever",
     kind: "yesno",
@@ -1960,7 +1870,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MIL-03",
     section: "military",
     sourceRef: sourceRefFor("MIL-03"),
-    sourceText: sourceTextFor("MIL-03"),
     customerText: "In the past 12 months, have you been on active duty or deployed?",
     timeframe: "Past 12 months",
     kind: "yesno",
@@ -1996,7 +1905,6 @@ export const QUESTION_BANK: Question[] = [
     id: "MIL-04",
     section: "military",
     sourceRef: sourceRefFor("MIL-04"),
-    sourceText: sourceTextFor("MIL-04"),
     customerText: "What kind of missions do you fly?",
     timeframe: "Current",
     helpText: "Broad categories only. No classified or operational detail is requested.",

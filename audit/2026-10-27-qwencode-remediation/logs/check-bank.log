@@ -1,0 +1,29 @@
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:bank
+> tsx scripts/check-bank.ts
+
+Question bank: 92 rows
+  approved for interview : 87
+  held for human review  : 5 (ID-04, MED-11, MH-06, RES-04, RES-05)
+  branching questions    : 14
+  supplemental           : 11
+  signed off by reviewer : 0
+
+Source questionnaire: 113 questions
+  traced to a bank row  : 85
+  gaps recorded         : 28 (19 partially collected, 9 out of scope, 0 collected nowhere)
+
+Reconciliation: 92 records, 29 with flags
+  matches_source    : 55
+  split_source_compound: 3
+  wording_changed   : 11
+  timeframe_changed : 7
+  added_by_lpp      : 9
+  not_in_source     : 2
+  held_for_review   : 5
+  flags: wording 16, timeframe 10, branching 12, attribution 10, omission 9
+
+Reconciliation is complete; 92 rows still need a named reviewer's sign-off.
+See docs/question-bank-reconciliation.md for each row's decision.
+
+Structural and reconciliation checks passed.

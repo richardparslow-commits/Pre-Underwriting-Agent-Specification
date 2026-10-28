@@ -121,6 +121,11 @@ requireText(".env.example", ["RATE_LIMIT_SALT", "QUESTIONNAIRE_APPROVED"]);
 forbidText("src/config/site.ts", ["all 56 rows"]);
 forbidText("src/features/interview/reconciliation.ts", ["56-row"]);
 forbidText("src/pages/LandingPage.tsx", ["Source questions"]);
+forbidText("src/pages/PrivacyPage.tsx", [
+  "encryption in transit and at rest",
+  "encrypted at rest",
+]);
+requireText("src/pages/PrivacyPage.tsx", ["transmitted over TLS", "provider controls"]);
 
 requireText("src/pages/LandingPage.tsx", ["Core questions"]);
 

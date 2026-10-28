@@ -22,7 +22,7 @@ const SECTIONS = [
   },
   {
     title: "How it is stored",
-    body: "Submitted answers are written to an access-controlled case store with encryption in transit and at rest. A submitted snapshot is immutable: corrections are recorded alongside it rather than overwriting the original record. The case reference, submission time and questionnaire version are fixed at submission.",
+    body: "Submitted answers are written to an access-controlled case store and transmitted over TLS. Hosted storage encryption and key management are provider controls that must be confirmed for the deployed project before launch; this draft does not claim that verification. A submitted snapshot is immutable: corrections are recorded alongside it rather than overwriting the original record. The case reference, submission time and questionnaire version are fixed at submission.",
   },
   {
     title: "What is kept out of other systems",

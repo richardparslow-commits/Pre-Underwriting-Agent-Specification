@@ -1,6 +1,11 @@
 /**
  * Verbatim inventory of the controlled source questionnaire.
  *
+ * BUILD/AUDIT-ONLY. Do not import this module from the customer application;
+ * the browser uses the generated, text-free `sourceIndex.ts` and
+ * `questionSourceRefs.ts`. `npm run check:bundle` proves the wording is absent
+ * from production JavaScript.
+ *
  * Source document: source/Detialed-Life-insurance-Questions.pdf (7 pages,
  * SHA-256 afe91d876f2c9e932302267ad10d0c46b774b4161efea8d0d2ffe71e3c82cca2).
  * The plain-text extraction used to build this file is checked in beside it as

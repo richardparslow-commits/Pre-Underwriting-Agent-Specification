@@ -1,5 +1,7 @@
 # Remediation ledger — Life Policy Pilot pre-underwriting
 
+> **Historical:** this ledger covers M-01–M-24 and predates A4 and the QwenCode pass. It does not include M-25–M-30 or the later M-11 bundle redaction, M-17 fail-closed rate limiting and M-30 privacy-copy fixes. The current 30-finding ledger is [`2026-10-27-qwencode-remediation/LEDGER.md`](2026-10-27-qwencode-remediation/LEDGER.md).
+
 **Started:** 27 October 2026  
 **Baseline:** `main` @ `07fdbfe632d48ef363caac086e82b8c2f13277a2`  
 **Source registers:** [`MASTER-ISSUE-LIST.md`](MASTER-ISSUE-LIST.md), [`2026-10-27-qwencloud/qwencloud-issues.md`](2026-10-27-qwencloud/qwencloud-issues.md)  

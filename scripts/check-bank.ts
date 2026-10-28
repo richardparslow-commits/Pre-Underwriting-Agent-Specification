@@ -6,16 +6,42 @@
  * rows and reconciliation coverage are consistent. It cannot prove a wording
  * is approved; a named reviewer must sign each row off.
  */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import { QUESTION_BANK } from "../src/features/interview/questionBank";
 import {
   reconciliationSummary,
   SOURCE_GAPS,
 } from "../src/features/interview/reconciliation";
 import { validateQuestionBank, validateReconciliation } from "../src/features/interview/validateQuestionBank";
+import { renderSourceIndex } from "./generate-source-index";
+import { renderQuestionSourceRefs } from "./generate-question-refs";
 
+const here = dirname(fileURLToPath(import.meta.url));
+const generatedIndex = readFileSync(
+  resolve(here, "../src/features/interview/sourceIndex.ts"),
+  "utf8",
+);
 const structural = validateQuestionBank();
 const reconciliation = validateReconciliation();
 const issues = [...structural, ...reconciliation];
+
+if (generatedIndex !== renderSourceIndex()) {
+  issues.push(
+    "sourceIndex.ts is out of date. Run `npm run generate:source-index` and commit the result.",
+  );
+}
+
+const generatedRefs = readFileSync(
+  resolve(here, "../src/features/interview/questionSourceRefs.ts"),
+  "utf8",
+);
+if (generatedRefs !== renderQuestionSourceRefs()) {
+  issues.push(
+    "questionSourceRefs.ts is out of date. Run `npm run generate:question-refs` and commit the result.",
+  );
+}
 
 const approved = QUESTION_BANK.filter((question) => question.reviewStatus === "approved");
 const held = QUESTION_BANK.filter((question) => question.reviewStatus === "human_review_required");

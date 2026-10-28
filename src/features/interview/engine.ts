@@ -288,7 +288,6 @@ export function toSubmittedAnswers(answers: Answers): SubmittedAnswer[] {
       questionId: question.id,
       section: question.section,
       sourceRef: question.sourceRef,
-      sourceText: question.sourceText,
       customerText: question.customerText,
       timeframe: question.timeframe,
       status: question.status,

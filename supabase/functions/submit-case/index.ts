@@ -10,7 +10,7 @@
  *
  * The function is still protected by:
  *   * an Origin allowlist (APP_ORIGIN, plus localhost in development),
- *   * a durable salted rate limit, with an in-memory last-resort fallback,
+ *   * a durable salted rate limit; production fails closed if it is unavailable,
  *   * a streaming 512 KB byte cap and a canonical 92-row completeness check,
  *   * strict server-side validation and rebuilding of the payload,
  *   * a server-generated case reference (a client cannot choose one).
@@ -161,18 +161,37 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "Submission too large" }, 413, origin);
   }
 
-  // A durable, salted counter is used when the project is configured. The
-  // in-memory limiter remains a last-resort guard for local tests and outages.
+  // A durable, salted counter is used when the project is configured. If it is
+  // unavailable, production must fail closed: the in-memory limiter cannot
+  // coordinate across instances and is reserved for the explicit test mode.
   const durableLimited = await durableRateLimited(req);
-  if (
-    durableLimited === true ||
-    (durableLimited === null && rateLimited(clientKey(req)))
-  ) {
+  if (durableLimited === true) {
     return jsonResponse(
       { error: "Too many submissions from this connection. Please try again shortly." },
       429,
       origin,
     );
+  }
+  if (durableLimited === null) {
+    if (Deno.env.get("ENVIRONMENT") === "test") {
+      if (rateLimited(clientKey(req))) {
+        return jsonResponse(
+          { error: "Too many submissions from this connection. Please try again shortly." },
+          429,
+          origin,
+        );
+      }
+    } else {
+      console.error("Durable rate limiter is unavailable");
+      return jsonResponse(
+        {
+          error:
+            "Submissions are temporarily unavailable. Nothing was saved and nothing was sent.",
+        },
+        503,
+        origin,
+      );
+    }
   }
 
   // Content-Length can be absent or lie, so the byte budget is enforced while

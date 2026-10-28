@@ -21,10 +21,14 @@
  * A flag is a finding, not a fix. Nothing here rewrites customer-facing text:
  * that is the reviewer's decision and is recorded by flipping
  * `sourceVerified` on the bank row after sign-off.
+ *
+ * REVIEWER/BUILD-ONLY. Flags and actions can quote withheld source wording, so
+ * this module must not be imported by the customer application. The browser
+ * uses the generated locator map in `questionSourceRefs.ts`.
  */
 
-import type { SourceQuestion } from "./sourceInventory";
-import { SOURCE_BY_ID, SOURCE_DOCUMENT } from "./sourceInventory";
+import type { SourceIndexEntry } from "./sourceIndex";
+import { SOURCE_BY_ID, SOURCE_DOCUMENT } from "./sourceIndex";
 
 export type ReconciliationVerdict =
   | "matches_source"
@@ -1306,10 +1310,10 @@ export function sourceIdsFor(questionId: string): string[] {
   return RECONCILIATION_BY_ID[questionId]?.sourceIds ?? [];
 }
 
-export function sourceQuestionsFor(questionId: string): SourceQuestion[] {
+export function sourceQuestionsFor(questionId: string): SourceIndexEntry[] {
   return sourceIdsFor(questionId)
     .map((id) => SOURCE_BY_ID[id])
-    .filter((question): question is SourceQuestion => Boolean(question));
+    .filter((question): question is SourceIndexEntry => Boolean(question));
 }
 
 function pageLabel(pages: number[]): string {
@@ -1336,20 +1340,6 @@ export function sourceRefFor(questionId: string): string {
 
   const pages = pageLabel(questions.map((question) => question.page));
   return `${SOURCE_DOCUMENT.fileName}, ${pages} — ${questions.map((question) => question.id).join(", ")}`;
-}
-
-/**
- * The source wording behind a bank question, with each source id and its own
- * window, so a merged row shows every question it merged rather than one.
- */
-export function sourceTextFor(questionId: string): string {
-  const questions = sourceQuestionsFor(questionId);
-  if (questions.length === 0) {
-    return "Not in the source questionnaire. Added by Life Policy Pilot.";
-  }
-  return questions
-    .map((question) => `${question.id} (${question.timeframe}): ${question.text}`)
-    .join(" • ");
 }
 
 const SOURCE_INVENTORY_IDS = Object.keys(SOURCE_BY_ID);

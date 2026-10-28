@@ -100,3 +100,8 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+      # Verbatim source wording belongs in the build/audit inventory, not in
+      # the public JavaScript. This is the bundle-level M-11 regression guard.
+      - name: No source wording in the public bundle
+        run: npm run check:bundle

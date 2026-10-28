@@ -258,10 +258,11 @@ every five minutes.
 
 `submit-case` enforces an Origin allowlist, a streaming 512 KiB byte cap, a
 92-row completeness check, server-side canonical validation, and a durable
-salted rate limit (ten submissions per ten minutes per hashed client key). The
-in-memory limiter is only a last-resort fallback for local tests or a durable
-limit outage. A WAF in front of the function is still recommended before public
-launch.
+salted rate limit (ten submissions per ten minutes per hashed client key). If
+the durable limiter is unavailable in production, the function refuses
+submissions with 503 rather than trusting the per-instance fallback;
+`ENVIRONMENT=test` is the only mode that uses the in-memory guard. A WAF in
+front of the function is still recommended before public launch.
 
 ### 4. Point the front end at it
 
@@ -295,14 +296,21 @@ The source PDF is committed at `source/Detialed-Life-insurance-Questions.pdf`
 (SHA-256 `afe91d87…82cca2`). It has been reconciled against the bank once:
 
 - `src/features/interview/sourceInventory.ts` — all 113 source questions,
-  verbatim, with page numbers and the window each one states.
+  verbatim, with page numbers and the window each one states. Build/audit-only:
+  it is not imported by the customer application.
 - `src/features/interview/reconciliation.ts` — one record per bank row: source
   ids, verdict, every mismatch as a flag, and the decision a reviewer must make;
   plus the 28 source questions no row fully covers (19 partly collected, 9 out
-  of scope).
-- `src/features/interview/questionBank.ts` — `sourceRef` and `sourceText` are
-  derived from those records, so the locator and wording cannot drift from the
-  source.
+  of scope). Reviewer/build-only; its flags can quote withheld wording.
+- `src/features/interview/sourceIndex.ts` and
+  `src/features/interview/questionSourceRefs.ts` — generated, text-free
+  projections. `questionSourceRefs.ts` is the browser locator map;
+  `sourceIndex.ts` is the build-side metadata. `npm run check:bank` fails if
+  either drifts.
+- `src/features/interview/questionBank.ts` — `sourceRef` comes from the
+  generated locator map; the canonical server bank attaches `sourceText` after
+  submission. Held wording and reviewer reconciliation detail are therefore
+  absent from the public bundle (`npm run check:bundle`).
 - `docs/question-bank-reconciliation.md` — generated review document with the
   full row-by-row record (`npm run report:reconciliation`).
 
@@ -362,10 +370,11 @@ is the reviewer's signature in the report.
   questions, driving its separate 24-month, 5-year and ever questions, and the
   newly added rows branched only where the source branches (solo climbing,
   salvage diving, bankruptcy discharge date, military mission type).
-- `deno test --allow-env --lock=deno.lock supabase/functions/tests/` — 35 tests:
-  handler-level launch lock, required consent and byte-cap checks; canonical
-  snapshot/consent/crisis/age/branch rejection tests; phone/text contact rules;
-  and Svix signature tests for valid, replayed, tampered and rotating-key events.
+- `deno test --allow-env --lock=deno.lock supabase/functions/tests/` — 36 tests:
+  handler-level launch lock, required consent, fail-closed rate limiting and
+  byte-cap checks; canonical snapshot/consent/crisis/age/branch rejection tests;
+  phone/text contact rules; and Svix signature tests for valid, replayed,
+  tampered and rotating-key events.
   This runs in CI with Deno 2.
 - `npm run test:consent` — 7 tests over the pure consent builder: only enabled
   marketing channels produce a record, each enabled channel appears once, an

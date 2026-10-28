@@ -7,13 +7,15 @@
 
 This is a consolidation, not a fourth audit. It does not change any finding, close any item or imply a fix. The full evidence remains in the source registers.
 
+> **Historical note:** this list covers A1–A3 only. The post-A4 master list, including the six new Freebuff findings and the current remediation status, is [`2026-10-27-master-issue-list.md`](2026-10-27-master-issue-list.md).
+
 ## 1. What the three audit passes actually contain
 
 | Run | Artifact | Finding register | Conditions | Unique finding IDs | Note |
 |---|---|---|---|---:|---|
-| A1 — Baseline repository audit | [2026-10-27-pre-underwriting-audit.md](audit/2026-10-27-pre-underwriting-audit.md) | F-01–F-18 (18) | C-01–C-12 (report section 12) (12) | 18 | Full report, 18-finding register and questionnaire matrix. |
-| A2 — Freebuff Pre-Underwriting Audit Prompt pass | [LIST-2-CONDITIONS.md](audit/archive/2026-10-27-pre-qwencloud/LIST-2-CONDITIONS.md) | No separate finding register preserved (0) | C-01–C-12 (same conditions list) (12) | 0 | The archive records that no separate second finding report was present. No unique IDs were available to merge; this pass is represented by the conditions list. |
-| A3 — Qwencloud audit | [qwencloud-audit.md](audit/2026-10-27-qwencloud/qwencloud-audit.md) | QW-01–QW-24 (24) | QC-01–QC-13 (report section 12) (13) | 24 | 18 prior findings reconfirmed at the same commit; 6 new findings. |
+| A1 — Baseline repository audit | [2026-10-27-pre-underwriting-audit.md](2026-10-27-pre-underwriting-audit.md) | F-01–F-18 (18) | C-01–C-12 (report section 12) (12) | 18 | Full report, 18-finding register and questionnaire matrix. |
+| A2 — Freebuff Pre-Underwriting Audit Prompt pass | [LIST-2-CONDITIONS.md](archive/2026-10-27-pre-qwencloud/LIST-2-CONDITIONS.md) | No separate finding register preserved (0) | C-01–C-12 (same conditions list) (12) | 0 | The archive records that no separate second finding report was present. No unique IDs were available to merge; this pass is represented by the conditions list. |
+| A3 — Qwencloud audit | [qwencloud-audit.md](2026-10-27-qwencloud/qwencloud-audit.md) | QW-01–QW-24 (24) | QC-01–QC-13 (report section 12) (13) | 24 | 18 prior findings reconfirmed at the same commit; 6 new findings. |
 
 **Important provenance limit.** Only two distinct finding registers exist in the preserved corpus: `F-01`–`F-18` (A1) and `QW-01`–`QW-24` (A3). The A2 pass is preserved as the 12-condition list, not as a separate findings list. The archive explicitly records that no separate second finding report was present. This master list therefore unions what exists; it does not invent A2 findings.
 
