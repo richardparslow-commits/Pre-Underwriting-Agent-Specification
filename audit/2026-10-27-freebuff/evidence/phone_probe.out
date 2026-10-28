@@ -1,0 +1,5 @@
+{"scenario":"phone preference, no phone","ok":true,"reason":null,"storedPhone":null}
+{"scenario":"text preference, no phone","ok":true,"reason":null,"storedPhone":null}
+{"scenario":"phone preference, junk phone","ok":true,"reason":null,"storedPhone":"+"}
+{"scenario":"phone preference, 3 digits","ok":true,"reason":null,"storedPhone":"+512"}
+{"scenario":"phone preference, valid 10 digits","ok":true,"reason":null,"storedPhone":"+15125550134"}

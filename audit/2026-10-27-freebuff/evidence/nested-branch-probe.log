@@ -1,0 +1,37 @@
+before parent closes: { visible: [ 'MIL-01', 'MIL-02', 'MIL-03', 'MIL-04' ] }
+after parent closes: {
+  answerKeys: [ 'MIL-01', 'MIL-04' ],
+  visible: [ 'MIL-01' ],
+  submitted: [
+    {
+      id: 'MIL-01',
+      disposition: 'answered',
+      answerState: 'no',
+      answerValues: undefined,
+      fields: []
+    },
+    {
+      id: 'MIL-02',
+      disposition: 'not_asked',
+      answerState: undefined,
+      answerValues: undefined,
+      fields: []
+    },
+    {
+      id: 'MIL-03',
+      disposition: 'not_asked',
+      answerState: undefined,
+      answerValues: undefined,
+      fields: []
+    },
+    {
+      id: 'MIL-04',
+      disposition: 'not_asked',
+      answerState: undefined,
+      answerValues: undefined,
+      fields: []
+    }
+  ],
+  nestedOrphanStillVisible: false,
+  nestedOrphanStillAnswered: false
+}

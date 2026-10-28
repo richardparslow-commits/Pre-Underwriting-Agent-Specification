@@ -1,0 +1,31 @@
+{
+  retainedWhileClosed: [ 'MIL-01', 'MIL-04' ],
+  visibleWhenReopened: [ 'MIL-01', 'MIL-02', 'MIL-03', 'MIL-04' ],
+  submitted: [
+    {
+      id: 'MIL-01',
+      disposition: 'answered',
+      answerValues: undefined,
+      answerState: 'yes'
+    },
+    {
+      id: 'MIL-02',
+      disposition: 'answered',
+      answerValues: undefined,
+      answerState: 'yes'
+    },
+    {
+      id: 'MIL-03',
+      disposition: 'unresolved',
+      answerValues: undefined,
+      answerState: undefined
+    },
+    {
+      id: 'MIL-04',
+      disposition: 'answered',
+      answerValues: [Array],
+      answerState: undefined
+    }
+  ],
+  staleNestedAnswerRevived: true
+}
