@@ -303,6 +303,14 @@ export interface CorrectionRecord {
   recordedAt: string;
 }
 
+export interface MarketingRevocationRecord {
+  channel: "phone" | "email";
+  reason: string;
+  source: string;
+  recordedBy: string;
+  recordedAt: string;
+}
+
 export interface CaseRecord extends CaseDraft {
   reference: string;
   submittedAt: string;
@@ -310,6 +318,8 @@ export interface CaseRecord extends CaseDraft {
   notification: NotificationRecord;
   reviewLog: ReviewLogEntry[];
   corrections: CorrectionRecord[];
+  /** Append-only withdrawal evidence; the submitted consent snapshot is unchanged. */
+  marketingRevocations: MarketingRevocationRecord[];
   draftSummary: DraftSummary;
   /** True only for the clearly-labelled non-customer case used in previews. */
   sample?: boolean;

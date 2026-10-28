@@ -123,6 +123,11 @@ export function SiteLayout() {
                 </Link>
               </li>
               <li>
+                <Link to="/marketing-opt-out" className="link-quiet">
+                  Stop marketing
+                </Link>
+              </li>
+              <li>
                 <a href={`mailto:${SITE.reviewerEmail}`} className="link-quiet">
                   Contact {SITE.owner}
                 </a>

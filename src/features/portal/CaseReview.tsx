@@ -168,6 +168,15 @@ export function CaseReview({
 
   const notification = NOTIFICATION[record.notification.state];
   const unanswered = record.answers.filter((answer) => answer.disposition === "unresolved").length;
+  const latestPhoneRevocation = record.marketingRevocations.find(
+    (entry) => entry.channel === "phone",
+  );
+  const consentRows = record.consents.map((consent) => ({
+    consent,
+    revoked:
+      (consent.id === "marketing_call" || consent.id === "marketing_text") &&
+      Boolean(latestPhoneRevocation),
+  }));
 
   async function runAction(action: ReviewLogEntry["action"], actionNote?: string) {
     setBusy(action);
@@ -444,17 +453,20 @@ export function CaseReview({
           <section className="panel p-5">
             <h2 className="text-base font-medium">Consent evidence</h2>
             <ul className="mt-3 space-y-3">
-              {record.consents.map((consent) => (
+              {consentRows.map(({ consent, revoked }) => (
                 <li key={consent.id} className="text-xs">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm">{consent.label}</span>
-                    <Badge tone={consent.granted ? "ok" : "outline"}>
-                      {consent.granted ? "Given" : "Not given"}
+                    <Badge tone={revoked ? "danger" : consent.granted ? "ok" : "outline"}>
+                      {revoked ? "Revoked" : consent.granted ? "Given" : "Not given"}
                     </Badge>
                   </div>
                   <p className="mt-1 text-muted-foreground">
-                    {consent.grantedAt ? formatDate(consent.grantedAt) : "No permission recorded"} ·
-                    text v{consent.textVersion}
+                    {consent.grantedAt ? formatDate(consent.grantedAt) : "No permission recorded"}
+                    {revoked && latestPhoneRevocation
+                      ? ` · withdrawn ${formatDate(latestPhoneRevocation.recordedAt)}`
+                      : ""}{" "}
+                    · text v{consent.textVersion}
                   </p>
                   <details className="mt-1">
                     <summary className="cursor-pointer text-muted-foreground">
@@ -467,6 +479,33 @@ export function CaseReview({
                 </li>
               ))}
             </ul>
+            {record.marketingRevocations.length > 0 ? (
+              <div className="mt-4 border-t border-border pt-3">
+                <p className="text-sm font-medium">Marketing withdrawal evidence</p>
+                <ul className="mt-2 space-y-2">
+                  {record.marketingRevocations.map((entry) => (
+                    <li key={`${entry.channel}-${entry.recordedAt}`} className="text-xs">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge tone="danger">
+                          {entry.channel === "phone" ? "Phone" : "Email"}
+                        </Badge>
+                        <span>{formatDate(entry.recordedAt)}</span>
+                        <span className="text-muted-foreground">via {entry.source}</span>
+                      </div>
+                      {entry.reason ? (
+                        <p className="mt-1 leading-relaxed text-muted-foreground">
+                          {entry.reason}
+                        </p>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[0.7rem] leading-relaxed text-muted-foreground">
+                  The submitted consent snapshot is unchanged. This withdrawal is append-only
+                  evidence and is enforced before any marketing send.
+                </p>
+              </div>
+            ) : null}
           </section>
 
           <section className="panel p-5">

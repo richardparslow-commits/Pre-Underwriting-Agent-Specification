@@ -88,7 +88,12 @@ requireText("README.md", [
   "0003_reliability_and_access.sql",
   "0004_reviewer_write_paths.sql",
   "0005_case_summary_view.sql",
+  "0006_notification_terminal_state.sql",
+  "0007_marketing_revocation.sql",
   "Applied and exercised on a non-production staging project",
+  "revoke-marketing",
+  "sync-marketing-suppressions",
+  "/marketing-opt-out",
   "check:portal",
 ]);
 forbidText("README.md", [
@@ -107,12 +112,14 @@ requireText("docs/LAUNCH-GATES.md", [
   "AAL2",
   "Svix",
   "complete_case_notification",
+  "assert_marketing_send_allowed",
   "check:portal",
 ]);
 forbidText("docs/LAUNCH-GATES.md", [
   "MFA must be enabled on the account (operational task)",
   "shared secret, not provider signature",
   "live MFA enrolment/step-up for a real staff reviewer remains unverified",
+  "**Not started:** a customer-facing revocation flow",
 ]);
 
 requireText("docs/question-bank-reconciliation.md", [
@@ -124,11 +131,20 @@ requireText("docs/OPERATIONS.md", [
   "retention_months",
   "delete_case",
   "record_marketing_revocation",
+  "request_marketing_revocation",
+  "assert_marketing_send_allowed",
+  "pending_marketing_suppressions",
+  "MARKETING_SUPPRESSION_WEBHOOK_URL",
   "BLOCKED",
-  "0001–0005",
+  "0001–0007",
 ]);
 
-requireText(".env.example", ["RATE_LIMIT_SALT", "QUESTIONNAIRE_APPROVED"]);
+requireText(".env.example", [
+  "RATE_LIMIT_SALT",
+  "QUESTIONNAIRE_APPROVED",
+  "VITE_REVOKE_MARKETING_URL",
+  "MARKETING_SUPPRESSION_WEBHOOK_URL",
+]);
 
 forbidText("src/config/site.ts", ["all 56 rows"]);
 forbidText("src/features/interview/reconciliation.ts", ["56-row"]);

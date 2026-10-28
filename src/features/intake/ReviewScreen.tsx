@@ -63,7 +63,11 @@ export function ReviewScreen({
   );
   const held = QUESTION_BANK.filter((question) => question.reviewStatus === "human_review_required");
   const marketingGiven = consent.marketingCall || consent.marketingText;
-  const marketingWithdrawal = [MARKETING.texts ? "replying STOP" : null, "asking us"]
+  const marketingWithdrawal = [
+    MARKETING.texts ? "replying STOP" : null,
+    "using the marketing opt-out page",
+    "emailing us",
+  ]
     .filter(Boolean)
     .join(" or ");
 

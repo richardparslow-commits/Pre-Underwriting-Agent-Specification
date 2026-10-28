@@ -73,6 +73,8 @@ const migrations = [
   "0003_reliability_and_access.sql",
   "0004_reviewer_write_paths.sql",
   "0005_case_summary_view.sql",
+  "0006_notification_terminal_state.sql",
+  "0007_marketing_revocation.sql",
 ].map((name) => readFileSync(`supabase/migrations/${name}`, "utf8"));
 
 // Every migration must be safe to re-run.
@@ -134,9 +136,9 @@ await pass(
   "RLS enabled on sensitive tables",
   () =>
     query(
-      "select relname, relrowsecurity from pg_class where relname in ('cases','case_review_log','email_events','case_deletions','marketing_revocations','submission_rate_limits','app_settings') order by relname",
+      "select relname, relrowsecurity from pg_class where relname in ('cases','case_review_log','email_events','case_deletions','marketing_revocations','marketing_suppression_sync','submission_rate_limits','app_settings') order by relname",
     ),
-  (rows) => rows.length === 7 && rows.every((row) => row.relrowsecurity === true),
+  (rows) => rows.length === 8 && rows.every((row) => row.relrowsecurity === true),
 );
 
 // ------------------------------------------------------------------ AAL2
@@ -305,10 +307,13 @@ await pass(
 // completion path must not regress a delivered case or put it back in the
 // retry queue, and a genuine retry after failure must still be stored.
 await query(
-  `insert into public.cases (reference, questionnaire_version, notification_state, provider_message_id, payload)
-   values ('LPP-2026-LATE1','v','delivered','msg_late1','{}'::jsonb),
-          ('LPP-2026-LATE2','v','delivered','msg_late2','{}'::jsonb),
-          ('LPP-2026-RETRY1','v','failed',null,'{}'::jsonb)`,
+  `insert into public.cases
+     (reference, questionnaire_version, notification_state, notification_attempts,
+      notification_detail, notification_claimed_at, notification_claimed_by,
+      provider_message_id, payload)
+   values ('LPP-2026-LATE1','v','delivered',2,'provider delivered',now(),'worker-old','msg_late1','{}'::jsonb),
+          ('LPP-2026-LATE2','v','delivered',1,'provider delivered',null,null,'msg_late2','{}'::jsonb),
+          ('LPP-2026-RETRY1','v','failed',1,'smtp 451',null,null,null,'{}'::jsonb)`,
 );
 await pass(
   "late acceptance cannot regress a delivered case",
@@ -317,8 +322,15 @@ await pass(
 );
 await pass(
   "the delivered case stays delivered",
-  () => query("select notification_state from public.cases where reference='LPP-2026-LATE1'"),
-  (rows) => rows[0].notification_state === "delivered",
+  () =>
+    query(
+      "select notification_state, notification_attempts, notification_detail, provider_message_id from public.cases where reference='LPP-2026-LATE1'",
+    ),
+  (rows) =>
+    rows[0].notification_state === "delivered" &&
+    rows[0].notification_attempts === 2 &&
+    rows[0].notification_detail === "provider delivered" &&
+    rows[0].provider_message_id === "msg_late1",
 );
 await pass(
   "late failure cannot regress a delivered case",
@@ -346,6 +358,47 @@ await pass(
   (rows) => rows[0].notification_state === "accepted",
 );
 
+// The RPC guard is not enough on its own: a service-role caller can issue a
+// direct update. The table trigger must reject both a state regression and a
+// retry attachment on a delivered row.
+await expectError(
+  "service role cannot regress a delivered notification directly",
+  () =>
+    query(
+      "update public.cases set notification_state='accepted' where reference='LPP-2026-LATE1'",
+    ),
+  "terminal",
+);
+await expectError(
+  "service role cannot attach a retry time to a delivered case",
+  () =>
+    query(
+      "update public.cases set notification_next_attempt_at=now() where reference='LPP-2026-LATE1'",
+    ),
+  "terminal",
+);
+await pass(
+  "the delivered case is unchanged after the rejected writes",
+  () =>
+    query(
+      "select notification_state, notification_next_attempt_at from public.cases where reference='LPP-2026-LATE1'",
+    ),
+  (rows) => rows[0].notification_state === "delivered" && rows[0].notification_next_attempt_at === null,
+);
+await pass(
+  "an accepted case can still become delivered",
+  () =>
+    query(
+      "select public.complete_case_notification('LPP-2026-RETRY1','delivered','provider confirmed',null)",
+    ),
+  () => true,
+);
+await pass(
+  "the accepted case records delivery",
+  () => query("select notification_state from public.cases where reference='LPP-2026-RETRY1'"),
+  (rows) => rows[0].notification_state === "delivered",
+);
+
 // --------------------------------------------------------------- rate limit
 await pass("rate limit allows the first two", async () => {
   const a = await query("select public.consume_submission_rate('rate-key-00000001',2,600) allowed");
@@ -358,6 +411,127 @@ await pass("rate limit rejects the third", () => query("select public.consume_su
 await pass("reviewer records a phone revocation", () => query("select public.record_marketing_revocation('LPP-2026-TEST01','phone','Customer asked to stop')"), () => true);
 await pass("suppression is queryable", () => query("select public.is_contact_suppressed('phone','+1 (512) 555-0134') suppressed"), (rows) => rows[0].suppressed === true);
 await pass("revocation is audited", () => query("select count(*)::int n from public.marketing_revocations"), (rows) => rows[0].n === 1);
+
+// ------------------------------------------------- customer revocation path
+await query(
+  `insert into public.cases (reference, questionnaire_version, payload)
+   values ('LPP-2026-OPTOUT','v',$1::jsonb)`,
+  [JSON.stringify({
+    lead: { email: "optout@example.com", phone: "+15125550199" },
+    answers: [],
+    consents: [],
+  })],
+);
+
+await pass(
+  "customer opt-out does not match a wrong contact",
+  () =>
+    query(
+      "select public.request_marketing_revocation('LPP-2026-OPTOUT','+15125550000',null,'Wrong number','customer_web','44444444-4444-4444-8444-444444444444') result",
+    ),
+  (rows) => rows[0].result?.recorded === false,
+);
+await pass(
+  "a non-match writes no suppression",
+  () =>
+    query(
+      "select count(*)::int n from public.contact_suppressions where address_normalized in ('15125550000','15125550199','optout@example.com')",
+    ),
+  (rows) => rows[0].n === 0,
+);
+await pass(
+  "customer opt-out matches the phone on the case",
+  () =>
+    query(
+      "select public.request_marketing_revocation('LPP-2026-OPTOUT','(512) 555-0199',null,'Stop calls','customer_web','44444444-4444-4444-8444-444444444445') result",
+    ),
+  (rows) =>
+    rows[0].result?.recorded === true &&
+    Array.isArray(rows[0].result?.channels) &&
+    rows[0].result.channels.includes("phone"),
+);
+await pass(
+  "customer revocation is audited with its source and request id",
+  () =>
+    query(
+      "select channel, source, request_id, recorded_by from public.marketing_revocations where request_id='44444444-4444-4444-8444-444444444445'",
+    ),
+  (rows) =>
+    rows.length === 1 &&
+    rows[0].channel === "phone" &&
+    rows[0].source === "customer_web" &&
+    rows[0].recorded_by === "customer_web",
+);
+await expectError(
+  "a revoked phone is blocked by the outbound guard",
+  () => query("select public.assert_marketing_send_allowed('phone','+1 (512) 555-0199')"),
+  "suppressed",
+);
+await pass(
+  "an unrelated phone is still allowed",
+  () => query("select public.assert_marketing_send_allowed('phone','+15125550001') allowed"),
+  (rows) => rows[0].allowed === true,
+);
+await pass(
+  "the revocation is queued for vendor propagation",
+  () =>
+    query(
+      "select status, request_id from public.marketing_suppression_sync where channel='phone' and address_normalized='15125550199'",
+    ),
+  (rows) => rows.length === 1 && rows[0].status === "pending" && rows[0].request_id === "44444444-4444-4444-8444-444444444445",
+);
+await pass(
+  "the vendor worker can mark the suppression synced",
+  () => query("select public.mark_marketing_suppression_synced('phone','+1 512 555 0199','test-crm') synced"),
+  (rows) => rows[0].synced === true,
+);
+await pass(
+  "the synced row leaves the pending set",
+  () =>
+    query(
+      "select count(*)::int n from public.pending_marketing_suppressions(100) where channel='phone' and address_normalized='15125550199'",
+    ),
+  (rows) => rows[0].n === 0,
+);
+await pass(
+  "customer opt-out can suppress the email on the case",
+  () =>
+    query(
+      "select public.request_marketing_revocation('LPP-2026-OPTOUT',null,'OPTOUT@EXAMPLE.COM','Stop email','customer_web','44444444-4444-4444-8444-444444444446') result",
+    ),
+  (rows) =>
+    rows[0].result?.recorded === true &&
+    Array.isArray(rows[0].result?.channels) &&
+    rows[0].result.channels.includes("email"),
+);
+await pass(
+  "the email revocation is suppressed and queued",
+  () =>
+    query(
+      "select public.is_contact_suppressed('email','optout@example.com') suppressed, (select count(*)::int from public.marketing_suppression_sync where channel='email' and address_normalized='optout@example.com') queued",
+    ),
+  (rows) => rows[0].suppressed === true && rows[0].queued === 1,
+);
+await exec("set role authenticated;");
+await expectError(
+  "an authenticated customer cannot call the revocation RPC directly",
+  () =>
+    query(
+      "select public.request_marketing_revocation('LPP-2026-OPTOUT','+15125550199',null,null,'customer_web',null)",
+    ),
+  "permission denied",
+);
+await exec("reset role;");
+await exec("set role anon;");
+await expectError(
+  "an anonymous caller cannot call the revocation RPC directly",
+  () =>
+    query(
+      "select public.request_marketing_revocation('LPP-2026-OPTOUT','+15125550199',null,null,'customer_web',null)",
+    ),
+  "permission denied",
+);
+await exec("reset role;");
 
 // --------------------------------------------------------- retention/delete
 await pass("retention is disabled while no schedule is approved", () => query("select public.purge_expired_cases() n"), (rows) => rows[0].n === 0);

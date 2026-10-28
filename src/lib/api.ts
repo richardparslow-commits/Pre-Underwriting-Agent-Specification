@@ -10,6 +10,7 @@ import type {
   CaseRecord,
   CaseStatus,
   CorrectionRecord,
+  MarketingRevocationRecord,
   NotificationRecord,
   NotificationState,
   ReviewLogEntry,
@@ -120,6 +121,7 @@ function fromRow(row: CaseRow): CaseRecord {
     notification: notificationFromRow(row),
     reviewLog: row.payload?.reviewLog ?? [],
     corrections: row.payload?.corrections ?? [],
+    marketingRevocations: [],
     draftSummary: buildDraftSummary(answers),
   };
 }
@@ -316,6 +318,7 @@ function buildSampleCase(): CaseRecord {
         recordedAt: new Date(Date.parse(submittedAt) + 1000 * 60 * 45).toISOString(),
       },
     ],
+    marketingRevocations: [],
     draftSummary: buildDraftSummary(allAnswers),
     sample: true,
   };
@@ -390,6 +393,7 @@ export async function submitCase(
     notification,
     reviewLog: [],
     corrections: [],
+    marketingRevocations: [],
     draftSummary: buildDraftSummary(draft.answers),
   };
 
@@ -551,7 +555,24 @@ export async function getCase(reference: string): Promise<CaseRecord | null> {
       }))
     : [];
 
-  return { ...record, reviewLog, corrections };
+  const { data: revocationRows } = await supabase
+    .from("marketing_revocations")
+    .select("channel, reason, source, recorded_by, created_at")
+    .eq("case_reference", reference)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  const marketingRevocations: MarketingRevocationRecord[] = Array.isArray(revocationRows)
+    ? revocationRows.map((entry) => ({
+        channel: entry.channel === "email" ? "email" : "phone",
+        reason: String(entry.reason ?? ""),
+        source: String(entry.source ?? "operator"),
+        recordedBy: String(entry.recorded_by ?? ""),
+        recordedAt: String(entry.created_at ?? ""),
+      }))
+    : [];
+
+  return { ...record, reviewLog, corrections, marketingRevocations };
 }
 
 export async function recordCorrection(reference: string, detail: string): Promise<void> {

@@ -94,3 +94,8 @@ export const PREVIEW_MODE =
 export const SUBMIT_CASE_URL =
   ENV.VITE_SUBMIT_CASE_URL?.replace(/\/$/, "") ||
   (SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/submit-case` : "");
+
+/** Public marketing opt-out function; separate from case submission. */
+export const REVOKE_MARKETING_URL =
+  ENV.VITE_REVOKE_MARKETING_URL?.replace(/\/$/, "") ||
+  (SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/revoke-marketing` : "");

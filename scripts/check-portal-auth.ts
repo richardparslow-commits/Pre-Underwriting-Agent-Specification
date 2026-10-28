@@ -8,7 +8,8 @@
  *  * the portal renders that gate instead of sending them elsewhere;
  *  * a magic link cannot create an account;
  *  * hosted sign-ups are disabled in the committed project config;
- *  * the queue uses a cursor with an exact count rather than a silent limit.
+ *  * the queue uses a cursor with an exact count rather than a silent limit;
+ *  * a marketing withdrawal is loaded and shown beside the consent snapshot.
  *
  * Run: `npm run check:portal`.
  */
@@ -49,9 +50,35 @@ requireMarker("src/lib/api.ts", api, "shouldCreateUser: false", "a magic link mu
 requireMarker("src/lib/api.ts", api, "count: \"exact\"", "the queue needs an exact total");
 requireMarker("src/lib/api.ts", api, "nextCursor", "the queue needs a cursor for older cases");
 requireMarker("src/lib/api.ts", api, ".limit(QUEUE_PAGE_SIZE + 1)", "the queue must detect whether another page exists");
+requireMarker(
+  "src/lib/api.ts",
+  api,
+  ".from(\"marketing_revocations\")",
+  "the case view must load the append-only marketing withdrawal evidence",
+);
+
+const caseReview = read("src/features/portal/CaseReview.tsx");
+requireMarker(
+  "src/features/portal/CaseReview.tsx",
+  caseReview,
+  "Marketing withdrawal evidence",
+  "a reviewer must see a withdrawal instead of only the original consent",
+);
 
 const config = read("supabase/config.toml");
 requireMarker("supabase/config.toml", config, "enable_signup = false", "self-service sign-ups must stay off");
+requireMarker(
+  "supabase/config.toml",
+  config,
+  "enroll_enabled = true",
+  "a project started from this config would reject TOTP enrolment",
+);
+requireMarker(
+  "supabase/config.toml",
+  config,
+  "verify_enabled = true",
+  "a project started from this config would reject TOTP verification",
+);
 
 if (failures.length > 0) {
   console.error("Reviewer access guard failed:");
@@ -60,5 +87,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  "Reviewer access guard passed: TOTP enrol/challenge/verify, in-app gate, no self-service sign-up, paginated queue with an exact count.",
+  "Reviewer access guard passed: TOTP enabled and enrol/challenge/verify present, in-app gate, no self-service sign-up, paginated queue with an exact count, marketing withdrawal evidence visible.",
 );

@@ -17,6 +17,10 @@ const SECTIONS = [
     }`,
   },
   {
+    title: "Marketing choices",
+    body: `Marketing calls and texts are optional and are never required to submit. You can withdraw at any time using the marketing opt-out page or by emailing ${SITE.reviewerEmail}. A withdrawal stops future marketing and does not affect your requested review.`,
+  },
+  {
     title: "Who reads it",
     body: `Your submitted case is available to ${SITE.owner} through an authenticated reviewer portal. Access requires an individual account, and every case is checked for permission on each request. A forwarded notification email does not grant access to a case.`,
   },
@@ -90,6 +94,10 @@ export default function PrivacyPage() {
           carrier. Optional marketing is governed by the{" "}
           <Link to="/messaging-terms" className="link-quiet">
             Messaging Terms
+          </Link>
+          ; you can withdraw it with the{" "}
+          <Link to="/marketing-opt-out" className="link-quiet">
+            marketing opt-out form
           </Link>
           .
         </p>
