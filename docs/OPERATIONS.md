@@ -41,6 +41,47 @@ A deletion request handled manually:
 
 **Not yet evidenced:** on-call coverage, provider contact path, backup restore drill, and whether the mailbox is monitored.
 
+## Notification retries
+
+The notification worker claims a case with a lease, sends with the case
+reference as the provider idempotency key, and records the result. The provider
+deduplicates that key for 24 hours, so migration `0010` records
+`notification_first_attempted_at` and refuses to claim a case more than 24 hours
+after it. Backoff is unchanged: `failed` retries after 15 minutes and `not_sent`
+after one hour, up to five attempts, inside the seven-day submission window.
+
+A case that reaches the window boundary is not silently dropped. It appears in:
+
+```sql
+select * from public.notification_retry_backlog order by submitted_at;
+```
+
+Review each row against the provider dashboard:
+
+- If the provider shows an accepted or delivered message for the case, the
+  notification was sent. Do not retry it; reconcile the case state instead.
+- If the provider shows no message for the case, the send did not happen. The
+  operator may reopen it once:
+
+```sql
+update public.cases
+set notification_first_attempted_at = null,
+    notification_next_attempt_at = now(),
+    notification_state = 'queued'
+where reference = 'LPP-YYYY-XXXXXX'
+  and notification_state in ('failed', 'not_sent');
+```
+
+Never clear the timestamp without that provider check: it re-arms a retry whose
+idempotency key may have expired. Record the case reference and the provider
+evidence in the operations log.
+
+The 24-hour figure is the provider's documented window, not a local guarantee.
+If the provider changes it, update `FIRST_ATTEMPT_WINDOW_HOURS`,
+`claim_case_notification` and this section together. A shorter real window would
+still allow a duplicate after an ambiguous acceptance; the only complete fix is
+provider confirmation, which this repository cannot supply.
+
 ## Marketing revocation and suppression
 
 Marketing calls and texts are **disabled** in the current build and `submit-case` rejects any marketing consent record. No outbound marketing is authorised.
@@ -129,7 +170,8 @@ Rows stay `pending` or `failed` until the worker records success. Do not enable 
 - [ ] Set `RATE_LIMIT_SALT` to a random value and confirm the durable limiter is active; without it production returns 503 (fail closed). Only `ENVIRONMENT=test` uses the in-memory guard.
 - [ ] Store `project_url` and `cron_secret` in Vault, apply `supabase/ops/retry-schedule.sql`, and verify one scheduler tick.
 - [ ] Deploy `revoke-marketing` and `sync-marketing-suppressions` with `verify_jwt = false`, then submit one labelled opt-out twice with the same `Idempotency-Key` and confirm one audit row and one outbox state; use a new key to confirm propagation re-queues.
-- [ ] Configure `EMAIL_WEBHOOK_SECRET` with the provider's `whsec_…` secret and test a signed unmatched event arriving before message-id correlation: verify the 503 triggers provider retry and eventual correlation. Verify the provider retry horizon and the separate 24-hour idempotency versus seven-day retry risk.
+- [ ] Configure `EMAIL_WEBHOOK_SECRET` with the provider's `whsec_…` secret and test a signed unmatched event arriving before message-id correlation: verify the 503 triggers provider retry and eventual correlation.
+- [ ] Confirm the provider's idempotency-key window is still 24 hours. Migration `0010` refuses an automatic retry after that window; exercise one `notification_retry_backlog` review with labelled data and record the provider evidence.
 - [ ] Configure `MARKETING_SUPPRESSION_WEBHOOK_URL` and its secret, then run one suppression-sync tick against a non-customer test address and confirm the row leaves `pending`.
 - [ ] Confirm reviewer MFA enrolment and an aal1 → aal2 step-up on a non-customer account.
 - [ ] Decide and record `retention_months`, backup expiry and the incident contact path.

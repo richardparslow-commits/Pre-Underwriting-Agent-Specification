@@ -77,6 +77,7 @@ const migrations = [
   "0007_marketing_revocation.sql",
   "0008_marketing_revocation_idempotency.sql",
   "0009_audited_case_access.sql",
+  "0010_notification_retry_window.sql",
 ].map((name) => readFileSync(`supabase/migrations/${name}`, "utf8"));
 
 // Every migration must be safe to re-run.
@@ -285,6 +286,75 @@ await pass("first claim wins", () => query("select * from public.claim_case_noti
 await pass("second concurrent claim gets no row", () => query("select * from public.claim_case_notification('LPP-2026-TEST01','worker-b')"), (rows) => rows.length === 0);
 await pass("acceptance completes the lease", () => query("select public.complete_case_notification('LPP-2026-TEST01','accepted','{\"note\":\"ok\"}','msg_abc')"), () => true);
 await pass("accepted case cannot be claimed again", () => query("select * from public.claim_case_notification('LPP-2026-TEST01','worker-c')"), (rows) => rows.length === 0);
+
+// ------------------------------------------- provider dedupe retry window
+// The provider honours the case-reference idempotency key for 24 hours. A
+// retry after that window can duplicate the reviewer email, so it must be
+// refused and surfaced for a human decision instead.
+await query(
+  `insert into public.cases (reference, questionnaire_version, notification_state, payload)
+   values ('LPP-2026-WINDOW1','v','queued','{}'::jsonb)`,
+);
+await pass(
+  "a first claim stamps the first-attempt time",
+  async () => {
+    const claimed = await query("select * from public.claim_case_notification('LPP-2026-WINDOW1','worker-window')");
+    const rows = await query("select notification_first_attempted_at from public.cases where reference='LPP-2026-WINDOW1'");
+    return { claimed: claimed.length, stamped: rows[0].notification_first_attempted_at !== null };
+  },
+  (value) => value.claimed === 1 && value.stamped === true,
+);
+await query(
+  "select public.complete_case_notification('LPP-2026-WINDOW1','failed','{\"note\":\"request timed out after send\"}',null)",
+);
+await query(
+  "update public.cases set notification_first_attempted_at = now() - interval '25 hours', notification_next_attempt_at = now() - interval '1 minute' where reference='LPP-2026-WINDOW1'",
+);
+await pass(
+  "a retry after the provider dedupe window is refused",
+  () => query("select * from public.claim_case_notification('LPP-2026-WINDOW1','worker-late')"),
+  (rows) => rows.length === 0,
+);
+await pass(
+  "the refused case appears in the operator backlog",
+  () =>
+    query(
+      "select count(*)::int n from public.notification_retry_backlog where reference='LPP-2026-WINDOW1'",
+    ),
+  (rows) => rows[0].n === 1,
+);
+await pass(
+  "a case still inside the dedupe window can be retried",
+  async () => {
+    const inserted = await query(
+      `insert into public.cases (reference, questionnaire_version, notification_state, notification_attempts, notification_first_attempted_at, notification_next_attempt_at, payload)
+       values ('LPP-2026-WINDOW2','v','failed',1, now() - interval '23 hours', now() - interval '1 minute', '{}'::jsonb)
+       returning reference`,
+    );
+    const claimed = await query("select * from public.claim_case_notification('LPP-2026-WINDOW2','worker-inside')");
+    return { inserted: inserted.length, claimed: claimed.length };
+  },
+  (value) => value.inserted === 1 && value.claimed === 1,
+);
+await pass(
+  "a never-attempted case keeps the recovery path",
+  async () => {
+    await query(
+      `insert into public.cases (reference, questionnaire_version, notification_state, submitted_at, payload)
+       values ('LPP-2026-WINDOW3','v','not_sent', now() - interval '3 days', '{}'::jsonb)`,
+    );
+    const claimed = await query("select * from public.claim_case_notification('LPP-2026-WINDOW3','worker-recover')");
+    return claimed.length;
+  },
+  (value) => value === 1,
+);
+await exec("set role authenticated;");
+await expectError(
+  "a signed-in user cannot read the retry backlog",
+  () => query("select count(*)::int n from public.notification_retry_backlog"),
+  "permission denied",
+);
+await exec("reset role;");
 
 // --------------------------------------------------------- delivery events
 await query(
