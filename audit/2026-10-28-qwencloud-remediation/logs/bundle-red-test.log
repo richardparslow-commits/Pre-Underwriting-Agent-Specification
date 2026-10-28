@@ -1,0 +1,7 @@
+
+> lifepolicypilot-pre-underwriting@0.1.0 check:bundle
+> tsx scripts/check-bundle.ts
+
+Withheld or reviewer-only wording reached the public bundle:
+  - index-CRsCW4k3.js contains reviewer-only review note for ID-04
+Keep source text, reviewer notes and reconciliation detail in build/server-only modules and attach them server-side.

@@ -57,7 +57,29 @@ interface CaseRow {
   crisis_disclosure: boolean;
 }
 
-function notificationFromRow(row: CaseRow): NotificationRecord {
+/** Queue projection. Deliberately has no payload or answer field. */
+interface CaseSummaryRow {
+  reference: string;
+  submitted_at: string;
+  status: CaseStatus;
+  notification_state: NotificationState;
+  crisis_disclosure: boolean;
+  first_name: string | null;
+  last_name: string | null;
+  residence_state: string | null;
+  unanswered: number;
+}
+
+function notificationFromRow(
+  row: Pick<
+    CaseRow,
+    | "submitted_at"
+    | "notification_state"
+    | "notification_attempts"
+    | "notification_detail"
+    | "notification_updated_at"
+  >,
+): NotificationRecord {
   let detail: string | undefined;
   if (row.notification_detail) {
     try {
@@ -183,7 +205,6 @@ function buildSampleCase(): CaseRecord {
         timeframe: question.timeframe,
         status: question.status,
         reviewStatus: question.reviewStatus,
-        reviewNote: question.reviewNote,
         sensitive: question.sensitive ? true : undefined,
         disposition: (record.state === "unknown" ? "unknown" : "answered") as SubmittedAnswer["disposition"],
         answerText: answerText === "Details provided" ? "Details provided" : answerText,
@@ -212,7 +233,6 @@ function buildSampleCase(): CaseRecord {
       timeframe: question.timeframe,
       status: question.status,
       reviewStatus: question.reviewStatus,
-      reviewNote: question.reviewNote,
       sensitive: question.sensitive ? true : undefined,
       disposition: question.reviewStatus === "human_review_required" ? "held_for_review" : "unresolved",
       answerText:
@@ -395,30 +415,30 @@ export async function listCases(): Promise<CaseListItem[]> {
 
   if (!supabase) throw new Error("Sign-in is not configured.");
 
+  // The queue is a metadata projection. Never select `payload` here: that
+  // would transfer every health answer for up to 50 cases before the reviewer
+  // opens any of them and would bypass the per-case `opened` audit.
   const { data, error } = await supabase
-    .from("cases")
+    .from("case_summaries")
     .select(
-      "id, reference, submitted_at, status, payload, notification_state, notification_attempts, notification_detail, notification_updated_at, crisis_disclosure",
+      "reference, submitted_at, status, notification_state, crisis_disclosure, first_name, last_name, residence_state, unanswered",
     )
     .order("submitted_at", { ascending: false })
     .limit(50);
 
   if (error) throw new Error("Cases could not be loaded.");
 
-  return (data as CaseRow[]).map((row) => {
-    const record = fromRow(row);
-    return {
-      reference: record.reference,
-      submittedAt: record.submittedAt,
-      status: record.status,
-      notificationState: record.notification.state,
-      crisisDisclosure: record.crisisDisclosure,
-      firstName: record.lead.firstName,
-      lastName: record.lead.lastName,
-      residenceState: record.lead.state,
-      unanswered: record.answers.filter((answer) => answer.disposition === "unresolved").length,
-    };
-  });
+  return (data as CaseSummaryRow[]).map((row) => ({
+    reference: row.reference,
+    submittedAt: row.submitted_at,
+    status: row.status,
+    notificationState: row.notification_state,
+    crisisDisclosure: row.crisis_disclosure,
+    firstName: row.first_name ?? "",
+    lastName: row.last_name ?? "",
+    residenceState: row.residence_state ?? "",
+    unanswered: Number(row.unanswered) || 0,
+  }));
 }
 
 export async function getCase(reference: string): Promise<CaseRecord | null> {

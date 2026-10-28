@@ -183,8 +183,6 @@ export const QUESTION_BANK: Question[] = [
     section: "identity",
     sourceRef: sourceRefFor("ID-04"),
     customerText: "Held for review: a source question requiring jurisdiction and carrier approval.",
-    reviewNote:
-      "Collection of sex/gender needs jurisdiction and carrier review, including whether the question is permissible at all and which answer set is authorized. Not asked until that review is documented.",
     sensitive: true,
     kind: "short_text",
     reviewStatus: "human_review_required",
@@ -604,8 +602,6 @@ export const QUESTION_BANK: Question[] = [
     section: "medical",
     sourceRef: sourceRefFor("MED-11"),
     customerText: "Held for review: a sensitive medical question requiring legal and clinical approval.",
-    reviewNote:
-      "Requires documented legal, clinical and underwriting review of necessity, wording, confidentiality and state restrictions before any automated collection. Do not deploy this row unchanged.",
     sensitive: true,
     kind: "yesno",
     reviewStatus: "human_review_required",
@@ -761,8 +757,6 @@ export const QUESTION_BANK: Question[] = [
     section: "mental",
     sourceRef: sourceRefFor("MH-06"),
     customerText: "Held for review: a sensitive mental-health detail requiring clinical approval.",
-    reviewNote:
-      "Detail-level suicide questions need clinical and legal review for wording, necessity and crisis support before automated collection. The approved screening question and current-safety question cover the immediate need.",
     sensitive: true,
     kind: "long_text",
     reviewStatus: "human_review_required",
@@ -1743,8 +1737,6 @@ export const QUESTION_BANK: Question[] = [
     section: "residency",
     sourceRef: sourceRefFor("RES-04"),
     customerText: "Held for review: a source question requiring legal approval.",
-    reviewNote:
-      "Immigration-status detail is sensitive and the source wording uses static categories that may be out of date. Requires legal review of necessity and approved answer sets before collection. No document numbers are collected here.",
     sensitive: true,
     kind: "short_text",
     reviewStatus: "human_review_required",
@@ -1756,8 +1748,6 @@ export const QUESTION_BANK: Question[] = [
     section: "residency",
     sourceRef: sourceRefFor("RES-05"),
     customerText: "Held for review: an identity-document question not collected in this intake.",
-    reviewNote:
-      "Identity-document numbers are not collected in this intake. If ever required, collection must move to an approved downstream workflow with a documented necessity and secure handling.",
     sensitive: true,
     kind: "short_text",
     reviewStatus: "human_review_required",

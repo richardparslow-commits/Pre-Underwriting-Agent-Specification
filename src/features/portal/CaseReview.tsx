@@ -621,7 +621,8 @@ export function CaseReview({
           </span>
         ) : null}
         <span className="text-muted-foreground">
-          Retention and deletion follow the documented schedule.
+          Retention is not active yet: no retention period has been approved. Deletion is manual
+          until counsel approves a schedule.
         </span>
       </div>
     </div>

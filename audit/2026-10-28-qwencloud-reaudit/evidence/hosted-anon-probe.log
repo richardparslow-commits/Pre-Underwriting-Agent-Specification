@@ -1,0 +1,9 @@
+=== auth health (no key) ===
+curl: (6) Could not resolve host: mndgqpoxfupiuqljopoe.supabase.co
+HTTP 000
+
+=== anonymous HEAD /rest/v1/cases (publishable key, no row body) ===
+curl: (6) Could not resolve host: mndgqpoxfupiuqljopoe.supabase.co
+
+=== anonymous HEAD /rest/v1/app_settings (publishable key, no row body) ===
+curl: (6) Could not resolve host: mndgqpoxfupiuqljopoe.supabase.co

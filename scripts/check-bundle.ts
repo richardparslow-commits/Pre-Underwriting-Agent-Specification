@@ -12,13 +12,13 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { QUESTION_BANK } from "../src/features/interview/questionBank";
 import { QUESTION_RECONCILIATION } from "../src/features/interview/reconciliation";
+import { REVIEW_NOTES } from "../src/features/interview/reviewNotes.server";
 import { SOURCE_BY_ID } from "../src/features/interview/sourceInventory";
 
-const heldIds = new Set(
-  QUESTION_BANK.filter((question) => question.reviewStatus === "human_review_required").map(
-    (question) => question.id,
-  ),
+const heldQuestions = QUESTION_BANK.filter(
+  (question) => question.reviewStatus === "human_review_required",
 );
+const heldIds = new Set(heldQuestions.map((question) => question.id));
 
 const heldRecords = QUESTION_RECONCILIATION.filter((record) => heldIds.has(record.questionId));
 const heldSourceIds = [...new Set(heldRecords.flatMap((record) => record.sourceIds))];
@@ -64,6 +64,11 @@ for (const sourceId of heldSourceIds) {
   if (source) probe(`withheld source wording from ${sourceId}`, source.text);
 }
 
+for (const question of heldQuestions) {
+  const note = REVIEW_NOTES[question.id];
+  if (note) probe(`reviewer-only review note for ${question.id}`, note);
+}
+
 for (const record of heldRecords) {
   for (const flag of record.flags) {
     probe(`reviewer-only reconciliation detail for ${record.questionId}`, flag.detail);
@@ -74,10 +79,12 @@ for (const record of heldRecords) {
 if (failures.length > 0) {
   console.error("Withheld or reviewer-only wording reached the public bundle:");
   for (const failure of failures) console.error(`  - ${failure}`);
-  console.error("Keep reconciliation detail in build/audit-only modules and attach source text server-side.");
+  console.error(
+    "Keep source text, reviewer notes and reconciliation detail in build/server-only modules and attach them server-side.",
+  );
   process.exit(1);
 }
 
 console.log(
-  `Bundle check passed: ${bundles.length} JavaScript asset(s); ${heldSourceIds.length} withheld source items and ${heldRecords.length} held reconciliation records are absent.`,
+  `Bundle check passed: ${bundles.length} JavaScript asset(s); ${heldSourceIds.length} withheld source items, ${heldQuestions.length} reviewer notes and ${heldRecords.length} held reconciliation records are absent.`,
 );

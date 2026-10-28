@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { QUESTION_BANK } from "../src/features/interview/questionBank";
+import { REVIEW_NOTES } from "../src/features/interview/reviewNotes.server";
 import {
   reconciliationSummary,
   SOURCE_GAPS,
@@ -47,6 +48,17 @@ const approved = QUESTION_BANK.filter((question) => question.reviewStatus === "a
 const held = QUESTION_BANK.filter((question) => question.reviewStatus === "human_review_required");
 const signedOff = QUESTION_BANK.filter((question) => question.sourceVerified);
 const summary = reconciliationSummary();
+
+for (const question of held) {
+  if (!REVIEW_NOTES[question.id]) {
+    issues.push(`${question.id}: held-for-review question has no server-only reviewNote`);
+  }
+}
+for (const questionId of Object.keys(REVIEW_NOTES)) {
+  if (!held.some((question) => question.id === questionId)) {
+    issues.push(`${questionId}: reviewNote exists for a row that is not held`);
+  }
+}
 
 console.log(`Question bank: ${QUESTION_BANK.length} rows`);
 console.log(`  approved for interview : ${approved.length}`);

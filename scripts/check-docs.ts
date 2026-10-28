@@ -87,6 +87,7 @@ requireText("README.md", [
   "QUESTIONNAIRE_APPROVED",
   "0003_reliability_and_access.sql",
   "0004_reviewer_write_paths.sql",
+  "0005_case_summary_view.sql",
 ]);
 forbidText("README.md", [
   "45 source questions",
@@ -113,7 +114,7 @@ requireText("docs/OPERATIONS.md", [
   "delete_case",
   "record_marketing_revocation",
   "BLOCKED",
-  "0001–0004",
+  "0001–0005",
 ]);
 
 requireText(".env.example", ["RATE_LIMIT_SALT", "QUESTIONNAIRE_APPROVED"]);
@@ -136,6 +137,34 @@ if (reviewScreen.includes("question.sourceText")) {
   console.error("FAIL: ReviewScreen renders held/source wording to the customer.");
 }
 requireText("src/features/intake/ReviewScreen.tsx", ["Questions held for human review"]);
+
+// The reviewer footer must describe the actual retention state, not an
+// approved schedule that does not exist.
+requireText("src/features/portal/CaseReview.tsx", ["Retention is not active"]);
+forbidText("src/features/portal/CaseReview.tsx", [
+  "Retention and deletion follow the documented schedule.",
+]);
+
+// The queue must read the payload-free summary view. Keep the check scoped to
+// listCases so getCase can still fetch the detail it is allowed to open.
+const apiSource = read("src/lib/api.ts");
+const listCasesStart = apiSource.indexOf("export async function listCases");
+const getCaseStart = apiSource.indexOf("export async function getCase");
+const listCasesSource =
+  listCasesStart >= 0 && getCaseStart > listCasesStart
+    ? apiSource.slice(listCasesStart, getCaseStart)
+    : "";
+const listCasesCode = listCasesSource
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/\/\/.*$/gm, "");
+if (!listCasesCode.includes('from("case_summaries")')) {
+  failures += 1;
+  console.error("FAIL: listCases does not read the payload-free case_summaries view.");
+}
+if (listCasesCode.includes("payload")) {
+  failures += 1;
+  console.error("FAIL: listCases references a case payload; the queue must stay metadata-only.");
+}
 
 // Confirmation copy must distinguish "saved" from "notification sent".
 requireText("src/features/intake/ConfirmationScreen.tsx", [

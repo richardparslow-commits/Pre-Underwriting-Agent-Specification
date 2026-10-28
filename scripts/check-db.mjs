@@ -72,6 +72,7 @@ const migrations = [
   "0002_case_corrections.sql",
   "0003_reliability_and_access.sql",
   "0004_reviewer_write_paths.sql",
+  "0005_case_summary_view.sql",
 ].map((name) => readFileSync(`supabase/migrations/${name}`, "utf8"));
 
 // Every migration must be safe to re-run.
@@ -96,7 +97,10 @@ const payload = {
     email: "test-case@example.com",
     phone: "+15125550134",
   },
-  answers: [],
+  answers: [
+    { questionId: "MED-01", disposition: "unresolved", answerText: "Not answered" },
+    { questionId: "MED-02", disposition: "answered", answerText: "Yes" },
+  ],
   consents: [],
   acknowledgements: [],
   flags: [],
@@ -139,6 +143,11 @@ await pass(
 await claims("aal1");
 await exec("set role authenticated;");
 await pass("aal1 reviewer sees zero cases", () => query("select count(*)::int n from public.cases"), (rows) => rows[0].n === 0);
+await pass(
+  "aal1 reviewer sees zero case summaries",
+  () => query("select count(*)::int n from public.case_summaries"),
+  (rows) => rows[0].n === 0,
+);
 await expectError(
   "aal1 reviewer cannot record a review",
   () => query("select public.record_case_review('LPP-2026-TEST01','opened')"),
@@ -149,6 +158,33 @@ await exec("reset role;");
 await claims("aal2");
 await exec("set role authenticated;");
 await pass("aal2 reviewer sees the case", () => query("select count(*)::int n from public.cases"), (rows) => rows[0].n === 1);
+await pass(
+  "aal2 reviewer sees the queue summary without a payload",
+  () =>
+    query(
+      "select reference, first_name, last_name, residence_state, unanswered from public.case_summaries where reference='LPP-2026-TEST01'",
+    ),
+  (rows) =>
+    rows.length === 1 &&
+    rows[0].unanswered === 1 &&
+    rows[0].first_name === "Test" &&
+    rows[0].last_name === "Case" &&
+    rows[0].residence_state === "TX",
+);
+await pass(
+  "queue summary has no answer or payload column",
+  () =>
+    query(
+      "select column_name from information_schema.columns where table_schema='public' and table_name='case_summaries'",
+    ),
+  (rows) =>
+    !rows.some((row) => ["payload", "answers", "answer_text", "answer_values", "details"].includes(row.column_name)),
+);
+await expectError(
+  "queue summary cannot be asked for payload",
+  () => query("select payload from public.case_summaries limit 1"),
+  "does not exist",
+);
 await pass("aal2 reviewer can record opened", () => query("select public.record_case_review('LPP-2026-TEST01','opened')"), () => true);
 await pass("opened is deduplicated within the session window", () => query("select public.record_case_review('LPP-2026-TEST01','opened')"), () => true);
 await pass("exactly one opened entry exists", () => query("select count(*)::int n from public.case_review_log where action='opened'"), (rows) => rows[0].n === 1);
@@ -178,6 +214,14 @@ await pass(
   "the RPC updates status and log atomically",
   () => query("select c.status, count(l.id)::int n from public.cases c left join public.case_review_log l on l.case_id = c.id and l.action = 'marked_reviewed' where c.reference = 'LPP-2026-TEST01' group by c.status"),
   (rows) => rows[0].status === "reviewed" && rows[0].n === 1,
+);
+await exec("reset role;");
+
+await exec("set role anon;");
+await expectError(
+  "anonymous caller cannot read case summaries",
+  () => query("select count(*)::int n from public.case_summaries"),
+  "permission denied",
 );
 await exec("reset role;");
 

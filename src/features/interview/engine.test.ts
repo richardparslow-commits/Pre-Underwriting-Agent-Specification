@@ -7,7 +7,7 @@ import {
   pruneBranchClosedAnswers,
   toSubmittedAnswers,
 } from "./engine";
-import { QUESTION_BY_ID } from "./questionBank";
+import { QUESTION_BANK, QUESTION_BY_ID } from "./questionBank";
 import type { Answers } from "./types";
 
 const AT = "2026-10-27T12:00:00.000Z";
@@ -76,6 +76,16 @@ test("a branch-closed row never emits fields or supplemental detail", () => {
   assert.deepEqual(row.fields, []);
   assert.deepEqual(row.details, []);
   assert.equal(row.answerState, undefined);
+});
+
+test("reviewer notes are not present on any public question row", () => {
+  for (const question of QUESTION_BANK) {
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(question, "reviewNote"),
+      false,
+      `${question.id} exposes a reviewer-only note in the public bank`,
+    );
+  }
 });
 
 test("a held row stays held and carries no answer content", () => {

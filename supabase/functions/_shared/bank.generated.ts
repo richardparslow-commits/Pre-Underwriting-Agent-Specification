@@ -1,6 +1,7 @@
 /**
  * GENERATED FILE — do not edit by hand.
- * Source: src/features/interview/questionBank.ts
+ * Sources: src/features/interview/questionBank.ts and
+ *          src/features/interview/reviewNotes.server.ts
  * Regenerate: npm run generate:server-bank
  */
 export const QUESTIONNAIRE_VERSION = "2026.10-draft.9" as const;

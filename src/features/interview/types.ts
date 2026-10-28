@@ -117,8 +117,8 @@ export interface Question {
   /** Ask only when another question has one of these answers. */
   askWhen?: { questionId: string; includes: Array<AnswerState | string> };
   reviewStatus: "approved" | "human_review_required";
-  /** Required when reviewStatus is human_review_required. */
-  reviewNote?: string;
+  // Held-row reviewer rationale is server-only and deliberately absent here.
+  // The generated server bank attaches it from `reviewNotes.server.ts`.
   sensitive?: boolean;
   /** Selecting Yes pauses the interview and shows the crisis panel. */
   crisisFollowUp?: boolean;

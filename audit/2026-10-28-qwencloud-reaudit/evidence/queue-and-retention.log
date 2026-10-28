@@ -1,0 +1,79 @@
+=== queue payload selection ===
+   396	  if (!supabase) throw new Error("Sign-in is not configured.");
+   397	
+   398	  const { data, error } = await supabase
+   399	    .from("cases")
+   400	    .select(
+   401	      "id, reference, submitted_at, status, payload, notification_state, notification_attempts, notification_detail, notification_updated_at, crisis_disclosure",
+   402	    )
+   403	    .order("submitted_at", { ascending: false })
+   404	    .limit(50);
+   405	
+   406	  if (error) throw new Error("Cases could not be loaded.");
+   407	
+   408	  return (data as CaseRow[]).map((row) => {
+   409	    const record = fromRow(row);
+   410	    return {
+   411	      reference: record.reference,
+   412	      submittedAt: record.submittedAt,
+   413	      status: record.status,
+   414	      notificationState: record.notification.state,
+   415	      crisisDisclosure: record.crisisDisclosure,
+   416	      firstName: record.lead.firstName,
+   417	      lastName: record.lead.lastName,
+   418	      residenceState: record.lead.state,
+   419	      unanswered: record.answers.filter((answer) => answer.disposition === "unresolved").length,
+   420	    };
+   421	  });
+
+=== detail opened audit ===
+   443	  const record = fromRow(data as CaseRow);
+   444	
+   445	  // Opening a sensitive case is an access event. The RPC deduplicates repeated
+   446	  // loads by the same reviewer within eight hours, so a refresh does not spam
+   447	  // the log. A logging failure must not block legitimate review.
+   448	  const { error: accessLogError } = await supabase.rpc("record_case_review", {
+   449	    p_reference: reference,
+   450	    p_action: "opened",
+   451	    p_note: null,
+   452	  });
+   453	  if (accessLogError) {
+   454	    console.warn("Access log write failed", accessLogError.code);
+   455	  }
+
+=== retention footer claim ===
+   618	          <span className="text-muted-foreground">
+   619	            {record.answers.filter((answer) => answer.status === "core").length} source questions ·{" "}
+   620	            {record.answers.filter((answer) => answer.status === "supplemental").length} supplemental
+   621	          </span>
+   622	        ) : null}
+   623	        <span className="text-muted-foreground">
+   624	          Retention and deletion follow the documented schedule.
+   625	        </span>
+   626	      </div>
+
+=== operations retention status ===
+1:# Operations — retention, deletion, incidents and marketing suppression
+2-
+3:This is an engineering runbook, not a legal opinion. Items marked **BLOCKED** require an owner, counsel or provider decision and have not been executed.
+4-
+5-## Retention and deletion
+--
+8-|---|---|
+9-| Case deletion function | Implemented: `public.delete_case(reference, reason)` requires an AAL2 reviewer and writes `case_deletions` before deleting the case. |
+10:| Automatic expiry | Implemented: `public.purge_expired_cases()` reads `app_settings.retention_months`. It returns 0 while the value is null. |
+11:| Approved retention period | **BLOCKED — LEGAL.** `retention_months` is null. No period is implied by this document. |
+12:| Scheduled execution | **BLOCKED — OPERATIONS.** No cron job is committed for deletion until counsel approves a period. |
+13-| Backup expiry | **UNVERIFIED.** Confirm the Supabase project's backup/PITR window in the provider console and record the actual expiry here. |
+14-| Deletion of backups | Provider-dependent. A deleted row is not immediately removed from an existing backup; the approved schedule must say how that is handled. |
+--
+17-
+18-```sql
+19:update public.app_settings set value = '<months>' where key = 'retention_months';
+20-```
+21-
+--
+75-- [ ] Configure `EMAIL_WEBHOOK_SECRET` with the provider's `whsec_…` secret and send one signed test event.
+76-- [ ] Confirm reviewer MFA enrolment and an aal1 → aal2 step-up on a non-customer account.
+77:- [ ] Decide and record `retention_months`, backup expiry and the incident contact path.
+78-- [ ] Confirm database at-rest encryption, backup encryption and key management in the provider console; do not restore the privacy-page at-rest claim until that evidence is recorded.

@@ -1,0 +1,28 @@
+=== check-bundle reviewNote coverage ===
+NO reviewNote REFERENCE IN scripts/check-bundle.ts
+
+=== check-bundle probes only source text, flags and action ===
+    60	}
+    61	
+    62	for (const sourceId of heldSourceIds) {
+    63	  const source = SOURCE_BY_ID[sourceId];
+    64	  if (source) probe(`withheld source wording from ${sourceId}`, source.text);
+    65	}
+    66	
+    67	for (const record of heldRecords) {
+    68	  for (const flag of record.flags) {
+    69	    probe(`reviewer-only reconciliation detail for ${record.questionId}`, flag.detail);
+    70	  }
+    71	  probe(`reviewer-only action for ${record.questionId}`, record.action);
+    72	}
+    73	
+    74	if (failures.length > 0) {
+    75	  console.error("Withheld or reviewer-only wording reached the public bundle:");
+    76	  for (const failure of failures) console.error(`  - ${failure}`);
+    77	  console.error("Keep reconciliation detail in build/audit-only modules and attach source text server-side.");
+    78	  process.exit(1);
+    79	}
+    80	
+    81	console.log(
+    82	  `Bundle check passed: ${bundles.length} JavaScript asset(s); ${heldSourceIds.length} withheld source items and ${heldRecords.length} held reconciliation records are absent.`,
+    83	);
