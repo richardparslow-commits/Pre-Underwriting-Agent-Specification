@@ -1,18 +1,20 @@
 /**
  * POST /functions/v1/retry-case-notifications — scheduled notification retry.
  *
- * Deploy with JWT verification OFF and invoke it from Supabase Cron (or any
+ * Deploy with JWT verification OFF and invoke from Supabase Cron (or any
  * scheduler) with the `x-cron-secret` header:
  *
  *   [functions.retry-case-notifications]
  *   verify_jwt = false
  *
- * Retries only touch the notification columns of an existing case. A retry can
- * never create a second case, and a case that already reached the provider is
- * not sent again, because `notification_state` moves to 'accepted'.
- *
- * Records older than two minutes are eligible, so a submission that is still
- * in flight is not picked up concurrently.
+ * Reliability rules:
+ *   * the worker claims a row with `claim_case_notification` before sending;
+ *     an overlapping invocation gets no row and sends nothing,
+ *   * the provider idempotency key is the stable case reference, so a crash
+ *     after provider acceptance cannot create a second email on retry,
+ *   * `not_sent` is eligible once a provider is configured, which recovers
+ *     cases submitted before email was set up,
+ *   * attempts and backoff are persisted; no state is kept in memory.
  */
 
 import { jsonResponse, serviceClient } from "../_shared/case.ts";
@@ -34,6 +36,20 @@ interface RetryRow {
   notification_attempts: number;
 }
 
+async function requestedReference(req: Request): Promise<string | null> {
+  const raw = await req.text().catch(() => "");
+  if (!raw.trim()) return null;
+  if (raw.length > 4096) return null;
+  try {
+    const body = JSON.parse(raw) as { reference?: unknown };
+    return typeof body.reference === "string" && /^LPP-\d{4}-[0-9A-Z]{6}$/.test(body.reference)
+      ? body.reference
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") {
     return jsonResponse({ error: "Method not allowed" }, 405, null);
@@ -45,22 +61,41 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "Unauthorized" }, 401, null);
   }
 
+  // Without a provider, claiming rows would burn attempts for no benefit.
+  if (!Deno.env.get("RESEND_API_KEY")) {
+    return jsonResponse({ inspected: 0, sent: 0, failed: 0, skipped: 0, provider: "not_configured" }, 200, null);
+  }
+
   const origin = portalOrigin();
+  if (!origin) {
+    return jsonResponse({ inspected: 0, sent: 0, failed: 0, skipped: 0, portal: "not_configured" }, 200, null);
+  }
+
+  const single = await requestedReference(req);
   const now = Date.now();
   const olderThan = new Date(now - MIN_AGE_MS).toISOString();
   const newerThan = new Date(now - MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
   const supabase = serviceClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("cases")
     .select("reference, submitted_at, notification_attempts")
-    .in("notification_state", ["queued", "failed"])
+    .in("notification_state", ["queued", "failed", "not_sent"])
     .lt("notification_attempts", MAX_ATTEMPTS)
-    .lt("submitted_at", olderThan)
     .gt("submitted_at", newerThan)
     .order("submitted_at", { ascending: true })
     .limit(BATCH_SIZE);
+
+  if (single) {
+    query = query.eq("reference", single);
+  } else {
+    // A submission still in flight is left alone for two minutes. The claim
+    // function remains the authoritative guard against overlap.
+    query = query.lt("submitted_at", olderThan);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("Retry query failed", error.code);
@@ -68,42 +103,49 @@ Deno.serve(async (req: Request) => {
   }
 
   const rows = (data ?? []) as RetryRow[];
+  const worker = `retry:${crypto.randomUUID()}`;
   let sent = 0;
   let failed = 0;
   let skipped = 0;
 
   for (const row of rows) {
-    const result = await sendCaseNotification({
-      reference: row.reference,
-      submittedAt: row.submitted_at,
-      portalOrigin: origin,
+    const claim = await supabase.rpc("claim_case_notification", {
+      p_reference: row.reference,
+      p_worker: worker,
     });
 
-    if (result.state === "not_sent") {
-      // No provider configured: leave the row queued for a later attempt
-      // rather than marking it failed and hiding the configuration gap.
+    if (claim.error) {
+      console.error("Notification claim failed", claim.error.code);
+      failed += 1;
+      continue;
+    }
+    if (!claim.data || claim.data.length === 0) {
+      // Another worker owns it, it is not due yet, or the attempt cap is hit.
       skipped += 1;
       continue;
     }
 
-    const attempts = (row.notification_attempts ?? 0) + 1;
-    const { error: updateError } = await supabase
-      .from("cases")
-      .update({
-        notification_state: result.state,
-        notification_attempts: attempts,
-        notification_detail: notificationDetailForStorage(result),
-        notification_updated_at: new Date().toISOString(),
-      })
-      .eq("reference", row.reference);
+    const result = await sendCaseNotification({
+      reference: row.reference,
+      submittedAt: row.submitted_at,
+      portalOrigin: origin,
+      idempotencyKey: row.reference,
+    });
 
-    if (updateError) {
-      console.error("Retry update failed", updateError.code);
+    const { error: completeError } = await supabase.rpc("complete_case_notification", {
+      p_reference: row.reference,
+      p_state: result.state,
+      p_detail: notificationDetailForStorage(result),
+      p_message_id: result.messageId ?? null,
+    });
+
+    if (completeError) {
+      console.error("Retry completion failed", completeError.code);
       failed += 1;
       continue;
     }
 
-    if (result.state === "failed") failed += 1;
+    if (result.state === "failed" || result.state === "not_sent") failed += 1;
     else sent += 1;
   }
 

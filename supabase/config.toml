@@ -1,0 +1,23 @@
+# Life Policy Pilot — Supabase project configuration
+#
+# These settings are part of the deployable repository so a clean deployment
+# does not silently leave the public endpoint behind JWT verification or expose
+# a reviewer-only function to anonymous callers.
+#
+# submit-case is the only customer-facing function. It is public by design and
+# is protected by origin allowlisting, a byte cap, durable rate limiting and
+# server-side validation. email-events and retry-case-notifications are
+# machine-facing and authenticate with a provider signature or cron secret.
+
+project_id = "lifepolicypilot"
+
+[functions.submit-case]
+verify_jwt = false
+
+[functions.email-events]
+verify_jwt = false
+
+[functions.retry-case-notifications]
+verify_jwt = false
+
+# No other function should be deployed with JWT verification disabled.

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { AlertTriangle, ArrowLeft, Check, Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, Badge, Checkbox } from "@/components/ui/surface";
@@ -58,8 +57,6 @@ export function ReviewScreen({
   onSubmit,
   onBack,
 }: ReviewScreenProps) {
-  const [showHeld, setShowHeld] = useState(false);
-
   const visible = visibleQuestions(answers);
   const pending = visible.filter(
     (question) => dispositionFor(question, answers[question.id], answers) === "unresolved",
@@ -265,38 +262,13 @@ export function ReviewScreen({
       </div>
 
       <section className="panel p-5">
-        <button
-          type="button"
-          className="flex w-full items-center justify-between text-left"
-          onClick={() => setShowHeld((current) => !current)}
-          aria-expanded={showHeld}
-        >
-          <span>
-            <span className="text-base font-medium">Questions held for human review</span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">
-              {held.length} source questions are not asked in this interview.
-            </span>
-          </span>
-          <Badge tone="outline">{showHeld ? "Hide" : "Show"}</Badge>
-        </button>
-
-        {showHeld ? (
-          <div className="mt-4 space-y-3">
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              The source questionnaire includes questions that need legal and underwriting approval
-              before they can be collected automatically. They stay in the coverage record but are
-              not asked here. If one applies to you, {SITE.owner} will discuss it with you directly.
-            </p>
-            <ul className="space-y-2">
-              {held.map((question) => (
-                <li key={question.id} className="rounded-md bg-secondary/50 px-3 py-2 text-xs">
-                  <span className="font-semibold">{question.id}</span>{" "}
-                  <span className="text-muted-foreground">{question.sourceText}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
+        <h2 className="text-base font-medium">Questions held for human review</h2>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+          {held.length} source topics are not asked in this automated interview because they need
+          legal and underwriting approval first. Their wording is kept in the internal coverage
+          record, not shown to customers. If one applies to you, {SITE.owner} will discuss it with
+          you directly.
+        </p>
       </section>
 
       <section className="panel space-y-4 p-5">

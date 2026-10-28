@@ -35,6 +35,7 @@ function context(overrides: Partial<ConsentContext> = {}): ConsentContext {
     brand: "Life Policy Pilot",
     reviewerEmail: "reviewer@example.com",
     textVersion: VERSION,
+    privacyVersion: "privacy-version-test",
     channels: channels(),
     intakePermissionText: "Intake permission wording.",
     privacyAcknowledgementText: "Privacy acknowledgement wording.",
@@ -59,6 +60,14 @@ const TIMESTAMPS = {
 function recordsFor(value: ConsentContext, selection = EVERYTHING_GRANTED) {
   return buildConsentRecords(value, selection, PHONE, TIMESTAMPS);
 }
+
+test("stamps the privacy acknowledgement with the privacy notice version", () => {
+  const privacy = recordsFor(context()).find(
+    (record) => record.id === "privacy_acknowledgement",
+  );
+
+  assert.equal(privacy?.textVersion, "privacy-version-test");
+});
 
 test("records no marketing consent when no channel is enabled", () => {
   const value = context();

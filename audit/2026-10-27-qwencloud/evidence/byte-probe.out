@@ -1,0 +1,3 @@
+body characters=424063 bytes=824063 cap=524288
+observed throw before HTTP response: Error: Server configuration is incomplete
+FAIL: body passed the 512 KB byte boundary

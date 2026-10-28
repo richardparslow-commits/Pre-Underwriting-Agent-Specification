@@ -35,9 +35,11 @@ be imported, edited and deployed from Lovable without restructuring.
 
 1. Enable **Lovable Cloud** for the project (this creates the Supabase project and
    injects `VITE_SUPABASE_URL` and the publishable key).
-2. Open the Supabase SQL editor and run
-   `supabase/migrations/0001_pre_underwriting.sql` top to bottom.
-3. Auth → Users: create the reviewer account, enable MFA, then register it:
+2. Open the Supabase SQL editor and run, in order,
+   `supabase/migrations/0001_pre_underwriting.sql`,
+   `0002_case_corrections.sql` and `0003_reliability_and_access.sql` top to bottom.
+3. Auth → Users: create the reviewer account, enrol MFA, then register it. An
+   AAL2 session is required by the policies, not merely recommended:
 
    ```sql
    insert into public.reviewers (user_id, email, display_name)
@@ -48,10 +50,12 @@ be imported, edited and deployed from Lovable without restructuring.
    ```
 
 4. Deploy the three functions (`submit-case`, `email-events`,
-   `retry-case-notifications`) with JWT verification **off**, exactly as described
-   in the README. In Lovable this is usually done through the Supabase
+   `retry-case-notifications`) with the JWT settings in the committed
+   `supabase/config.toml`. In Lovable this is usually done through the Supabase
    integration; if the dashboard does not expose `verify_jwt`, use the Supabase
-   CLI against the same project and keep the `config.toml` flags in the repo.
+   CLI against the same project. Keep `QUESTIONNAIRE_APPROVED=false` until every
+   row is signed off, and apply `supabase/ops/retry-schedule.sql` only after
+   storing the Vault secrets.
 5. Add the function secrets listed in the README under Supabase → Edge Functions
    → Secrets. Never put them in `.env` or any `VITE_` variable.
 6. Set `VITE_APP_MODE=live` and rebuild. Submit a labelled non-customer test case

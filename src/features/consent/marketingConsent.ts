@@ -26,6 +26,8 @@ export interface ConsentContext {
   brand: string;
   reviewerEmail: string;
   textVersion: string;
+  /** Privacy notice version is tracked separately from the shared consent version. */
+  privacyVersion: string;
   channels: MarketingChannels;
   intakePermissionText: string;
   privacyAcknowledgementText: string;
@@ -155,7 +157,7 @@ export function buildConsentRecords(
       context.privacyAcknowledgementText,
       selection.privacyAcknowledged,
       selection.privacyAcknowledged ? (timestamps.privacy_acknowledgement ?? null) : null,
-      context.textVersion,
+      context.privacyVersion,
     ),
   ];
 

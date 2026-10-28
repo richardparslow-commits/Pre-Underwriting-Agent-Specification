@@ -76,14 +76,16 @@ export function buildNotification(input: {
  * Delivery itself is confirmed only by the provider webhook, which updates
  * cases.notification_state to 'delivered'.
  *
- * Webhook signature verification note: the `email-events` function currently
- * checks a shared secret header. If the chosen provider signs webhooks (Svix
- * or similar), verify the signature there before trusting any event.
+ * Provider acceptance is reconciled by the `email-events` webhook, which
+ * verifies the Svix signature over the raw request body before recording a
+ * delivery event.
  */
 export async function sendCaseNotification(input: {
   reference: string;
   submittedAt: string;
   portalOrigin: string;
+  /** Stable across retries so the provider can deduplicate a resent message. */
+  idempotencyKey?: string;
 }): Promise<NotificationResult> {
   const apiKey = Deno.env.get("RESEND_API_KEY");
   if (!apiKey) {
@@ -103,6 +105,10 @@ export async function sendCaseNotification(input: {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        // Resend honours Idempotency-Key for 24 hours. A crash after provider
+        // acceptance therefore cannot produce a second reviewer email when the
+        // lease expires and the outbox row is retried.
+        "Idempotency-Key": input.idempotencyKey ?? input.reference,
       },
       body: JSON.stringify({
         from,

@@ -16,6 +16,7 @@ export function useReviewerAuth() {
   const [previewUnlocked, setPreviewUnlocked] = useState(false);
   const [linkSent, setLinkSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsMfa, setNeedsMfa] = useState(false);
 
   useEffect(() => {
     if (!supabase) {
@@ -25,14 +26,29 @@ export function useReviewerAuth() {
 
     let active = true;
 
-    supabase.auth.getSession().then(({ data }) => {
+    async function applySession(session: { user: { email?: string | null } } | null) {
       if (!active) return;
-      setEmail(data.session?.user.email ?? null);
-      setLoading(false);
+      const address = session?.user.email ?? null;
+      setEmail(address);
+
+      if (!session) {
+        setNeedsMfa(false);
+        return;
+      }
+
+      // Supabase does not enforce AAL2 at the gateway. The portal refuses an
+      // aal1 session, and every reviewer RLS policy independently requires it.
+      const { data: assurance } = await supabase!.auth.mfa.getAuthenticatorAssuranceLevel();
+      setNeedsMfa(assurance?.currentLevel !== "aal2");
+    }
+
+    supabase.auth.getSession().then(async ({ data }) => {
+      await applySession(data.session);
+      if (active) setLoading(false);
     });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
-      setEmail(session?.user.email ?? null);
+      void applySession(session);
     });
 
     return () => {
@@ -57,6 +73,7 @@ export function useReviewerAuth() {
   const leave = useCallback(async () => {
     await signOut();
     setEmail(null);
+    setNeedsMfa(false);
     setPreviewUnlocked(false);
   }, []);
 
@@ -64,7 +81,8 @@ export function useReviewerAuth() {
 
   return {
     previewMode: PREVIEW_MODE,
-    signedIn: PREVIEW_MODE ? previewUnlocked : email !== null,
+    signedIn: PREVIEW_MODE ? previewUnlocked : email !== null && !needsMfa,
+    needsMfa,
     email: PREVIEW_MODE ? (previewUnlocked ? SITE.reviewerEmail : null) : email,
     loading,
     linkSent,

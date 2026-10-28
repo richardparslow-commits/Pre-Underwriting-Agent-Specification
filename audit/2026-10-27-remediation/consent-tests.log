@@ -1,0 +1,19 @@
+
+> lifepolicypilot-pre-underwriting@0.1.0 test:consent
+> tsx --test src/features/consent/marketingConsent.test.ts
+
+✔ stamps the privacy acknowledgement with the privacy notice version (0.499625ms)
+✔ records no marketing consent when no channel is enabled (0.418667ms)
+✔ records only the text channel when calls are disabled (0.187709ms)
+✔ records only the call channel when texts are disabled (0.111709ms)
+✔ records each enabled channel exactly once when both are on (0.097541ms)
+✔ keeps marketing off while the seller is blank or a placeholder (0.0935ms)
+✔ keeps an enabled channel record when its box was left unchecked (0.083834ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 86.288584

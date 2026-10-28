@@ -1,0 +1,13 @@
+
+> lifepolicypilot-pre-underwriting@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 1668 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.07 kB │ gzip:   0.57 kB
+dist/assets/index-BxxaBfs-.css   24.46 kB │ gzip:   5.60 kB
+dist/assets/index-DKZDlodJ.js   432.75 kB │ gzip: 120.59 kB
+✓ built in 1.70s

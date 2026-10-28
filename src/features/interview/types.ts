@@ -54,12 +54,6 @@ export const ANSWER_OPTIONS: Array<{
   { value: "declined", label: "Prefer not to answer", hint: "We will flag this for Richard" },
 ];
 
-export const NOT_APPLICABLE_OPTION = {
-  value: "not_applicable" as const,
-  label: "Not applicable",
-  hint: "Only where an approved rule makes this question inapplicable",
-};
-
 export type QuestionKind =
   | "yesno"
   | "short_text"
@@ -166,6 +160,10 @@ export interface LeadDetails {
   firstName: string;
   lastName: string;
   state: string;
+  /** Collected before any health question so the adult boundary is enforced early. */
+  dateOfBirth: string;
+  /** Explicit adult-self attestation; "relationship: self" alone is not proof. */
+  adultAttested: boolean;
   email: string;
   preferredContact: "email" | "phone" | "text" | "chat";
   phone?: string;
@@ -216,6 +214,10 @@ export interface SubmittedAnswer {
   reviewNote?: string;
   sensitive?: boolean;
   disposition: Disposition;
+  /** Structured state for branch evaluation; never inferred from the prose. */
+  answerState?: AnswerState;
+  /** Selected option values for a multi-choice question. */
+  answerValues?: string[];
   /** Human-readable answer, e.g. "Yes" or "March 2024". */
   answerText: string;
   /** Component answers for compound questions, in display order. */
@@ -257,6 +259,8 @@ export interface CaseDraft {
   flags: CaseFlag[];
   /** True when the customer disclosed current thoughts of self-harm. */
   crisisDisclosure: boolean;
+  /** Explicit attestation that the customer is 18+ and answering for themselves. */
+  adultAttested: boolean;
   /** How the customer says they are related to the person the questions cover. */
   relationship: "self" | "other";
 }

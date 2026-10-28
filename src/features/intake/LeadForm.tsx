@@ -22,6 +22,7 @@ interface LeadFormProps {
   lead: Partial<LeadDetails>;
   consent: ConsentSelection;
   onField: (field: keyof LeadDetails, value: string) => void;
+  onAdultAttested: (value: boolean) => void;
   onConsent: (key: keyof ConsentSelection, value: boolean) => void;
   onContinue: () => void;
 }
@@ -33,10 +34,23 @@ const ASSISTANCE_OPTIONS = [
   "Something else",
 ];
 
-export function LeadForm({ lead, consent, onField, onConsent, onContinue }: LeadFormProps) {
+export function LeadForm({
+  lead,
+  consent,
+  onField,
+  onAdultAttested,
+  onConsent,
+  onContinue,
+}: LeadFormProps) {
   const [errors, setErrors] = useState<LeadErrors>({});
   const [consentError, setConsentError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+
+  const latestAdultBirthDate = (() => {
+    const date = new Date();
+    date.setUTCFullYear(date.getUTCFullYear() - 18);
+    return date.toISOString().slice(0, 10);
+  })();
 
   const needsPhone = lead.preferredContact === "phone" || lead.preferredContact === "text";
   const marketingHeading =
@@ -135,6 +149,24 @@ export function LeadForm({ lead, consent, onField, onConsent, onContinue }: Lead
             Recorded so the reviewer knows which state&rsquo;s rules apply to your request.
           </p>
           <FieldError>{errors.state}</FieldError>
+        </div>
+        <div>
+          <Label htmlFor="dateOfBirth">Date of birth</Label>
+          <Input
+            id="dateOfBirth"
+            name="dateOfBirth"
+            type="date"
+            max={latestAdultBirthDate}
+            autoComplete="bday"
+            value={lead.dateOfBirth ?? ""}
+            onChange={(event) => onField("dateOfBirth", event.target.value)}
+            aria-invalid={Boolean(errors.dateOfBirth)}
+            className="mt-1.5"
+          />
+          <p className="field-help">
+            This interview is only for adults aged 18 or over answering for themselves.
+          </p>
+          <FieldError>{errors.dateOfBirth}</FieldError>
         </div>
         <div>
           <Label htmlFor="email">Email</Label>
@@ -425,6 +457,24 @@ export function LeadForm({ lead, consent, onField, onConsent, onContinue }: Lead
           </p>
         )}
       </section>
+
+      <div>
+        <label className="flex gap-3 text-sm leading-relaxed">
+          <Checkbox
+            id="adult-attested"
+            name="adultAttested"
+            checked={lead.adultAttested === true}
+            onChange={(event) => onAdultAttested(event.target.checked)}
+            aria-required="true"
+            aria-invalid={Boolean(errors.adultAttested)}
+          />
+          <span>
+            I confirm that I am 18 or older and am answering these questions about myself. I am not
+            completing this on behalf of another person.
+          </span>
+        </label>
+        <FieldError>{errors.adultAttested}</FieldError>
+      </div>
 
       <Alert tone="neutral">
         <div className="flex gap-3">

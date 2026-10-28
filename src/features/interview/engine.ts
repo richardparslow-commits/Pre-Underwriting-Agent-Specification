@@ -238,6 +238,29 @@ export function crisisDisclosed(answers: Answers): boolean {
   );
 }
 
+/**
+ * Removes answers that belong to a branch the customer has just closed. A
+ * withdrawn detail must not survive in state, the payload, the summary or the
+ * portal. Held rows are never pruned because they are not branch answers.
+ */
+export function pruneBranchClosedAnswers(answers: Answers): Answers {
+  const visible = new Set(visibleQuestions(answers).map((question) => question.id));
+  const next: Answers = {};
+  let changed = false;
+
+  for (const [questionId, answer] of Object.entries(answers)) {
+    const question = ORDERED_QUESTIONS.find((candidate) => candidate.id === questionId);
+    if (!question) continue;
+    if (question.askWhen && !visible.has(questionId)) {
+      changed = true;
+      continue;
+    }
+    next[questionId] = answer;
+  }
+
+  return changed ? next : answers;
+}
+
 export function unansweredQuestions(answers: Answers): Question[] {
   return visibleQuestions(answers).filter(
     (question) => dispositionFor(question, answers[question.id], answers) === "unresolved",
@@ -265,6 +288,14 @@ export function toSubmittedAnswers(answers: Answers): SubmittedAnswer[] {
       reviewNote: question.reviewNote,
       sensitive: question.sensitive ? true : undefined,
       disposition,
+      answerState:
+        disposition === "answered" || disposition === "unknown" || disposition === "declined"
+          ? answer?.state
+          : undefined,
+      answerValues:
+        disposition === "answered" && answer?.values && answer.values.length > 0
+          ? answer.values
+          : undefined,
       answerText:
         disposition === "held_for_review"
           ? "Held for human review — not asked"
@@ -273,8 +304,10 @@ export function toSubmittedAnswers(answers: Answers): SubmittedAnswer[] {
             : disposition === "unresolved"
               ? "Not answered"
               : answerTextFor(question, answer),
-      fields: fieldEntries(question, answer),
-      details: detailEntries(question, answer),
+      // A closed branch or a held row must not carry the detail entered before
+      // the parent changed. Only an answered row emits component/detail data.
+      fields: disposition === "answered" ? fieldEntries(question, answer) : [],
+      details: disposition === "answered" ? detailEntries(question, answer) : [],
     } satisfies SubmittedAnswer;
   });
 }
@@ -402,6 +435,7 @@ export function buildCaseDraft(input: {
   consents: CaseDraft["consents"];
   acknowledgements: CaseDraft["acknowledgements"];
   startedAt: string;
+  adultAttested: boolean;
 }): CaseDraft {
   return {
     questionnaireVersion: QUESTIONNAIRE_VERSION,
@@ -413,6 +447,7 @@ export function buildCaseDraft(input: {
     acknowledgements: input.acknowledgements,
     flags: buildFlags(input.answers),
     crisisDisclosure: crisisDisclosed(input.answers),
+    adultAttested: input.adultAttested,
     relationship: "self",
   };
 }

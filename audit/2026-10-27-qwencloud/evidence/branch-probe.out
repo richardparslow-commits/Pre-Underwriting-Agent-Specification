@@ -1,0 +1,22 @@
+PASS | MH-02 | expected true | observed true
+PASS | MH-02 | expected false | observed false
+PASS | NIC-04 | expected true | observed true
+PASS | NIC-04 | expected false | observed false
+PASS | AVI-03 | expected true | observed true
+PASS | AVI-03 | expected false | observed false
+PASS | AVO-02 | expected true | observed true
+PASS | AVO-03 | expected true | observed true
+PASS | AVO-04 | expected true | observed true
+PASS | AVO-05 | expected true | observed true
+PASS | AVO-06 | expected true | observed true
+PASS | AVO-07 | expected true | observed true
+PASS | AVO-02 | expected false | observed false
+PASS | FIN-02 | expected true | observed true
+PASS | FIN-03 | expected true | observed true
+PASS | FIN-02 | expected false | observed false
+PASS | MIL-02 | expected true | observed true
+PASS | MIL-03 | expected true | observed true
+PASS | MIL-02 | expected false | observed false
+PASS | MIL-04 | expected true | observed true
+PASS | MIL-04 | expected false | observed false
+SUMMARY failures=0 checks=21

@@ -1,0 +1,26 @@
+PASS | migration 0001 first run | undefined
+PASS | migration 0002 first run | undefined
+PASS | migration 0001 second run (idempotent) | undefined
+PASS | migration 0002 second run (idempotent) | undefined
+PASS | RLS enabled on all four sensitive tables | [{"relname":"case_corrections","relrowsecurity":true},{"relname":"case_review_log","relrowsecurity":true},{"relname":"cases","relrowsecurity":true},{"relname":"contact_suppressions","relrowsecurity":true},{"relname":"reviewers","relrowsecurity":true}]
+PASS | anon cannot read cases | error=permission denied for table cases
+PASS | authenticated non-reviewer sees zero cases | [{"n":0}]
+PASS | non-reviewer cannot call record_case_review | error=Not authorised
+PASS | authenticated reviewer sees the case | [{"n":1}]
+PASS | reviewer sees own reviewer row only | [{"n":1}]
+PASS | reviewer can update workflow status | [{"status":"reviewed"}]
+PASS | reviewer cannot update notification state | error=permission denied for table cases
+PASS | reviewer cannot update crisis metadata | error=permission denied for table cases
+PASS | reviewer cannot insert a case | error=permission denied for table cases
+PASS | reviewer cannot insert a correction directly | error=permission denied for table case_corrections
+PASS | reviewer RPC records review and actor | [{"record_case_review":""}]
+PASS | review log has reviewer action | [{"action":"marked_reviewed","actor":"reviewer@example.com"}]
+PASS | review RPC changed status | [{"status":"reviewed"}]
+PASS | correction RPC trims and attributes | [{"record_case_correction":""}]
+PASS | correction row is append-only and attributed | [{"detail":"corrected detail","recorded_by":"reviewer@example.com"}]
+PASS | empty correction rejected | error=Correction text is required
+PASS | overlong correction rejected | error=Correction text is too long
+PASS | snapshot payload is immutable | error=Submitted case snapshots are immutable
+PASS | service role can change crisis metadata (trigger gap) | [{"crisis_disclosure":true}]
+PASS | snapshot payload survived | [{"tampered":null}]
+SUMMARY failures=0

@@ -1,0 +1,13 @@
+before flip: answered fields 4
+after flip: not_asked fields 4
+ORPHAN CONFIRMED: not_asked row still carries fields
+held visible: none
+crisis after history=no: visible=true disclosed=true
+crisis after history=unknown: visible=true disclosed=true
+crisis after history=declined: visible=true disclosed=true
+MH-01 blank -> unresolved
+MH-01 no -> answered
+MH-01 unknown -> unknown
+MH-01 declined -> declined
+answer options: yes,no,unknown,declined
+submitted rows: 92

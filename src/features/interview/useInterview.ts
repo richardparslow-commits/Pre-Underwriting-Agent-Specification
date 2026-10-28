@@ -4,6 +4,7 @@ import {
   crisisDisclosed,
   ORDERED_QUESTIONS,
   progressFor,
+  pruneBranchClosedAnswers,
   visibleQuestions,
 } from "./engine";
 import type {
@@ -57,10 +58,13 @@ export interface InterviewHook {
   prefilledIds: string[];
   receipt: SubmissionReceipt | null;
   draft: CaseDraft | null;
+  /** Stable per-draft key; a retry reuses it so the server can deduplicate. */
+  submissionKey: string;
   currentQuestionId: string | null;
   crisis: boolean;
   progress: ReturnType<typeof progressFor>;
   setLeadField: (field: keyof LeadDetails, value: string) => void;
+  setAdultAttested: (value: boolean) => void;
   setConsent: (key: keyof ConsentSelection, value: boolean) => void;
   begin: () => void;
   givePermission: () => void;
@@ -84,12 +88,15 @@ export function useInterview(): InterviewHook {
   const [lead, setLead] = useState<Partial<LeadDetails>>({
     preferredContact: "email",
     state: "",
+    dateOfBirth: "",
+    adultAttested: false,
   });
   const [consent, setConsentState] = useState<ConsentState>(EMPTY_CONSENT);
   const [answers, setAnswers] = useState<Answers>({});
   const [acknowledgements, setAcknowledgements] = useState<SubmissionAcknowledgement[]>([]);
   const [prefilledIds, setPrefilledIds] = useState<string[]>([]);
   const [receipt, setReceipt] = useState<SubmissionReceipt | null>(null);
+  const [submissionKey, setSubmissionKey] = useState(() => crypto.randomUUID());
   const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(null);
   const [startedAt] = useState(() => new Date().toISOString());
 
@@ -99,6 +106,11 @@ export function useInterview(): InterviewHook {
 
   const setLeadField = useCallback((field: keyof LeadDetails, value: string) => {
     setLead((current) => ({ ...current, [field]: value }));
+    setAcknowledgements([]);
+  }, []);
+
+  const setAdultAttested = useCallback((value: boolean) => {
+    setLead((current) => ({ ...current, adultAttested: value }));
     setAcknowledgements([]);
   }, []);
 
@@ -127,13 +139,19 @@ export function useInterview(): InterviewHook {
     // Reuse a fact the customer already gave, visibly and only where the scope
     // matches: residence state on the lead form and in the interview.
     const residence = QUESTION_BY_ID["ID-03"];
+    const birth = QUESTION_BY_ID["ID-01"];
     const state = lead.state?.trim();
+    const dateOfBirth = lead.dateOfBirth?.trim();
+    const prefill: Answers = {};
     if (residence && state && !answers["ID-03"]) {
-      setAnswers((current) => ({
-        ...current,
-        [residence.id]: { value: state, updatedAt: new Date().toISOString() },
-      }));
-      setPrefilledIds([residence.id]);
+      prefill[residence.id] = { value: state, updatedAt: new Date().toISOString() };
+    }
+    if (birth && dateOfBirth && !answers["ID-01"]) {
+      prefill[birth.id] = { value: dateOfBirth, updatedAt: new Date().toISOString() };
+    }
+    if (Object.keys(prefill).length > 0) {
+      setAnswers((current) => ({ ...current, ...prefill }));
+      setPrefilledIds(Object.keys(prefill));
     }
 
     setStep("interview");
@@ -145,10 +163,13 @@ export function useInterview(): InterviewHook {
   const setAnswer = useCallback((questionId: string, patch: Partial<AnswerRecord>) => {
     setAnswers((current) => {
       const previous = current[questionId] ?? {};
-      return {
+      const next = {
         ...current,
         [questionId]: { ...previous, ...patch, updatedAt: new Date().toISOString() },
       };
+      // Closing a parent branch removes the descendant answers immediately, so
+      // withdrawn health detail cannot survive into the review screen or case.
+      return pruneBranchClosedAnswers(next);
     });
     // Any edit invalidates a prior review confirmation: the customer must see
     // the new complete picture before it is submitted.
@@ -204,7 +225,15 @@ export function useInterview(): InterviewHook {
   }, []);
 
   const draft = useMemo<CaseDraft | null>(() => {
-    if (!lead.firstName || !lead.lastName || !lead.state || !lead.email || !lead.preferredContact) {
+    if (
+      !lead.firstName ||
+      !lead.lastName ||
+      !lead.state ||
+      !lead.dateOfBirth ||
+      !lead.email ||
+      !lead.preferredContact ||
+      lead.adultAttested !== true
+    ) {
       return null;
     }
     if (acknowledgements.length === 0) return null;
@@ -221,6 +250,7 @@ export function useInterview(): InterviewHook {
       consents,
       acknowledgements,
       startedAt,
+      adultAttested: true,
     });
   }, [acknowledgements, answers, consent, lead, startedAt]);
 
@@ -232,12 +262,13 @@ export function useInterview(): InterviewHook {
 
   const startOver = useCallback(() => {
     setStep("lead");
-    setLead({ preferredContact: "email", state: "" });
+    setLead({ preferredContact: "email", state: "", dateOfBirth: "", adultAttested: false });
     setConsentState(EMPTY_CONSENT);
     setAnswers({});
     setAcknowledgements([]);
     setPrefilledIds([]);
     setReceipt(null);
+    setSubmissionKey(crypto.randomUUID());
     setCurrentQuestionId(null);
   }, []);
 
@@ -258,10 +289,12 @@ export function useInterview(): InterviewHook {
     prefilledIds,
     receipt,
     draft,
+    submissionKey,
     currentQuestionId: safeCurrentId,
     crisis,
     progress,
     setLeadField,
+    setAdultAttested,
     setConsent,
     begin,
     givePermission,

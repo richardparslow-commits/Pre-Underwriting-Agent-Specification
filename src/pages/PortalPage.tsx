@@ -101,8 +101,9 @@ function SignInCard({ auth }: { auth: ReturnType<typeof useReviewerAuth> }) {
         ) : null}
 
         <p className="mt-6 border-t border-border pt-4 text-[0.7rem] leading-relaxed text-muted-foreground">
-          Multifactor authentication should be enforced on the reviewer account before production
-          use. Every case request is authorised against the reviewer allowlist on the server.
+          Multifactor authentication is required: the portal refuses an aal1 session and every
+          reviewer policy independently requires an aal2 session. Every case request is also
+          authorised against the reviewer allowlist on the server.
         </p>
       </div>
     </div>
@@ -138,6 +139,31 @@ export default function PortalPage() {
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Checking your session…
         </p>
+      </div>
+    );
+  }
+
+  if (auth.needsMfa && !auth.previewMode) {
+    return (
+      <div className="container max-w-md py-16">
+        <div className="panel p-7">
+          <Badge tone="warn">MFA required</Badge>
+          <h1 className="mt-4 text-2xl leading-snug">Step up your session</h1>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            You are signed in as {auth.email ?? "a reviewer"}, but this session has not completed
+            multifactor authentication. Case data is not available until you verify a second factor.
+            Enrol an authenticator in your account security settings, then sign in again and complete
+            the challenge.
+          </p>
+          <Alert tone="warn" className="mt-4">
+            A password-only session cannot read cases. This is enforced in the portal and in every
+            row-level security policy.
+          </Alert>
+          <Button variant="outline" className="mt-5" onClick={() => void auth.leave()}>
+            <LogOut aria-hidden />
+            Sign out and try again
+          </Button>
+        </div>
       </div>
     );
   }

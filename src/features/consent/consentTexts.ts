@@ -43,6 +43,7 @@ const CONSENT_CONTEXT: ConsentContext = {
   brand: SITE.brand,
   reviewerEmail: SITE.reviewerEmail,
   textVersion: CONSENT_VERSION,
+  privacyVersion: PRIVACY_PRACTICES_VERSION,
   channels: {
     calls: MARKETING.calls,
     texts: MARKETING.texts,

@@ -1,0 +1,45 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@std/assert@1.0.6": "1.0.6",
+    "jsr:@std/internal@^1.0.4": "1.0.14"
+  },
+  "jsr": {
+    "@std/assert@1.0.6": {
+      "integrity": "1904c05806a25d94fe791d6d883b685c9e2dcd60e4f9fc30f4fc5cf010c72207",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
+    },
+    "@std/internal@1.0.14": {
+      "integrity": "291516b3d4c35024d6ffbc0a9df5bf4c64116e05b50012cf846710152d2ffdf7"
+    }
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:@radix-ui/react-slot@^1.1.1",
+        "npm:@supabase/supabase-js@^2.49.4",
+        "npm:@types/node@^22.10.2",
+        "npm:@types/react-dom@^18.3.5",
+        "npm:@types/react@^18.3.18",
+        "npm:@vitejs/plugin-react-swc@^4.3.3",
+        "npm:autoprefixer@^10.4.20",
+        "npm:class-variance-authority@~0.7.1",
+        "npm:clsx@^2.1.1",
+        "npm:lovable-tagger@^1.1.7",
+        "npm:lucide-react@0.462",
+        "npm:postcss@^8.4.49",
+        "npm:react-dom@^18.3.1",
+        "npm:react-router-dom@^7.18.5",
+        "npm:react@^18.3.1",
+        "npm:tailwind-merge@^2.6.0",
+        "npm:tailwindcss-animate@^1.0.7",
+        "npm:tailwindcss@^3.4.17",
+        "npm:tsx@^4.19.2",
+        "npm:typescript@^5.7.2",
+        "npm:vite@^8.3.5"
+      ]
+    }
+  }
+}

@@ -46,6 +46,26 @@ export default function PortalCasePage() {
     );
   }
 
+  if (auth.needsMfa && !auth.previewMode) {
+    return (
+      <div className="container max-w-md py-20">
+        <div className="panel p-7">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-secondary">
+            <LockKeyhole className="h-4 w-4" aria-hidden />
+          </span>
+          <h1 className="mt-4 text-2xl leading-snug">Multifactor authentication required</h1>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            Your session is signed in but has not completed a second factor. Case data stays hidden
+            until the session reaches AAL2.
+          </p>
+          <Button asChild variant="outline" className="mt-5">
+            <Link to="/portal">Return to the portal</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (!auth.signedIn) {
     return (
       <div className="container max-w-md py-20">

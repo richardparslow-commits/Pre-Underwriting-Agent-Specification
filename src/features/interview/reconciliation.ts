@@ -1,5 +1,5 @@
 /**
- * Reconciliation of the 56-row question bank against the controlled source
+ * Reconciliation of the 92-row question bank against the controlled source
  * questionnaire (source/Detialed-Life-insurance-Questions.pdf).
  *
  * Every bank row has exactly one record here. A record names the source items

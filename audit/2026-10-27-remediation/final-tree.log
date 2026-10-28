@@ -1,0 +1,86 @@
+/Users/richardparslow/.config/freebuff-desktop/local-projects/63e542bb-916b-480d-ae0c-3cf2709f03f7/threads/21116134370fef0acaacd3c35c93f2677f707f0dc911a97dd3065f3d4dc0d950
+ M .github/workflows/ci.yml
+ M LOVABLE.md
+ M README.md
+ M docs/LAUNCH-GATES.md
+ M package-lock.json
+ M package.json
+ M src/config/site.ts
+ M src/features/consent/consentTexts.ts
+ M src/features/consent/marketingConsent.test.ts
+ M src/features/consent/marketingConsent.ts
+ M src/features/intake/ConfirmationScreen.tsx
+ M src/features/intake/LeadForm.tsx
+ M src/features/intake/ReviewScreen.tsx
+ M src/features/intake/validation.ts
+ M src/features/interview/engine.ts
+ M src/features/interview/reconciliation.ts
+ M src/features/interview/types.ts
+ M src/features/interview/useInterview.ts
+ M src/features/portal/useReviewerAuth.ts
+ M src/lib/api.ts
+ M src/pages/IntakePage.tsx
+ M src/pages/LandingPage.tsx
+ M src/pages/PortalCasePage.tsx
+ M src/pages/PortalPage.tsx
+ M supabase/functions/_shared/case.ts
+ M supabase/functions/_shared/email.ts
+ M supabase/functions/email-events/index.ts
+ M supabase/functions/retry-case-notifications/index.ts
+ M supabase/functions/submit-case/deno.json
+ M supabase/functions/submit-case/index.ts
+ M supabase/functions/tests/submit-case_test.ts
+ M vite.config.ts
+?? .tmp/
+?? audit/
+?? deno.lock
+?? docs/OPERATIONS.md
+?? scripts/check-docs.ts
+?? scripts/check-server-bank.ts
+?? scripts/check-server-policy.ts
+?? scripts/generate-server-bank.ts
+?? scripts/generate-server-policy.ts
+?? src/features/interview/engine.test.ts
+?? supabase/config.toml
+?? supabase/functions/_shared/bank.generated.ts
+?? supabase/functions/_shared/policy.generated.ts
+?? supabase/functions/_shared/svix.ts
+?? supabase/functions/tests/email_test.ts
+?? supabase/functions/tests/fixtures.ts
+?? supabase/functions/tests/svix_test.ts
+?? supabase/functions/tests/validate-draft_test.ts
+?? supabase/migrations/0003_reliability_and_access.sql
+?? supabase/ops/
+ .github/workflows/ci.yml                           |   39 +-
+ LOVABLE.md                                         |   16 +-
+ README.md                                          |  151 +-
+ docs/LAUNCH-GATES.md                               |   34 +-
+ package-lock.json                                  | 3166 +++++++++-----------
+ package.json                                       |   12 +-
+ src/config/site.ts                                 |   28 +-
+ src/features/consent/consentTexts.ts               |    1 +
+ src/features/consent/marketingConsent.test.ts      |    9 +
+ src/features/consent/marketingConsent.ts           |    4 +-
+ src/features/intake/ConfirmationScreen.tsx         |   15 +-
+ src/features/intake/LeadForm.tsx                   |   52 +-
+ src/features/intake/ReviewScreen.tsx               |   42 +-
+ src/features/intake/validation.ts                  |   28 +
+ src/features/interview/engine.ts                   |   39 +-
+ src/features/interview/reconciliation.ts           |    2 +-
+ src/features/interview/types.ts                    |   16 +-
+ src/features/interview/useInterview.ts             |   49 +-
+ src/features/portal/useReviewerAuth.ts             |   28 +-
+ src/lib/api.ts                                     |   28 +-
+ src/pages/IntakePage.tsx                           |    3 +-
+ src/pages/LandingPage.tsx                          |    2 +-
+ src/pages/PortalCasePage.tsx                       |   20 +
+ src/pages/PortalPage.tsx                           |   30 +-
+ supabase/functions/_shared/case.ts                 |  793 ++++-
+ supabase/functions/_shared/email.ts                |   12 +-
+ supabase/functions/email-events/index.ts           |   94 +-
+ .../functions/retry-case-notifications/index.ts    |  102 +-
+ supabase/functions/submit-case/deno.json           |    2 +-
+ supabase/functions/submit-case/index.ts            |  213 +-
+ supabase/functions/tests/submit-case_test.ts       |  121 +-
+ vite.config.ts                                     |    2 +-
+ 32 files changed, 2968 insertions(+), 2185 deletions(-)

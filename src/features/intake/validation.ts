@@ -8,6 +8,16 @@ export function phoneDigits(value: string): string {
   return value.replace(/\D/g, "");
 }
 
+/** Age in whole years on a given date, computed in UTC. */
+export function ageOn(dateOfBirth: string, onDate = new Date()): number {
+  const birth = new Date(`${dateOfBirth}T00:00:00.000Z`);
+  if (Number.isNaN(birth.getTime())) return Number.NaN;
+  let age = onDate.getUTCFullYear() - birth.getUTCFullYear();
+  const month = onDate.getUTCMonth() - birth.getUTCMonth();
+  if (month < 0 || (month === 0 && onDate.getUTCDate() < birth.getUTCDate())) age -= 1;
+  return age;
+}
+
 /**
  * Client-side validation only. The `submit-case` function repeats and hardens
  * every one of these checks: the browser is never the authority.
@@ -19,6 +29,20 @@ export function validateLead(lead: Partial<LeadDetails>): LeadErrors {
   if (!lead.lastName?.trim()) errors.lastName = "Enter your last name.";
   if (!lead.state?.trim()) errors.state = "Choose your state of residence.";
 
+  const dateOfBirth = lead.dateOfBirth?.trim() ?? "";
+  if (!dateOfBirth) {
+    errors.dateOfBirth = "Enter your date of birth.";
+  } else if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) {
+    errors.dateOfBirth = "Enter a complete date of birth.";
+  } else {
+    const age = ageOn(dateOfBirth);
+    if (!Number.isFinite(age) || age > 120) {
+      errors.dateOfBirth = "Enter a valid date of birth.";
+    } else if (age < 18) {
+      errors.dateOfBirth = "This interview is only available to adults aged 18 or over.";
+    }
+  }
+
   if (!lead.email?.trim()) {
     errors.email = "Enter an email address for your review.";
   } else if (!EMAIL.test(lead.email.trim())) {
@@ -27,6 +51,10 @@ export function validateLead(lead: Partial<LeadDetails>): LeadErrors {
 
   if (!lead.preferredContact) {
     errors.preferredContact = "Choose how you would like to be contacted.";
+  }
+
+  if (lead.adultAttested !== true) {
+    errors.adultAttested = "Confirm that you are 18 or older and answering for yourself.";
   }
 
   const needsPhone = lead.preferredContact === "phone" || lead.preferredContact === "text";

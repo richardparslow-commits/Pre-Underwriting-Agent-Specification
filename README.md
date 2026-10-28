@@ -21,12 +21,12 @@ service. The following are deliberate, visible gaps:
 
 | Item | State |
 | --- | --- |
-| Source questionnaire (`Detialed-Life-insurance-Questions.pdf`) | **In the repo** at `source/Detialed-Life-insurance-Questions.pdf` (7 pages, 113 questions) with a verbatim text extraction. All 92 bank rows are reconciled against it. Nicotine, criminal history, medical history, alcohol and drug use, aviation and driving are rebuilt as one question per source window (58 rows now follow their source wording and window); 29 rows still carry flags, no row collapses lookbacks, and every remaining source gap has a recorded decision (19 partly collected, 9 out of scope, 0 waiting on a new question). Every row is `sourceVerified: false` — a named reviewer must accept each decision before launch. See [docs/question-bank-reconciliation.md](docs/question-bank-reconciliation.md). |
+| Source questionnaire (`Detialed-Life-insurance-Questions.pdf`) | **In the repo** at `source/Detialed-Life-insurance-Questions.pdf` (7 pages, 113 questions) with a verbatim text extraction. All 92 bank rows are reconciled against it. Nicotine, criminal history, medical history, alcohol and drug use, aviation and driving are rebuilt as one question per source window (58 rows now follow their source wording and window); 29 rows still carry flags, 7 replace a single source window, no row merges two windows, and every remaining source gap has a recorded decision (19 partly collected, 9 out of scope, 0 waiting on a new question). 0 of 92 rows are signed off (`sourceVerified: false`) — a named reviewer must accept each decision before launch. See [docs/question-bank-reconciliation.md](docs/question-bank-reconciliation.md). |
 | Legal wording (intake acknowledgment, TCPA disclosure) | Draft, pending counsel. `SITE.legalEntity` is supplied by `VITE_LEGAL_ENTITY`; marketing consent and the TCPA disclosure appear only when a seller and at least one channel are configured. `SITE.legalReviewPending` is `true`. |
 | Language-model explainer | **Not wired.** The interview engine is deterministic. `FEATURES.aiExplainerEnabled = false`, so the customer copy does not claim an AI assistant is active. |
 | Email notification | Implemented against Resend in a Supabase edge function; no provider key is configured here, so the UI reports `not_sent` honestly. |
 | Supabase deployment | Migration and functions are written but have not been run against a project from this workspace. |
-| Retention / deletion job | Not implemented; schedule must be documented and approved. |
+| Retention / deletion job | Deletion and expiry functions are implemented in `0003_reliability_and_access.sql`; the schedule stays unset (`retention_months = null`) until counsel approves it. |
 | Carrier screening, quoting, rate classes | Intentionally absent. |
 
 Preview mode (the default) is fully local: no backend, no email, no data leaves
@@ -95,14 +95,22 @@ src/
 supabase/
   migrations/0001_pre_underwriting.sql
   migrations/0002_case_corrections.sql
+  migrations/0003_reliability_and_access.sql
+  ops/retry-schedule.sql         operator-applied pg_cron schedule
   functions/submit-case/         public intake, server-generated reference
-  functions/_shared/case.ts      validation, CORS, rate limit, service client
+  functions/_shared/case.ts      validation, byte cap, rate limit, service client
+  functions/_shared/bank.generated.ts    canonical server question bank
+  functions/_shared/policy.generated.ts  canonical consent wording/versions
+  functions/_shared/svix.ts      provider signature verification
   functions/_shared/email.ts     minimal notification, fixed recipient, Resend
   functions/email-events/        delivery webhook → notification state
   functions/retry-case-notifications/
 source/Detialed-Life-insurance-Questions.pdf   controlled source questionnaire
 source/Detialed-Life-insurance-Questions.txt   verbatim text extraction
 scripts/check-bank.ts            launch-gate bank + reconciliation check
+scripts/check-server-bank.ts     fails if the server bank drifts
+scripts/check-server-policy.ts   fails if consent wording drifts
+scripts/check-docs.ts            fails on stale counts/claims
 scripts/report-reconciliation.ts regenerates the reconciliation report
 docs/question-bank-reconciliation.md  every row's flags and required decision
 docs/LAUNCH-GATES.md             acceptance-test mapping and remaining work
@@ -116,9 +124,10 @@ LOVABLE.md                       import and wiring instructions for Lovable
 - One question at a time, section progress. Nicotine, criminal history, medical
   history, alcohol and drug use, aviation and driving keep a separate question for
   every source window, so no row collapses two lookbacks into one answer.
-- Answer states: **Yes, No, Unknown (I’m not sure), Prefer not to answer,
-  Not applicable (approved rule only)**. A blank is stored as `unresolved`,
-  never as `No`.
+- Answer states: **Yes, No, Unknown (I’m not sure), Prefer not to answer**.
+  `Not applicable` exists in the type only for legacy records; no approved rule
+  offers it, the UI never renders it, and the server rejects it. A blank is
+  stored as `unresolved`, never as `No`.
 - Compound questions collect components separately, then appear as one record.
 - Conditional branches are declared in the bank (`askWhen`) and disappear when
   the parent answer changes; orphaned detail is cleared.
@@ -160,15 +169,22 @@ is stored as evidence. Medical-record release is **not** collected in this intak
 - The customer-facing app never holds a service-role key. Submission goes through
   `submit-case`; the recipient is a server constant and cannot be influenced by
   the browser or a model.
-- The case is written **before** any email attempt. Notification states are
-  distinct: `not_sent`, `queued`, `accepted`, `failed`, `delivered` (webhook only).
-  Retries update a case, never create one.
-- The submitted payload is immutable at the database level (trigger), and the
-  case reference is generated server-side. A post-submission correction is an
-  append-only row in `case_corrections`, tied to the case and stamped with the
-  reviewer and time; it never edits the snapshot.
+- One draft has one server-side idempotency key. A retried or double-clicked
+  request returns the original case; a unique index makes a second row impossible.
+- The case is written **before** any email attempt. A row must be claimed with a
+  lease before sending, and the provider idempotency key is the case reference,
+  so overlapping workers or a crash after acceptance cannot duplicate an email.
+  Notification states are distinct: `not_sent`, `queued`, `accepted`, `failed`,
+  `delivered` (signed webhook only). Retries update a case, never create one.
+- The submitted payload and derived triage evidence (crisis disclosure,
+  residence state, server receipt time, questionnaire version, idempotency key)
+  are immutable at the database level, including against the service role. A
+  post-submission correction is an append-only row in `case_corrections`, tied
+  to the case and stamped with the reviewer and time; it never edits the snapshot.
 - `cases` has RLS enabled with `anon` fully revoked; reviewers authenticate with
-  Supabase Auth and must exist in `public.reviewers`. Every read is checked.
+  Supabase Auth, must exist in `public.reviewers`, and must have an AAL2 (MFA)
+  session. The portal also refuses an aal1 session, so a stolen password alone
+  cannot read cases. Every read is checked.
 - Health answers are kept out of URLs, analytics, logs, error echoes and the
   notification email. The email contains only a reference, timestamp and portal
   link.
@@ -181,12 +197,14 @@ is stored as evidence. Medical-record release is **not** collected in this intak
 ### 1. Create the case store
 
 In Supabase (or Lovable Cloud) run the migrations in order:
-[`0001_pre_underwriting.sql`](supabase/migrations/0001_pre_underwriting.sql), then
-[`0002_case_corrections.sql`](supabase/migrations/0002_case_corrections.sql). They
-create `reviewers`, `cases`, `case_review_log`, `case_corrections`,
-`contact_suppressions`, the reviewer RLS policies, the immutability trigger and
-the `record_case_review` and `record_case_correction` RPCs. Do not stop after
-0001: the portal's correction action needs the second migration.
+[`0001_pre_underwriting.sql`](supabase/migrations/0001_pre_underwriting.sql),
+[`0002_case_corrections.sql`](supabase/migrations/0002_case_corrections.sql) and
+[`0003_reliability_and_access.sql`](supabase/migrations/0003_reliability_and_access.sql).
+They create the reviewer allowlist, immutable cases, review log, corrections,
+suppressions, idempotency, notification leases, delivery-event dedupe, durable
+rate limiting, AAL2 reviewer policies, audited deletion and the opt-in retention
+job. Do not stop after 0001: the portal's correction action needs 0002 and the
+reliability controls need 0003.
 
 ### 2. Create the reviewer
 
@@ -200,8 +218,9 @@ where email = 'richardparslow@lifepolicypilot.blog'
 on conflict (user_id) do nothing;
 ```
 
-Enable MFA on that account. A forwarded notification email must not grant access
-— it does not, because the portal requires a session.
+Enrol MFA on that account. Reviewing requires an AAL2 session: the portal refuses
+a password-only session, and every reviewer RLS policy independently requires
+`aal2`. A forwarded notification email grants nothing without that session.
 
 ### 3. Deploy the functions
 
@@ -214,27 +233,30 @@ SUPABASE_SERVICE_ROLE_KEY=...
 RESEND_API_KEY=...                                   # optional until email is approved
 CASE_NOTIFY_FROM=Life Policy Pilot <notifications@lifepolicypilot.blog>
 CASE_NOTIFY_TO=richardparslow@lifepolicypilot.blog   # must match the allowlist
-EMAIL_WEBHOOK_SECRET=...                             # random, at least 32 chars
+EMAIL_WEBHOOK_SECRET=whsec_...                        # provider signing secret, not a shared password
 CRON_SECRET=...                                      # random, at least 32 chars
+RATE_LIMIT_SALT=...                                  # random; salts the hashed client key
+QUESTIONNAIRE_APPROVED=false                          # stays false until every row is signed off
 ENVIRONMENT=production
 ```
 
-Deploy with JWT verification disabled for the machine-facing functions:
+`QUESTIONNAIRE_APPROVED=true` is a deliberate launch lock: until it is set, the
+public function returns 503 and writes nothing. Do not set it while
+`sourceVerified` is false on any row.
 
-```toml
-[functions.submit-case]
-verify_jwt = false
+The three function JWT settings are committed in
+[`supabase/config.toml`](supabase/config.toml); a clean deployment no longer
+relies on an operator remembering them. Apply
+[`supabase/ops/retry-schedule.sql`](supabase/ops/retry-schedule.sql) after
+storing `project_url` and `cron_secret` in Vault to run the notification worker
+every five minutes.
 
-[functions.email-events]
-verify_jwt = false
-
-[functions.retry-case-notifications]
-verify_jwt = false
-```
-
-`submit-case` also enforces an Origin allowlist, a 512 KB body cap, a 400-answer
-cap, server-side validation and an in-memory rate limit. For production volume,
-put a WAF or durable limiter in front of it.
+`submit-case` enforces an Origin allowlist, a streaming 512 KiB byte cap, a
+92-row completeness check, server-side canonical validation, and a durable
+salted rate limit (ten submissions per ten minutes per hashed client key). The
+in-memory limiter is only a last-resort fallback for local tests or a durable
+limit outage. A WAF in front of the function is still recommended before public
+launch.
 
 ### 4. Point the front end at it
 
@@ -253,10 +275,12 @@ Build, then submit a **non-customer test case** and verify:
 
 ### 5. Delivery webhook (optional until email is approved)
 
-Point the provider’s delivery events at `/functions/v1/email-events` with the
-`x-webhook-secret` header. Only a `delivered` event moves the case to
-`delivered`. Replace the shared secret with provider signature verification
-before relying on it.
+Point the provider’s delivery events at `/functions/v1/email-events` and set
+`EMAIL_WEBHOOK_SECRET` to the provider’s `whsec_…` signing secret. The function
+verifies the Svix signature over the raw body, rejects timestamps outside five
+minutes, deduplicates by `svix-id`, and applies a monotonic state transition.
+Only a verified `delivered` event moves the case to `delivered`; a late “sent”
+or a bounce cannot move it backwards.
 
 ---
 
@@ -269,7 +293,8 @@ The source PDF is committed at `source/Detialed-Life-insurance-Questions.pdf`
   verbatim, with page numbers and the window each one states.
 - `src/features/interview/reconciliation.ts` — one record per bank row: source
   ids, verdict, every mismatch as a flag, and the decision a reviewer must make;
-  plus the 45 source questions no row fully covers.
+  plus the 28 source questions no row fully covers (19 partly collected, 9 out
+  of scope).
 - `src/features/interview/questionBank.ts` — `sourceRef` and `sourceText` are
   derived from those records, so the locator and wording cannot drift from the
   source.
@@ -294,8 +319,9 @@ To close gate 1:
    row by row. The nicotine and criminal rows show the intended shape: one row per
    source question and window. For each remaining row, either change the bank to
    match the source or record the revision as approved.
-2. Add the missing source questions (the 26 marked `add_question`) or record why
-   each is out of scope. Do not mark a gap covered without a row that asks it.
+2. Decide each of the 28 recorded gaps: 19 are partly collected and 9 are out of
+   scope. No gap is currently marked `add_question`. Do not mark a gap covered
+   without a row that asks it.
 3. Set `sourceVerified: true` on a row only when its decision is closed, and
    record the reviewer and date in the sign-off table.
 4. Update the five held rows (`ID-04`, `MED-11`, `MH-06`, `RES-04`, `RES-05`)
@@ -331,30 +357,33 @@ is the reviewer's signature in the report.
   questions, driving its separate 24-month, 5-year and ever questions, and the
   newly added rows branched only where the source branches (solo climbing,
   salvage diving, bankruptcy discharge date, military mission type).
-- `deno test --allow-env --no-lock supabase/functions/tests/` — 5 consent-gate
-  tests that drive the real `submit-case` handler and require HTTP 422 for a
-  draft with no consent records, a missing or declined intake permission, or a
-  missing or declined privacy acknowledgement. This runs in CI with Deno 2.
-- `npm run test:consent` — 6 tests over the pure consent builder: only enabled
+- `deno test --allow-env --lock=deno.lock supabase/functions/tests/` — 32 tests:
+  handler-level launch lock, required consent and byte-cap checks; canonical
+  snapshot/consent/crisis/age/branch rejection tests; and Svix signature tests
+  for valid, replayed, tampered and rotating-key events. This runs in CI with
+  Deno 2.
+- `npm run test:consent` — 7 tests over the pure consent builder: only enabled
   marketing channels produce a record, each enabled channel appears once, an
   unchecked box is stored as `granted: false` with no timestamp, and a blank or
   bracketed placeholder seller produces no marketing record or disclosure. CI
   runs it with Node's test runner through `tsx`.
+- `npm run test:engine` — 6 tests over branch pruning, payload integrity, blank
+  answers and current-crisis behaviour.
+- `npm run check:server-bank` and `npm run check:server-policy` — fail if the
+  server’s canonical bank or consent wording drifts from the client source.
 - `npm run report:reconciliation` — regenerates the review document from the
   data (92 rows, 28 gaps).
-- Browser walkthrough (preview mode): lead form with validation errors, consent
-  capture, permission gate, prefilled residence with “please check” label,
-  Yes + compound fields, branch appearing when diabetes = Yes (37 → 38
-  questions), supplemental labelling, review with 31 unanswered items, review
-  confirmation enabling submission, explicit “Submit for Richard’s Review”,
-  case reference, honest `not_sent` timeline, reviewer sign-in gate, case review
-  with draft summary/flags/consent evidence, “mark as reviewed” logging,
-  recording a post-submission correction and confirming it appears separately
-  while the original answer is unchanged, and the current-crisis panel with
-  988/911 links.
-- **Not run:** the Deno edge functions against a live Supabase project, real
-  email delivery, RLS enforcement against a live database, and MFA. The
-  `submit-case` handler's consent gate is covered by the Deno test above.
+- Isolated PostgreSQL (PGlite) replay of migrations 0001–0003, including AAL2
+  denial, opened-log dedupe, immutable triage columns, duplicate idempotency key
+  rejection, notification claim races, monotonic delivery events, durable rate
+  limits, revocation, retention and audited deletion — 0 failures.- **Not run during this remediation:** a fresh browser walkthrough of the
+  changed screens. The manual script is in [docs/LAUNCH-GATES.md](docs/LAUNCH-GATES.md);
+  earlier preview-mode observations are not treated as evidence for these edits.
+- **Not run:** the functions against a live Supabase project, real email
+  delivery or inbox receipt, live RLS/MFA step-up, provider signature
+  compatibility, cron execution, backups, retention execution or a production
+  accessibility/load pass. The isolated PGlite replay is not a hosted-database
+  verification.
 
 ## Regulatory note
 

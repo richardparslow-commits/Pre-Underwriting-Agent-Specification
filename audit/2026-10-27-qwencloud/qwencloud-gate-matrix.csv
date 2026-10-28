@@ -1,0 +1,11 @@
+gate,name,status,reason
+"1","Question coverage and sensitive restrictions","FAIL","113 source items inventoried; 85 traced, 19 partial, 9 out of scope; 92 rows with 0 sourceVerified; seven windows replaced and 11 wording changes."
+"2","Branch coverage and distinct timeframes","PARTIAL","14 declarative branches and an unconditional crisis question work; seven timeframe substitutions and orphaned branch details remain."
+"3","Answer integrity","PARTIAL","Answer states are distinct and blank becomes unresolved, but hidden children retain fields and the crisis flag is client-authored."
+"4","Review and explicit submission","PARTIAL","Client invalidation and required acknowledgement work, but the server accepts arbitrary acknowledgements and there is no submission idempotency."
+"5","Consent separation and withdrawal","PARTIAL","Marketing is off by default and required permissions are enforced, but consent evidence is client-asserted and revocation/suppression is unimplemented."
+"6","Recipient control","PASS","Recipient is a server constant with an allowlist; a probe confirmed an injected recipient falls back and the email contains no health, name or DOB content. Not tested with a live provider."
+"7","Secure access","PARTIAL","Both migrations replay and 25 isolated RLS/RPC/immutability checks pass; live Supabase RLS is unverified and no policy or client check requires AAL2, so MFA enrollment is not enforcement."
+"8","Delivery reliability","FAIL","No idempotency, no retry claiming, duplicate-send and webhook-regression paths, no provider test, and confirmation copy can say 'queued' when nothing was sent."
+"9","Leak prevention","PARTIAL","No analytics, browser storage, URL answers or secret in the bundle; held sensitive source text is shown to customers, no retention/deletion control exists and live logs were unavailable."
+"10","Human review of consequential actions","PASS","No automated eligibility, rate or carrier action; reviewer actions are logged and corrections are append-only. Live reviewer access not tested."
