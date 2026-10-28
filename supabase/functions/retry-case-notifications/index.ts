@@ -10,10 +10,14 @@
  * Reliability rules:
  *   * the worker claims a row with `claim_case_notification` before sending;
  *     an overlapping invocation gets no row and sends nothing,
- *   * the provider idempotency key is the stable case reference; the provider's
- *     24-hour deduplication window does not cover this worker's seven-day range,
+ *   * the provider idempotency key is the stable case reference and the provider
+ *     honours it for 24 hours, so no case is claimed more than 24 hours after
+ *     its first send attempt; anything that falls out is listed in
+ *     `public.notification_retry_backlog` for operator review rather than being
+ *     retried into a possible duplicate,
  *   * `not_sent` is eligible once a provider is configured, which recovers
- *     cases submitted before email was set up,
+ *     cases submitted before email was set up. A never-attempted case has no
+ *     first-attempt time, so it keeps the seven-day submission window,
  *   * attempts and backoff are persisted; no state is kept in memory.
  */
 
@@ -24,6 +28,8 @@ const MAX_ATTEMPTS = 5;
 const BATCH_SIZE = 20;
 const MIN_AGE_MS = 2 * 60 * 1000;
 const MAX_AGE_DAYS = 7;
+/** Matches the provider's documented Idempotency-Key window. */
+const FIRST_ATTEMPT_WINDOW_HOURS = 24;
 
 function portalOrigin(): string {
   const raw = Deno.env.get("APP_ORIGIN") ?? "";
@@ -75,6 +81,11 @@ Deno.serve(async (req: Request) => {
   const now = Date.now();
   const olderThan = new Date(now - MIN_AGE_MS).toISOString();
   const newerThan = new Date(now - MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  // Second precision keeps the PostgREST filter unambiguous. The claim function
+  // enforces the same bound, so this filter is a batch-starvation guard only.
+  const firstAttemptCutoff = new Date(now - FIRST_ATTEMPT_WINDOW_HOURS * 60 * 60 * 1000)
+    .toISOString()
+    .replace(/\.\d{3}Z$/, "Z");
 
   const supabase = serviceClient();
 
@@ -84,6 +95,11 @@ Deno.serve(async (req: Request) => {
     .in("notification_state", ["queued", "failed", "not_sent"])
     .lt("notification_attempts", MAX_ATTEMPTS)
     .gt("submitted_at", newerThan)
+    // Never re-send after the provider idempotency key has expired. Old rows are
+    // reported through notification_retry_backlog for a human decision.
+    .or(
+      `notification_first_attempted_at.is.null,notification_first_attempted_at.gt.${firstAttemptCutoff}`,
+    )
     .order("submitted_at", { ascending: true })
     .limit(BATCH_SIZE);
 

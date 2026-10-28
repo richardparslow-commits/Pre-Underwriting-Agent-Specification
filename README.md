@@ -26,7 +26,7 @@ service. The following are deliberate, visible gaps:
 | Language-model explainer | **Not wired.** The interview engine is deterministic. `FEATURES.aiExplainerEnabled = false`, so the customer copy does not claim an AI assistant is active. |
 | Email notification | Implemented against Resend in a Supabase edge function; no provider key is configured here, so the UI reports `not_sent` honestly. |
 | Marketing revocation | A customer form at `/marketing-opt-out` matches the case reference plus the email or phone on file, writes the suppression and audit rows immediately, and queues a vendor-sync row. The form sends an idempotency key; migration `0008` makes a retry a no-op, so it cannot duplicate evidence or re-open a synced outbox row. A server-only sender gate refuses unlicensed states and phone sends outside 08:00–21:00 local time, conservatively in every time zone of the state. The licensed-state list is empty by default, no provider adapter exists and no vendor endpoint is configured, so every channel remains disabled. |
-| Supabase deployment | Applied and exercised on a non-production staging project on 28 Oct 2026: migrations 0001–0005 are applied; the 0005 `case_summaries` view, its grants and the AAL1/AAL2 boundary were verified; and a live AAL2 queue response was captured with a labelled temporary reviewer. No edge-function or production deployment is recorded, and no live provider delivery, scheduler run or retention execution exists. Forward migrations 0006 (terminal notification state), 0007 (marketing revocation) and 0008 (revocation replay safety) are not applied there. |
+| Supabase deployment | Applied and exercised on a non-production staging project on 28 Oct 2026: migrations 0001–0005 are applied; the 0005 `case_summaries` view, its grants and the AAL1/AAL2 boundary were verified; and a live AAL2 queue response was captured with a labelled temporary reviewer. No edge-function or production deployment is recorded, and no live provider delivery, scheduler run or retention execution exists. Forward migrations 0006 (terminal notification state), 0007 (marketing revocation), 0008 (revocation replay safety), 0009 (audited case reads) and 0010 (notification retry window) are not applied there. |
 | Retention / deletion job | Deletion and expiry functions are implemented in `0003_reliability_and_access.sql`; the schedule stays unset (`retention_months = null`) until counsel approves it. |
 | Carrier screening, quoting, rate classes | Intentionally absent. |
 
@@ -103,6 +103,8 @@ supabase/
   migrations/0006_notification_terminal_state.sql
   migrations/0007_marketing_revocation.sql
   migrations/0008_marketing_revocation_idempotency.sql
+  migrations/0009_audited_case_access.sql
+  migrations/0010_notification_retry_window.sql
   ops/retry-schedule.sql         operator-applied pg_cron schedule
   functions/submit-case/         public intake, server-generated reference
   functions/revoke-marketing/    public opt-out, reference plus contact match
@@ -237,19 +239,23 @@ In Supabase (or Lovable Cloud) run the migrations in order:
 [`0004_reviewer_write_paths.sql`](supabase/migrations/0004_reviewer_write_paths.sql),
 [`0005_case_summary_view.sql`](supabase/migrations/0005_case_summary_view.sql),
 [`0006_notification_terminal_state.sql`](supabase/migrations/0006_notification_terminal_state.sql),
-[`0007_marketing_revocation.sql`](supabase/migrations/0007_marketing_revocation.sql) and
-[`0008_marketing_revocation_idempotency.sql`](supabase/migrations/0008_marketing_revocation_idempotency.sql).
+[`0007_marketing_revocation.sql`](supabase/migrations/0007_marketing_revocation.sql),
+[`0008_marketing_revocation_idempotency.sql`](supabase/migrations/0008_marketing_revocation_idempotency.sql),
+[`0009_audited_case_access.sql`](supabase/migrations/0009_audited_case_access.sql) and
+[`0010_notification_retry_window.sql`](supabase/migrations/0010_notification_retry_window.sql).
 They create the reviewer allowlist, immutable cases, review log, corrections,
 suppressions, idempotency, notification leases, delivery-event dedupe, durable
 rate limiting, AAL2 reviewer policies, RPC-only reviewer writes, a payload-free
 queue summary view, audited deletion, the opt-in retention job, a terminal
 delivery state enforced by both the completion RPC and a table trigger, and a
 customer marketing-revocation path with a vendor-sync outbox, replay-safe
-idempotency and an outbound send guard. Do not stop after 0001: the portal's correction
+idempotency and an outbound send guard, audited reviewer reads, and a
+notification retry window that cannot outlive the provider's idempotency key.
+Do not stop after 0001: the portal's correction
 action needs 0002, the reliability controls need 0003 and 0004, a database
 that already ran 0003 still needs 0006 because editing an applied migration
-does not change it, and the customer opt-out needs 0007 plus the replay guard
-in 0008.
+does not change it, the customer opt-out needs 0007 plus the replay guard
+in 0008, audited case reads need 0009, and the retry-window guard needs 0010.
 
 ### 2. Create the reviewer
 
@@ -310,6 +316,16 @@ relies on an operator remembering them. Apply
 [`supabase/ops/retry-schedule.sql`](supabase/ops/retry-schedule.sql) after
 storing `project_url` and `cron_secret` in Vault to run the notification worker
 every five minutes.
+
+The worker sends with the case reference as the provider idempotency key. The
+provider honours that key for 24 hours, so `0010` stamps the first send attempt
+and refuses any later automatic claim once that window has passed. A case that
+falls out is listed in `public.notification_retry_backlog` for a human decision
+instead of being retried into a possible duplicate. Cases that never had a send
+attempted — for example, submitted while no provider was configured — keep the
+seven-day recovery window. The 24-hour figure is the provider's documented
+contract, not something this repository can verify; see
+[docs/OPERATIONS.md](docs/OPERATIONS.md#notification-retries).
 
 `submit-case` enforces an Origin allowlist, a streaming 512 KiB byte cap, a
 92-row completeness check, server-side canonical validation, and a durable
@@ -465,13 +481,14 @@ is the reviewer's signature in the report.
 - `npm run report:reconciliation` — regenerates the review document from the
   data (92 rows, 28 gaps).
 - `npm run check:db` — isolated PostgreSQL (PGlite) replay of migrations
-  0001–0008, including AAL2 denial, the payload-free queue summary, RPC-only
+  0001–0010, including AAL2 denial, the payload-free queue summary, RPC-only
   reviewer writes, opened-log dedupe, immutable triage columns, duplicate
   idempotency key rejection, notification claim races, monotonic delivery
   events, terminal delivery through both the RPC and a direct-write trigger,
-  unmatched-event retry, durable rate limits, customer marketing revocation,
-  revocation replay safety, outbound suppression denial, vendor-sync queueing,
-  retention and audited deletion — 0 failures.
+  unmatched-event retry, the 24-hour first-attempt retry cap and its operator
+  backlog, durable rate limits, customer marketing revocation, revocation
+  replay safety, outbound suppression denial, vendor-sync queueing, retention
+  and audited deletion — 0 failures.
 - `npm run check:marketing` — fails if a state or IANA zone is missing, the
   licensed-state list stops defaulting to empty, the idempotency key stops being
   hashed, or the sender drops the policy or database guard before `deliver`.
