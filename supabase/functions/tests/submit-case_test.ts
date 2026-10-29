@@ -137,6 +137,58 @@ Deno.test("rejects a draft missing the privacy acknowledgement", async () => {
   );
 });
 
+Deno.test("a submission with no email provider is stored unclaimed and stays retryable", async () => {
+  Deno.env.set("QUESTIONNAIRE_APPROVED", "true");
+  Deno.env.set("SUPABASE_URL", "http://supabase.test");
+  Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "service-role-test");
+  Deno.env.delete("RESEND_API_KEY");
+
+  const calls: string[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? "GET";
+    calls.push(`${method} ${url}`);
+    if (url.includes("/rest/v1/cases") && method === "GET") {
+      return Promise.resolve(new Response("[]", { status: 200, headers: { "content-type": "application/json" } }));
+    }
+    if (url.includes("/rest/v1/cases")) {
+      return Promise.resolve(new Response("", { status: 201 }));
+    }
+    if (url.includes("/rest/v1/rpc/")) {
+      return Promise.resolve(
+        new Response("null", { status: 200, headers: { "content-type": "application/json" } }),
+      );
+    }
+    return Promise.resolve(new Response("[]", { status: 200, headers: { "content-type": "application/json" } }));
+  }) as typeof fetch;
+
+  try {
+    const response = await submit(buildValidDraft(), "no-provider-0001");
+    const body = (await response.json()) as { notification?: { state?: string } };
+
+    assertEquals(response.status, 201);
+    assertEquals(body.notification?.state, "not_sent");
+    // Claiming would stamp the provider idempotency window (0010), so with
+    // nothing to send the handler must record the state without a lease.
+    assertEquals(
+      calls.some((call) => call.includes("claim_case_notification")),
+      false,
+      "the submit path claimed a notification it could not send",
+    );
+    assertEquals(
+      calls.some((call) => call.includes("complete_case_notification")),
+      true,
+      "the honest not_sent state was not recorded",
+    );
+    assertEquals(calls.some((call) => call.includes("api.resend.com")), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    Deno.env.delete("SUPABASE_URL");
+    Deno.env.delete("SUPABASE_SERVICE_ROLE_KEY");
+  }
+});
+
 Deno.test("rejects a multibyte body above the 512 KiB byte budget with 413", async () => {
   Deno.env.set("QUESTIONNAIRE_APPROVED", "true");
   if (!handler) throw new Error("submit-case handler was not captured");
