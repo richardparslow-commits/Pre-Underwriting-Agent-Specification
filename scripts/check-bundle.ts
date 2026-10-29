@@ -46,15 +46,25 @@ const bundles = files.map((file) => ({
 const failures: string[] = [];
 
 function probe(label: string, text: string) {
-  // Prefix probes catch a minifier that changes quoting or escaping while
-  // still retaining the wording. Skip fragments too short to be distinctive.
-  const value = text.length > 60 ? text.slice(0, 60) : text;
-  if (value.length < 20) return;
+  // Short strings are matched whole. Longer ones are probed at the start,
+  // middle and end, because a 60-character prefix only covers one part of the
+  // wording and a minifier can change quoting or escaping elsewhere.
+  const fragments =
+    text.length <= 400
+      ? [text]
+      : [
+          text.slice(0, 60),
+          text.slice(Math.floor(text.length / 2) - 30, Math.floor(text.length / 2) + 30),
+          text.slice(-60),
+        ];
 
-  for (const bundle of bundles) {
-    if (bundle.content.includes(value)) {
-      failures.push(`${bundle.file} contains ${label}`);
-      return;
+  for (const fragment of fragments) {
+    if (fragment.trim().length < 20) continue;
+    for (const bundle of bundles) {
+      if (bundle.content.includes(fragment)) {
+        failures.push(`${bundle.file} contains ${label}`);
+        return;
+      }
     }
   }
 }
