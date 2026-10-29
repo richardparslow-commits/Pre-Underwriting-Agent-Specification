@@ -34,6 +34,15 @@ requireMarker("src/features/portal/MfaGate.tsx", gate, "mfa.enroll", "a reviewer
 requireMarker("src/features/portal/MfaGate.tsx", gate, "mfa.challenge", "an enrolled factor cannot be challenged");
 requireMarker("src/features/portal/MfaGate.tsx", gate, "mfa.verify", "a challenge cannot be completed");
 requireMarker("src/features/portal/MfaGate.tsx", gate, "mfa.unenroll", "abandoned enrolments would accumulate");
+requireMarker("src/features/portal/MfaGate.tsx", gate, "src={qrCode}", "the QR image must use the data URL auth-js already returns");
+// auth-js already prefixes `totp.qr_code` with `data:image/svg+xml;utf-8,`.
+// Wrapping it again produced a broken image that no source-substring check
+// noticed, so the double prefix is now forbidden explicitly.
+if (gate.includes("encodeURIComponent(qrCode)")) {
+  failures.push(
+    "src/features/portal/MfaGate.tsx re-encodes totp.qr_code; auth-js already returns a data URL, so the QR image will not render",
+  );
+}
 
 const portal = read("src/pages/PortalPage.tsx");
 requireMarker("src/pages/PortalPage.tsx", portal, "<MfaGate", "the portal must render the in-app step-up");

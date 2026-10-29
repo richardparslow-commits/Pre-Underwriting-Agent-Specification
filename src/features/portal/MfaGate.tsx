@@ -158,8 +158,11 @@ export function MfaGate({ email, onVerified, onLeave }: MfaGateProps) {
               Scan this code with an authenticator app, or enter the setup key manually. The key is
               shown once and is never stored by this site.
             </p>
+            {/* `totp.qr_code` is already a `data:image/svg+xml;utf-8,…` URL:
+                @supabase/auth-js prefixes it before returning. Prefixing again
+                renders a broken image. */}
             <img
-              src={`data:image/svg+xml;utf-8,${encodeURIComponent(qrCode)}`}
+              src={qrCode}
               alt="Authenticator setup QR code"
               className="mx-auto h-44 w-44 rounded-md border border-border bg-white p-2"
             />
