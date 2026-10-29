@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "check:bank": "tsx scripts/check-bank.ts",
     "check:docs": "tsx scripts/check-docs.ts",
+    "check:sc01": "tsx scripts/check-sc01-gate.ts",
     "check:bundle": "tsx scripts/check-bundle.ts",
     "check:portal": "tsx scripts/check-portal-auth.ts",
     "check:marketing": "tsx scripts/check-marketing.ts",
