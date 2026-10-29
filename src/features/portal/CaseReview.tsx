@@ -605,6 +605,12 @@ export function CaseReview({
 
           <section className="panel p-5">
             <h2 className="text-base font-medium">Human review log</h2>
+            {(record.reviewLogTotal ?? record.reviewLog.length) > record.reviewLog.length ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Showing the latest {record.reviewLog.length} of {record.reviewLogTotal} entries.
+                Earlier actions remain recorded; consequential actions are always shown first.
+              </p>
+            ) : null}
             <ul className="mt-3 space-y-2">
               {record.reviewLog.length === 0 ? (
                 <li className="text-xs text-muted-foreground">No review activity recorded yet.</li>

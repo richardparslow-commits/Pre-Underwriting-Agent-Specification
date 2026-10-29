@@ -37,6 +37,7 @@ as $$
 declare
   v_case public.cases%rowtype;
   v_log jsonb;
+  v_log_total integer;
   v_corrections jsonb;
   v_revocations jsonb;
 begin
@@ -54,11 +55,33 @@ begin
   insert into public.case_review_log (case_id, action, actor, note)
   values (v_case.id, 'opened', coalesce(auth.jwt() ->> 'email', auth.uid()::text), null);
 
-  select coalesce(jsonb_agg(to_jsonb(x) order by x.created_at desc), '[]'::jsonb)
-    into v_log from (
-      select action, actor, created_at, note from public.case_review_log
-      where case_id = v_case.id order by created_at desc, id desc limit 20
-    ) x;
+  select count(*)::integer into v_log_total
+  from public.case_review_log
+  where case_id = v_case.id;
+
+  -- Twenty opens must not bury a `marked_reviewed` or `requested_clarification`.
+  -- Consequential actions sort first (`is_open` false before true); the
+  -- aggregate strips the sort key and the row id so the JSON shape is stable.
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'action', action,
+        'actor', actor,
+        'created_at', created_at,
+        'note', note
+      )
+      order by is_open, created_at desc, id desc
+    ),
+    '[]'::jsonb
+  )
+  into v_log
+  from (
+    select action, actor, created_at, note, id, (action = 'opened') as is_open
+    from public.case_review_log
+    where case_id = v_case.id
+    order by (action = 'opened'), created_at desc, id desc
+    limit 20
+  ) x;
   select coalesce(jsonb_agg(to_jsonb(x) order by x.created_at desc), '[]'::jsonb)
     into v_corrections from (
       select id, detail, recorded_by, created_at from public.case_corrections
@@ -80,7 +103,8 @@ begin
       'notification_updated_at', v_case.notification_updated_at,
       'crisis_disclosure', v_case.crisis_disclosure
     ),
-    'review_log', v_log, 'corrections', v_corrections, 'revocations', v_revocations
+    'review_log', v_log, 'review_log_total', v_log_total,
+    'corrections', v_corrections, 'revocations', v_revocations
   );
 end;
 $$;

@@ -317,6 +317,8 @@ export interface CaseRecord extends CaseDraft {
   status: CaseStatus;
   notification: NotificationRecord;
   reviewLog: ReviewLogEntry[];
+  /** Total audit entries stored, so the window can be described honestly. */
+  reviewLogTotal?: number;
   corrections: CorrectionRecord[];
   /** Append-only withdrawal evidence; the submitted consent snapshot is unchanged. */
   marketingRevocations: MarketingRevocationRecord[];

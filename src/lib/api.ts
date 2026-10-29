@@ -509,6 +509,7 @@ export async function getCase(reference: string): Promise<CaseRecord | null> {
   const result = data as {
     case: CaseRow;
     review_log: Array<{ action: string; actor: string; created_at: string; note: string | null }>;
+    review_log_total?: number;
     corrections: Array<{ id: number; detail: string; recorded_by: string; created_at: string }>;
     revocations: Array<{ channel: string; reason: string | null; source: string; recorded_by: string; created_at: string }>;
   };
@@ -541,7 +542,13 @@ export async function getCase(reference: string): Promise<CaseRecord | null> {
       }))
     : [];
 
-  return { ...record, reviewLog, corrections, marketingRevocations };
+  return {
+    ...record,
+    reviewLog,
+    reviewLogTotal: Number(result.review_log_total ?? reviewLog.length),
+    corrections,
+    marketingRevocations,
+  };
 }
 
 export async function recordCorrection(reference: string, detail: string): Promise<void> {
