@@ -521,3 +521,12 @@ entity, its role and its vendors. The specification’s launch gates — counsel
 review of the sensitive questions, authorized wording, TCPA disclosure, state and
 carrier restrictions, retention schedule and vendor arrangements — remain
 outstanding and are tracked in [docs/LAUNCH-GATES.md](docs/LAUNCH-GATES.md).
+
+
+## Heal reviewer visibility repairs
+
+[Review-history pagination and queue-wide safety disclosures](docs/HEAL-REVIEWER-VISIBILITY.md)
+require forward migration `0012` and the matching portal build. These fixes are
+separate from the `0011` queue-permissions/submission-integrity repair. The
+application remains in testing; deployment evidence and other Heal defects
+remain outstanding.
