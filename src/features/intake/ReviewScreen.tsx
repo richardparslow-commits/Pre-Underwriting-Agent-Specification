@@ -298,7 +298,7 @@ export function ReviewScreen({
         </label>
 
         {error ? (
-          <Alert tone="danger" title="Nothing was sent">
+          <Alert tone="danger" title="Submission needs attention">
             {error}
           </Alert>
         ) : null}

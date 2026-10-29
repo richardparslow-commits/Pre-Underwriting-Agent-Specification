@@ -32,6 +32,8 @@ import {
 } from "../_shared/case.ts";
 import { notificationDetailForStorage, sendCaseNotification } from "../_shared/email.ts";
 
+import { sameSubmissionContent } from "../_shared/submission-content.ts";
+
 const MAX_BODY_BYTES = 512 * 1024;
 const REFERENCE_ATTEMPTS = 5;
 
@@ -41,6 +43,7 @@ function portalOrigin(): string {
 }
 
 interface ReceiptRow {
+  payload: unknown;
   reference: string;
   submitted_at: string;
   status: string;
@@ -107,6 +110,16 @@ function receiptFromRow(row: ReceiptRow, replayed = false) {
     },
     replayed,
   };
+}
+
+function replayResponse(row: ReceiptRow, draft: unknown, origin: string): Response {
+  if (!sameSubmissionContent(row.payload, draft)) {
+    return jsonResponse({
+      code: "submission_conflict",
+      error: `Case ${row.reference} was already saved with different content. Your changes were not saved. Contact Richard to record a correction to this case; do not start a duplicate submission.`,
+    }, 409, origin);
+  }
+  return jsonResponse(receiptFromRow(row, true), 200, origin);
 }
 
 Deno.serve(async (req: Request) => {
@@ -226,7 +239,7 @@ Deno.serve(async (req: Request) => {
   const existing = await supabase
     .from("cases")
     .select(
-      "reference, submitted_at, status, notification_state, notification_attempts, notification_detail, notification_updated_at",
+      "reference, submitted_at, status, notification_state, notification_attempts, notification_detail, notification_updated_at, payload",
     )
     .eq("idempotency_key", idempotencyKey)
     .maybeSingle();
@@ -234,14 +247,14 @@ Deno.serve(async (req: Request) => {
   if (existing.error) {
     console.error("Idempotency lookup failed", existing.error.code);
     return jsonResponse(
-      { error: "The case could not be saved. Nothing was sent. Please try again." },
+      { error: "We could not confirm whether this case was saved. Retry without changing your answers." },
       500,
       origin,
     );
   }
 
   if (existing.data) {
-    return jsonResponse(receiptFromRow(existing.data, true), 200, origin);
+    return replayResponse(existing.data, draft, origin);
   }
 
   // ---- Create the case first, before any notification is attempted --------
@@ -293,13 +306,13 @@ Deno.serve(async (req: Request) => {
       const replay = await supabase
         .from("cases")
         .select(
-          "reference, submitted_at, status, notification_state, notification_attempts, notification_detail, notification_updated_at",
+          "reference, submitted_at, status, notification_state, notification_attempts, notification_detail, notification_updated_at, payload",
         )
         .eq("idempotency_key", idempotencyKey)
         .maybeSingle();
 
       if (replay.data) {
-        return jsonResponse(receiptFromRow(replay.data, true), 200, origin);
+        return replayResponse(replay.data, draft, origin);
       }
 
       // Otherwise the collision was the reference: retry with a new one.
@@ -312,7 +325,7 @@ Deno.serve(async (req: Request) => {
     // Deliberately not logging error details: they can embed submitted values.
     console.error("Case creation failed", (lastError as { code?: string } | null)?.code ?? "unknown");
     return jsonResponse(
-      { error: "The case could not be saved. Nothing was sent. Please try again." },
+      { error: "We could not confirm whether this case was saved. Retry without changing your answers." },
       500,
       origin,
     );

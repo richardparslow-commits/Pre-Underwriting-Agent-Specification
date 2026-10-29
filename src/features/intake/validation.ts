@@ -1,3 +1,4 @@
+import { leadTextErrors } from "../../../supabase/functions/_shared/lead-validation";
 import type { LeadDetails } from "@/features/interview/types";
 
 export type LeadErrors = Partial<Record<keyof LeadDetails, string>>;
@@ -80,7 +81,7 @@ export function validateLead(lead: Partial<LeadDetails>): LeadErrors {
     errors.phone = "A phone number is needed for the contact method you chose.";
   }
 
-  return errors;
+  return { ...errors, ...leadTextErrors(lead) };
 }
 
 export function formatUsPhone(value: string): string {

@@ -10,6 +10,7 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.118.0";
 import { QUESTIONNAIRE_VERSION, SERVER_BANK } from "./bank.generated.ts";
 import { CONSENT_POLICY } from "./policy.generated.ts";
+import { leadTextErrors } from "./lead-validation.ts";
 
 // -----------------------------------------------------------------------------
 // CORS
@@ -622,6 +623,9 @@ export function validateDraft(body: unknown): ValidationResult {
 
   if (!isRecord(body.lead)) return { ok: false, reason: "Invalid contact details" };
   const leadInput = body.lead;
+  // Reject supplied values before optionalText can collapse overflow to absent.
+  const leadError = Object.values(leadTextErrors(leadInput))[0];
+  if (leadError) return { ok: false, reason: leadError };
 
   const firstName = text(leadInput.firstName, 100);
   const lastName = text(leadInput.lastName, 100);
