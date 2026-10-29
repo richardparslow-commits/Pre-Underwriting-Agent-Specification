@@ -116,3 +116,28 @@ jobs:
       # the public JavaScript. This is the bundle-level M-11 regression guard.
       - name: No source wording in the public bundle
         run: npm run check:bundle
+
+      # Enforcement is a branch decision, not a check decision: a push to a
+      # protected branch must go red until the gate closes, while a pull request
+      # reports a warning so everyday work is not blocked on a signature only
+      # the owner can provide. Add a branch to the pattern list to protect it.
+      - name: Scope the SC-01 gate to protected branches
+        run: |
+          enforce=0
+          case "${GITHUB_EVENT_NAME}:${GITHUB_REF_NAME}" in
+            push:main|push:release) enforce=1 ;;
+          esac
+          echo "SC01_ENFORCE=${enforce}" >> "$GITHUB_ENV"
+
+      # Deliberately last: a failing step aborts the job, so placing this
+      # earlier would hide typecheck, build and every other check while the
+      # gate is open.
+      #
+      # Enforced on a push to a protected branch (see the step above): red there
+      # means the gate is closed, not merely self-consistent. On a pull request
+      # an open gate is a warning. A resolution recorded before the owner
+      # attested, or a completed attestation the registers never picked up,
+      # fails on every branch. Fix by completing the attestation and updating
+      # the registers, never by deleting the step.
+      - name: SC-01 closure gate is closed and consistent
+        run: npm run check:sc01
