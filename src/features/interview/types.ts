@@ -285,7 +285,14 @@ export type CaseStatus =
   | "reviewed"
   | "needs_clarification";
 
+export interface ReviewHistoryCursor {
+  at: string;
+  /** PostgreSQL bigint remains text so cursor ties never lose precision. */
+  id: string;
+}
+
 export interface ReviewLogEntry {
+  id?: string;
   action: "opened" | "marked_reviewed" | "requested_clarification";
   actor: string;
   at: string;
@@ -317,6 +324,8 @@ export interface CaseRecord extends CaseDraft {
   status: CaseStatus;
   notification: NotificationRecord;
   reviewLog: ReviewLogEntry[];
+  /** Undefined means an older server could not establish history completeness. */
+  reviewHistoryCursor?: ReviewHistoryCursor | null;
   corrections: CorrectionRecord[];
   /** Append-only withdrawal evidence; the submitted consent snapshot is unchanged. */
   marketingRevocations: MarketingRevocationRecord[];

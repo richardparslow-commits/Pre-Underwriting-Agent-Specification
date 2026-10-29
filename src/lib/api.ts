@@ -1,3 +1,5 @@
+import { initialReviewHistory, readReviewHistory, readSafetyDisclosures } from "./reviewerVisibility";
+import type { ReviewHistoryPage, SafetyCursor, SafetyPage } from "./reviewerVisibility";
 import { PREVIEW_MODE, SUBMIT_CASE_URL, SUPABASE_ANON_KEY, SITE } from "@/config/site";
 import { supabase } from "@/integrations/supabase/client";
 import { buildConsentRecords, SUBMISSION_ACKNOWLEDGEMENT_TEXT, CONSENT_VERSION } from "@/features/consent/consentTexts";
@@ -14,6 +16,7 @@ import type {
   NotificationRecord,
   NotificationState,
   ReviewLogEntry,
+  ReviewHistoryCursor,
   SubmittedAnswer,
   SubmissionReceipt,
 } from "@/features/interview/types";
@@ -490,10 +493,32 @@ export async function listCases(cursor?: string): Promise<CasePage> {
   };
 }
 
+/** Independent of normal queue pagination; no full case payload is selected. */
+export async function listSafetyDisclosures(cursor?: SafetyCursor): Promise<SafetyPage> {
+  if (PREVIEW_MODE) {
+    ensurePreviewSeed();
+    const items = [...previewCases.values()].filter((record) => record.crisisDisclosure)
+      .map(({ reference, submittedAt, status }) => ({ reference, submittedAt, status }));
+    return { items, total: items.length, nextCursor: null };
+  }
+  if (!supabase) throw new Error("Safety disclosures could not be checked: sign-in is not configured.");
+  return readSafetyDisclosures(supabase, cursor);
+}
+
+export async function listCaseReviewHistory(reference: string, cursor?: ReviewHistoryCursor): Promise<ReviewHistoryPage> {
+  if (PREVIEW_MODE) {
+    ensurePreviewSeed();
+    return { items: previewCases.get(reference)?.reviewLog ?? [], nextCursor: null };
+  }
+  if (!supabase) throw new Error("Review history could not be loaded: sign-in is not configured.");
+  return readReviewHistory(supabase, reference, cursor);
+}
+
 export async function getCase(reference: string): Promise<CaseRecord | null> {
   if (PREVIEW_MODE) {
     ensurePreviewSeed();
-    return previewCases.get(reference) ?? null;
+    const record = previewCases.get(reference);
+    return record ? { ...record, reviewHistoryCursor: null } : null;
   }
 
   if (!supabase) throw new Error("Sign-in is not configured.");
@@ -508,19 +533,13 @@ export async function getCase(reference: string): Promise<CaseRecord | null> {
 
   const result = data as {
     case: CaseRow;
-    review_log: Array<{ action: string; actor: string; created_at: string; note: string | null }>;
+    review_log_cursor?: unknown;
+    review_log: Array<{ id?: string; action: string; actor: string; created_at: string; note: string | null }>;
     corrections: Array<{ id: number; detail: string; recorded_by: string; created_at: string }>;
     revocations: Array<{ channel: string; reason: string | null; source: string; recorded_by: string; created_at: string }>;
   };
   const record = fromRow(result.case);
-  const reviewLog: ReviewLogEntry[] = Array.isArray(result.review_log)
-    ? result.review_log.map((entry) => ({
-        action: entry.action as ReviewLogEntry["action"],
-        actor: String(entry.actor ?? ""),
-        at: String(entry.created_at ?? ""),
-        note: typeof entry.note === "string" ? entry.note : undefined,
-      }))
-    : [];
+  const { reviewLog, reviewHistoryCursor } = initialReviewHistory(result);
 
   const corrections: CorrectionRecord[] = Array.isArray(result.corrections)
     ? result.corrections.map((entry) => ({
@@ -541,7 +560,10 @@ export async function getCase(reference: string): Promise<CaseRecord | null> {
       }))
     : [];
 
-  return { ...record, reviewLog, corrections, marketingRevocations };
+  return {
+    ...record, reviewLog, corrections, marketingRevocations,
+    reviewHistoryCursor,
+  };
 }
 
 export async function recordCorrection(reference: string, detail: string): Promise<void> {
