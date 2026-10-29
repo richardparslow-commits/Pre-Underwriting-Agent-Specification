@@ -48,6 +48,8 @@ A6 compares the attached *Life Policy Pilot — Pre-Underwriting Agent Specifica
 
 [`2026-10-28-deployment-rehearsal.md`](2026-10-28-deployment-rehearsal.md) records the attempted hosted rehearsal. It is **blocked before deployment**: no Supabase token, linked project, Docker runtime or Resend key was available. It produces no live evidence and does not close any gate.
 
+[`2026-10-28-staging-evidence-template/`](2026-10-28-staging-evidence-template/README.md) is the record template for the `0006`–`0010` staging run in [`docs/STAGING-RUNBOOK.md`](../docs/STAGING-RUNBOOK.md). It supplies the per-step `Actual`/`Verdict` rows, the expected value for each check, the eight log names and the manifest and redaction procedure. It is a template, not evidence: copying it proves nothing until the table is filled from a run and hashed.
+
 ## What each package contains
 
 - **A1:** full 18-finding report, issue register in Markdown/JSON/CSV, questionnaire matrix and reconciliation decisions.
@@ -95,6 +97,7 @@ Each package carries its own hash manifest:
 - [`2026-10-28-master-remediation/MANIFEST.sha256`](2026-10-28-master-remediation/MANIFEST.sha256)
 - [`2026-10-28-notification-terminal-migration/MANIFEST.sha256`](2026-10-28-notification-terminal-migration/MANIFEST.sha256)
 - [`2026-10-28-attached-snapshot-audit/MANIFEST.sha256`](2026-10-28-attached-snapshot-audit/MANIFEST.sha256)
+- [`2026-10-28-staging-evidence-template/MANIFEST.sha256`](2026-10-28-staging-evidence-template/MANIFEST.sha256)
 
 A3 does not currently have a package-level manifest; its raw evidence is preserved under [`2026-10-27-qwencloud/evidence/`](2026-10-27-qwencloud/evidence/).
 
