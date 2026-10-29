@@ -306,6 +306,9 @@ const DISPOSITIONS = new Set([
 
 const ANSWER_STATES = new Set(["yes", "no", "unknown", "declined", "not_applicable"]);
 
+/** Canonical summary for a compound row; the detail lives in its fields. */
+const COMPOUND_SUMMARY = "Details provided";
+
 const SERVER_BY_ID = new Map(SERVER_BANK.map((question) => [question.id, question]));
 
 /**
@@ -1010,8 +1013,27 @@ export function validateDraft(body: unknown): ValidationResult {
       continue;
     }
 
-    if (question.compound && entry.fields.length === 0) {
-      return { ok: false, reason: "The compound question is incomplete" };
+    // A compound answer is its structured fields, which are validated above
+    // against the bank's declared ids. The prose is not trusted: a crafted body
+    // could otherwise carry one value in `fields` and a different claim in
+    // `answerText`, both shown to the reviewer. The summary is canonical and
+    // matches what the browser's review screen displays.
+    if (question.compound) {
+      if (entry.fields.length === 0) {
+        return { ok: false, reason: "The compound question is incomplete" };
+      }
+      answers.push(
+        canonicalAnswer(
+          question,
+          "answered",
+          undefined,
+          entry.values,
+          entry.fields,
+          entry.details,
+          COMPOUND_SUMMARY,
+        ),
+      );
+      continue;
     }
 
     if (entry.answerText === "No answer recorded" || entry.answerText === "Not answered") {
@@ -1177,9 +1199,16 @@ const RATE_LIMIT = 10;
 const hits = new Map<string, number[]>();
 
 export function clientKey(req: Request): string {
+  // The platform sets `cf-connecting-ip`; `x-forwarded-for` is a chain the
+  // caller can prepend to. Prefer the platform header so a rotated
+  // `x-forwarded-for` cannot choose its own rate-limit bucket. The forwarded
+  // header remains the fallback for local and self-hosted runs.
+  const connecting = req.headers.get("cf-connecting-ip")?.trim();
+  if (connecting) return connecting;
+
   const forwarded = req.headers.get("x-forwarded-for") ?? "";
   const first = forwarded.split(",")[0]?.trim();
-  return first || req.headers.get("cf-connecting-ip") || "unknown";
+  return first || "unknown";
 }
 
 export function rateLimited(key: string, now = Date.now()): boolean {
