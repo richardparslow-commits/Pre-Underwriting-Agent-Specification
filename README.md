@@ -30,6 +30,12 @@ service. The following are deliberate, visible gaps:
 | Retention / deletion job | Deletion and expiry functions are implemented in `0003_reliability_and_access.sql`; the schedule stays unset (`retention_months = null`) until counsel approves it. |
 | Carrier screening, quoting, rate classes | Intentionally absent. |
 
+**Heal priority repair batch (29 Oct 2026):** [deployment and regression notes](docs/HEAL-PRIORITY-REPAIRS.md)
+cover read-only queue permissions, edited-payload replay conflicts and explicit
+lead-field limits. Deploy forward migration `0011` with the updated intake
+function/browser build; these changes have not been applied to a hosted project.
+Other Heal defects and the existing launch gates remain open.
+
 Preview mode (the default) is fully local: no backend, no email, no data leaves
 the browser tab.
 
@@ -105,6 +111,7 @@ supabase/
   migrations/0008_marketing_revocation_idempotency.sql
   migrations/0009_audited_case_access.sql
   migrations/0010_notification_retry_window.sql
+  migrations/0011_queue_read_only.sql
   ops/retry-schedule.sql         operator-applied pg_cron schedule
   functions/submit-case/         public intake, server-generated reference
   functions/revoke-marketing/    public opt-out, reference plus contact match

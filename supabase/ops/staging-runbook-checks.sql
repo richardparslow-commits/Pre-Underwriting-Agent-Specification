@@ -1,4 +1,4 @@
--- Life Policy Pilot — staging runbook checks (0006–0010)
+-- Life Policy Pilot — staging runbook checks (0006–0011)
 -- =============================================================================
 -- Read-only. Run in the Supabase SQL editor or with:
 --
@@ -131,6 +131,18 @@ with checks as (
   union all
   select '0010 — authenticated cannot read the retry backlog',
          not has_table_privilege('authenticated', 'public.notification_retry_backlog', 'SELECT')
+
+  -- 0011 — queue callers are read-only, including retained column ACLs
+  union all
+  select '0011 — authenticated queue is readable but not writable',
+         has_table_privilege('authenticated', 'public.case_summaries', 'SELECT')
+         and not has_table_privilege('authenticated', 'public.case_summaries', 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+         and not has_any_column_privilege('authenticated', 'public.case_summaries', 'INSERT,UPDATE,REFERENCES')
+  union all
+  select '0011 — anonymous queue has no table or column access',
+         not has_table_privilege('anon', 'public.case_summaries', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+         and not has_any_column_privilege('anon', 'public.case_summaries', 'SELECT,INSERT,UPDATE,REFERENCES')
+
 )
 select check_name, passed
 from checks

@@ -61,6 +61,9 @@ jobs:
       - name: Lead validation regression test
         run: npm run test:validation
 
+      - name: Submission UI regression test
+        run: npm run test:submission-ui
+
       # Isolated PostgreSQL replay: reviewer writes must stay RPC-only and a
       # delivery event that arrives before its case must remain retryable.
       - name: Database regression test

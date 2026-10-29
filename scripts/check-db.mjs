@@ -78,12 +78,19 @@ const migrations = [
   "0008_marketing_revocation_idempotency.sql",
   "0009_audited_case_access.sql",
   "0010_notification_retry_window.sql",
+  "0011_queue_read_only.sql",
 ].map((name) => readFileSync(`supabase/migrations/${name}`, "utf8"));
 
 // Every migration must be safe to re-run.
 for (let round = 1; round <= 2; round += 1) {
   for (const [index, sql] of migrations.entries()) {
     await pass(`migration ${index + 1} run ${round}`, () => exec(sql), () => true);
+    // Reproduce Supabase/default ACLs retained by CREATE OR REPLACE VIEW.
+    // Include a column grant: revoking table privileges alone cannot remove it.
+    if (round === 1 && index === 4) {
+      await exec(`grant all on public.case_summaries to authenticated;
+        grant update (status) on public.case_summaries to authenticated;`);
+    }
   }
 }
 
@@ -195,6 +202,25 @@ await expectError(
   () => query("select payload from public.case_summaries limit 1"),
   "does not exist",
 );
+// Exercise writes against the owner-executed view, not just the base table.
+await pass(
+  "authenticated queue access is SELECT-only, including column grants",
+  () => query(`select
+    has_table_privilege('authenticated', 'public.case_summaries', 'SELECT') readable,
+    has_table_privilege('authenticated', 'public.case_summaries', 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') writable,
+    has_any_column_privilege('authenticated', 'public.case_summaries', 'INSERT,UPDATE,REFERENCES') column_writable`),
+  (rows) => rows[0].readable && !rows[0].writable && !rows[0].column_writable,
+);
+for (const [name, sql] of [
+  ["update", "update public.case_summaries set status='reviewed' where reference='LPP-2026-TEST01'"],
+  ["delete", "delete from public.case_summaries where reference='LPP-2026-TEST01'"],
+  ["insert", "insert into public.case_summaries (reference, submitted_at, status, notification_state, crisis_disclosure) values ('LPP-2026-NOWRIT', now(), 'submitted', 'queued', false)"],
+]) {
+  // Roll back even a regression's successful write so later checks stay valid.
+  await exec("begin");
+  await expectError(`reviewer cannot ${name} through queue view`, () => query(sql), "permission denied");
+  await exec("rollback");
+}
 await pass("aal2 reviewer opens a case through the audited RPC", () => query("select public.open_case_for_review('LPP-2026-TEST01') result"), (rows) => rows[0].result?.case?.reference === "LPP-2026-TEST01" && rows[0].result?.review_log?.[0]?.action === "opened");
 await pass("missing case returns no payload", () => query("select public.open_case_for_review('LPP-2026-MISSING') result"), (rows) => rows[0].result === null);
 await pass("second open is also audited", () => query("select public.open_case_for_review('LPP-2026-TEST01') result"), (rows) => rows[0].result?.review_log?.filter((entry) => entry.action === "opened").length === 2);
@@ -676,6 +702,13 @@ await expectError(
   "permission denied",
 );
 await exec("reset role;");
+
+// The deployment's read-only verification query must also execute and pass.
+await pass(
+  "staging catalog checks include and pass the queue write-denial checks",
+  () => query(readFileSync("supabase/ops/staging-runbook-checks.sql", "utf8")),
+  (rows) => rows.some((row) => row.check_name.startsWith("0011")) && rows.every((row) => row.passed),
+);
 
 // --------------------------------------------------------- retention/delete
 await pass("retention is disabled while no schedule is approved", () => query("select public.purge_expired_cases() n"), (rows) => rows[0].n === 0);
