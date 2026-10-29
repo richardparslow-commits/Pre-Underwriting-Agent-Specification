@@ -58,7 +58,7 @@ export interface InterviewHook {
   prefilledIds: string[];
   receipt: SubmissionReceipt | null;
   draft: CaseDraft | null;
-  /** Stable per-draft key; a retry reuses it so the server can deduplicate. */
+  /** Stable intake operation key: retries deduplicate; edits after a saved request conflict. */
   submissionKey: string;
   currentQuestionId: string | null;
   crisis: boolean;

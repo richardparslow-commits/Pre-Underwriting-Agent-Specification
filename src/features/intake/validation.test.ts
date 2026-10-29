@@ -43,3 +43,16 @@ test("an 11-digit number is accepted only with the US country code", () => {
   assert.equal(normaliseUsPhone("+1 512 555 0134"), "+15125550134");
   assert.equal(normaliseUsPhone("25125550134"), null);
 });
+
+// Independent boundary values protect the wire contract, including optional fields.
+for (const [field, limit] of Object.entries({
+  firstName: 100, lastName: 100, email: 254, preferredContactTime: 120,
+  timeZone: 80, assistance: 200, coverageAmount: 60, coveragePurpose: 120, termPreference: 60,
+})) {
+  test(`${field} rejects overflow locally instead of losing it on submission`, () => {
+    const key = field as keyof LeadDetails;
+    const value = field === "email" ? "a".repeat(limit - 12) + "@example.com" : "x".repeat(limit);
+    assert.equal(errors({ [key]: value })[key], undefined);
+    assert.match(errors({ [key]: "x" + value })[key] ?? "", new RegExp(String(limit)));
+  });
+}
