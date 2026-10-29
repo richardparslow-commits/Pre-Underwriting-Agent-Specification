@@ -165,7 +165,9 @@ Rows stay `pending` or `failed` until the worker records success. Do not enable 
 
 ## Deployment checklist
 
-- [ ] Apply migrations 0001–0009 and record the applied versions. **Staging:** 0001–0005 applied and verified on 28 Oct 2026; 0006 (terminal notification state), 0007 (marketing revocation), 0008 (revocation replay safety) and 0009 (audited case reads) have no hosted application evidence. **Production:** not verified. Deploy the matching portal code and migration together; verify AAL1/AAL2, non-reviewer and direct REST denial, and logging failure with labelled data.
+The detailed, window-by-window procedure for migrations `0006`–`0010`, including the audited case read and marketing withdrawal exercises, is in the [staging deployment runbook](STAGING-RUNBOOK.md). The list below is the summary version.
+
+- [ ] Apply migrations 0001–0010 and record the applied versions. **Staging:** 0001–0005 applied and verified on 28 Oct 2026; 0006 (terminal notification state), 0007 (marketing revocation), 0008 (revocation replay safety), 0009 (audited case reads) and 0010 (provider retry window) have no hosted application evidence. **Production:** not verified. Deploy the matching portal code and migration together; verify AAL1/AAL2, non-reviewer and direct REST denial, and logging failure with labelled data.
 - [ ] Keep `QUESTIONNAIRE_APPROVED=false` until 0/92 rows become 92/92 signed off.
 - [ ] Set `RATE_LIMIT_SALT` to a random value and confirm the durable limiter is active; without it production returns 503 (fail closed). Only `ENVIRONMENT=test` uses the in-memory guard.
 - [ ] Store `project_url` and `cron_secret` in Vault, apply `supabase/ops/retry-schedule.sql`, and verify one scheduler tick.
