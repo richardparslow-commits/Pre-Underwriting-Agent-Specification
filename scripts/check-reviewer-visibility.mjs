@@ -261,6 +261,26 @@ test("safety disclosures are counted across the queue and paginated without payl
   });
 });
 
+test("a new disclosure counted beyond an older cursor is reachable by refreshing the head", async () => {
+  const first = await authorized(() => rpc("get_queue_safety_disclosures", [null, null]));
+  assert.equal(first.total, 35);
+  assert.equal(first.entries.length, 25);
+  const before = first.next_cursor;
+  assert.ok(before);
+  await query(`insert into public.cases(reference,questionnaire_version,submitted_at,status,crisis_disclosure,payload)
+    values ('LPP-2026-NEW777','test','2026-10-31'::timestamptz,'submitted',true,'{}')`);
+  const older = await authorized(() => rpc("get_queue_safety_disclosures", [before.submitted_at, before.reference]));
+  assert.equal(older.total, 36, "the total must remain queue-wide, including the new case");
+  assert.equal(older.next_cursor, null);
+  const previousWalk = first.entries.concat(older.entries);
+  assert.equal(previousWalk.length, 35);
+  assert.ok(previousWalk.every(row => row.reference !== 'LPP-2026-NEW777'));
+  const refreshed = await authorized(() => rpc("get_queue_safety_disclosures", [null, null]));
+  assert.equal(refreshed.total, 36);
+  assert.equal(refreshed.entries[0].reference, 'LPP-2026-NEW777');
+  assert.ok(refreshed.next_cursor, "fresh paging remains bounded and can still reach the older cases");
+});
+
 for (
   const [label, role, aal, user, message] of [
     ["anonymous", "anon", "aal1", other, /permission denied/i],

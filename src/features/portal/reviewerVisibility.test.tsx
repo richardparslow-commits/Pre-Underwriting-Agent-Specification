@@ -200,7 +200,16 @@ test("queue-wide safety count and direct older-case links appear independently o
     assert.equal(calls, 2);
     await act(async () => pending.resolve(safetyPage(35, 25, 10)));
     assert.equal(view.root.findAllByType("a").length, 35);
-    assert.equal(view.root.findAllByType("button").length, 0);
+    assert.equal(
+      view.root.findAllByType("button").some((node) =>
+        node.children.join("") === "Load older safety disclosures"
+      ),
+      false,
+    );
+    assert.equal(
+      button(view, "Refresh safety disclosures").props.disabled,
+      false,
+    );
     assert.match(output(view), /does not monitor emergencies/);
   } finally {
     act(() => view.unmount());
