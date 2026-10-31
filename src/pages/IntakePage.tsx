@@ -1,3 +1,4 @@
+import { useRouterIntakeHistory } from "../features/interview/useRouterIntakeHistory";
 import { useEffect, useState } from "react";
 import { useInterview } from "@/features/interview/useInterview";
 import { QUESTION_BY_ID } from "@/features/interview/questionBank";
@@ -9,7 +10,8 @@ import { ConfirmationScreen } from "@/features/intake/ConfirmationScreen";
 import { submitCase } from "@/lib/api";
 
 export default function IntakePage() {
-  const interview = useInterview();
+  const navigation = useRouterIntakeHistory();
+  const interview = useInterview(navigation);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

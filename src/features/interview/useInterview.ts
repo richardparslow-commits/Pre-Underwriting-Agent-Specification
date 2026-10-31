@@ -1,3 +1,4 @@
+import type { IntakeNavigation } from "./useIntakeHistory";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
   buildCaseDraft,
@@ -88,8 +89,8 @@ export interface InterviewHook {
  * The interview state lives in memory only. Health answers are intentionally
  * never written to localStorage, sessionStorage, analytics or the URL.
  */
-export function useInterview(): InterviewHook {
-  const [step, setStep] = useState<IntakeStep>("lead");
+export function useInterview(navigation?: IntakeNavigation): InterviewHook {
+  const [localStep, setLocalStep] = useState<IntakeStep>("lead");
   const [lead, setLead] = useState<Partial<LeadDetails>>({
     preferredContact: "email",
     state: "",
@@ -106,6 +107,13 @@ export function useInterview(): InterviewHook {
   const reviewConfirmation = useRef<SubmissionAcknowledgement | null>(null);
   const [prefilledIds, setPrefilledIds] = useState<string[]>([]);
   const [receipt, setReceipt] = useState<SubmissionReceipt | null>(null);
+  const requestedStep = navigation?.step ?? localStep;
+  // Browser history cannot reopen a completed submission or bypass a withdrawn
+  // permission. History is navigation metadata, never evidence of consent.
+  const requiresPermission = navigation &&
+    (requestedStep === "interview" || requestedStep === "review") && !consent.intakePermission;
+  const step = receipt ? "submitted" : requiresPermission ? "permission" : requestedStep;
+  const setStep = navigation?.go ?? setLocalStep;
   const [submissionKey, setSubmissionKey] = useState(() => crypto.randomUUID());
   const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(
     null,
@@ -154,7 +162,7 @@ export function useInterview(): InterviewHook {
   // Returning from the review screen should not ask for permission twice.
   const begin = useCallback(
     () => setStep(consent.intakePermission ? "interview" : "permission"),
-    [consent.intakePermission],
+    [consent.intakePermission, setStep],
   );
 
   const givePermission = useCallback(() => {
@@ -194,9 +202,10 @@ export function useInterview(): InterviewHook {
     lead.dateOfBirth,
     visible,
     invalidateReview,
+    setStep,
   ]);
 
-  const backToLead = useCallback(() => setStep("lead"), []);
+  const backToLead = useCallback(() => setStep("lead"), [setStep]);
 
   const setAnswer = useCallback(
     (questionId: string, patch: Partial<AnswerRecord>) => {
@@ -224,7 +233,7 @@ export function useInterview(): InterviewHook {
   const goToQuestion = useCallback((questionId: string) => {
     setCurrentQuestionId(questionId);
     setStep("interview");
-  }, []);
+  }, [setStep]);
 
   const move = useCallback(
     (direction: 1 | -1) => {
@@ -252,11 +261,11 @@ export function useInterview(): InterviewHook {
       return;
     }
     move(1);
-  }, [currentQuestionId, move, visible]);
+  }, [currentQuestionId, move, visible, setStep]);
 
   const previousQuestion = useCallback(() => move(-1), [move]);
 
-  const finishInterview = useCallback(() => setStep("review"), []);
+  const finishInterview = useCallback(() => setStep("review"), [setStep]);
 
   const confirmReview = useCallback((confirmed: boolean) => {
     if (!confirmed) {
@@ -306,10 +315,11 @@ export function useInterview(): InterviewHook {
     setReceipt(next);
     setStep("submitted");
     window.scrollTo({ top: 0, behavior: "auto" });
-  }, []);
+  }, [setStep]);
 
   const startOver = useCallback(() => {
-    setStep("lead");
+    if (navigation) navigation.reset();
+    else setStep("lead");
     setLead({
       preferredContact: "email",
       state: "",
@@ -323,7 +333,7 @@ export function useInterview(): InterviewHook {
     setReceipt(null);
     setSubmissionKey(crypto.randomUUID());
     setCurrentQuestionId(null);
-  }, [invalidateReview]);
+  }, [invalidateReview, navigation, setStep]);
 
   // A question can disappear (a branch closes) or a held row can never appear.
   const safeCurrentId = useMemo(() => {
