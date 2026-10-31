@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { PREVIEW_MODE, SITE } from "@/config/site";
 import { sendSignInLink, signOut } from "@/lib/api";
-import { supabase } from "@/integrations/supabase/client";
+import { reviewerSignInFeedback, supabase } from "@/integrations/supabase/client";
 
 /** True when the session has not completed a second factor. */
 async function sessionNeedsStepUp(): Promise<boolean> {
@@ -22,7 +22,7 @@ export function useReviewerAuth() {
   const [loading, setLoading] = useState(!PREVIEW_MODE);
   const [previewUnlocked, setPreviewUnlocked] = useState(false);
   const [linkSent, setLinkSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => reviewerSignInFeedback.read());
   const [needsMfa, setNeedsMfa] = useState(false);
 
   useEffect(() => {
@@ -42,6 +42,9 @@ export function useReviewerAuth() {
         setNeedsMfa(false);
         return;
       }
+
+      reviewerSignInFeedback.clear();
+      setError(null);
 
       // Supabase does not enforce AAL2 at the gateway. The portal refuses an
       // aal1 session, and every reviewer RLS policy independently requires it.
@@ -64,6 +67,7 @@ export function useReviewerAuth() {
   }, []);
 
   const requestLink = useCallback(async (address: string) => {
+    reviewerSignInFeedback.clear();
     setError(null);
     setLinkSent(false);
     try {
