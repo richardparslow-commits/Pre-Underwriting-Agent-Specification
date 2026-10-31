@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -16,7 +16,8 @@ import { SITE } from "@/config/site";
 import { SafetyDisclosures } from "@/features/portal/SafetyDisclosures";
 import { MfaGate } from "@/features/portal/MfaGate";
 import { useReviewerAuth } from "@/features/portal/useReviewerAuth";
-import { listCases, type CaseListItem } from "@/lib/api";
+import { listCases } from "@/lib/api";
+import { useCaseQueue } from "@/features/portal/useCaseQueue";
 import type { CaseStatus, NotificationState } from "@/features/interview/types";
 import { formatDate } from "@/lib/utils";
 
@@ -116,35 +117,12 @@ function SignInCard({ auth }: { auth: ReturnType<typeof useReviewerAuth> }) {
 
 export default function PortalPage() {
   const auth = useReviewerAuth();
-  const [cases, setCases] = useState<CaseListItem[] | null>(null);
   const [safetyRefresh, setSafetyRefresh] = useState(0);
-  const [total, setTotal] = useState(0);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-
-  const load = useCallback(async (cursor?: string) => {
-    const appending = Boolean(cursor);
-    if (appending) setLoadingMore(true);
-    else setLoading(true);
-    setError(null);
-    try {
-      const page = await listCases(cursor);
-      setCases((current) => (appending ? [...(current ?? []), ...page.items] : page.items));
-      setTotal(page.total);
-      setNextCursor(page.nextCursor);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Cases could not be loaded.");
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (auth.signedIn) void load();
-  }, [auth.signedIn, load]);
+  const { cases, total, nextCursor, error, loading, loadingMore, load } = useCaseQueue(
+    auth.signedIn && !auth.loading,
+    listCases,
+    auth.email,
+  );
 
   if (auth.loading) {
     return (
@@ -290,7 +268,7 @@ export default function PortalPage() {
             <Button
               variant="outline"
               onClick={() => void load(nextCursor)}
-              disabled={loadingMore}
+              disabled={loading || loadingMore}
             >
               {loadingMore ? <Loader2 className="animate-spin" aria-hidden /> : null}
               Load more cases
