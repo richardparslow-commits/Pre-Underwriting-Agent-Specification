@@ -1,4 +1,6 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { IntakeSessionProvider } from "@/features/interview/IntakeSession";
+import { submitCase } from "@/lib/api";
+import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import { SiteLayout } from "@/components/site/SiteChrome";
 import LandingPage from "@/pages/LandingPage";
 import IntakePage from "@/pages/IntakePage";
@@ -15,9 +17,17 @@ export default function App() {
       <Routes>
         <Route element={<SiteLayout />}>
           <Route index element={<LandingPage />} />
-          <Route path="start" element={<IntakePage />} />
-          <Route path="privacy" element={<PrivacyPage />} />
-          <Route path="messaging-terms" element={<MessagingTermsPage />} />
+          <Route
+            element={
+              <IntakeSessionProvider send={submitCase}>
+                <Outlet />
+              </IntakeSessionProvider>
+            }
+          >
+            <Route path="start" element={<IntakePage />} />
+            <Route path="privacy" element={<PrivacyPage />} />
+            <Route path="messaging-terms" element={<MessagingTermsPage />} />
+          </Route>
           <Route path="marketing-opt-out" element={<MarketingOptOutPage />} />
           <Route path="portal" element={<PortalPage />} />
           <Route path="portal/:reference" element={<PortalCasePage />} />

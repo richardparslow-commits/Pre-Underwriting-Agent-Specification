@@ -9,6 +9,7 @@ export interface IntakeNavigation {
   step: IntakeStep;
   go: (step: IntakeStep) => void;
   reset: () => void;
+  historyEntry: IntakeHistoryEntry;
 }
 const STEPS: readonly IntakeStep[] = ["lead", "permission", "interview", "review", "submitted"];
 
@@ -18,17 +19,20 @@ const STEPS: readonly IntakeStep[] = ["lead", "permission", "interview", "review
 export function useIntakeHistory(
   entry: unknown,
   write: (entry: IntakeHistoryEntry, replace: boolean) => void,
+  onForm = true,
 ): IntakeNavigation {
   const [session, setSession] = useState(() => crypto.randomUUID());
   const pending = useRef<IntakeHistoryEntry | null>(null);
   useEffect(() => {
     pending.current = null;
   }, [entry]);
+  const rememberedStep = useRef<IntakeStep>("lead");
   const candidate = entry as Partial<IntakeHistoryEntry> | null;
-  const step =
-    candidate?.session === session && STEPS.includes(candidate.step as IntakeStep)
-      ? (candidate.step as IntakeStep)
-      : "lead";
+  const valid = candidate?.session === session && STEPS.includes(candidate.step as IntakeStep);
+  const step = valid ? (candidate.step as IntakeStep) : onForm ? "lead" : rememberedStep.current;
+  useEffect(() => {
+    if (onForm || valid) rememberedStep.current = step;
+  }, [onForm, valid, step]);
   const go = useCallback(
     (next: IntakeStep) => {
       if (next === step || (pending.current?.session === session && pending.current.step === next))
@@ -42,8 +46,9 @@ export function useIntakeHistory(
   const reset = useCallback(() => {
     const nextSession = crypto.randomUUID();
     pending.current = null;
+    rememberedStep.current = "lead";
     setSession(nextSession);
     write({ session: nextSession, step: "lead" }, true);
   }, [write]);
-  return { step, go, reset };
+  return { step, go, reset, historyEntry: { session, step } };
 }
