@@ -530,3 +530,9 @@ require forward migration `0012` and the matching portal build. These fixes are
 separate from the `0011` queue-permissions/submission-integrity repair. The
 application remains in testing; deployment evidence and other Heal defects
 remain outstanding.
+
+### Public endpoint rate-limit identity
+
+The public submission and marketing-withdrawal functions use `Deno.serve` connection metadata (`info.remoteAddr`) to select their salted durable quota. They never trust `X-Forwarded-For`, `Forwarded`, `X-Real-IP` or `CF-Connecting-IP`; source TCP ports and request content cannot create fresh quotas. If the runtime supplies no usable TCP peer, requests share the conservative `shared:unverified-peer` quota. Submission retains 10 requests per 600 seconds; withdrawal retains its separate 5 per 600 seconds. Missing durable configuration still fails closed in production.
+
+A transport peer can be a hosting gateway, so several visitors can share a quota. This deliberately favors bounded anonymous writes over guessing a visitor IP. Verify hosted capacity/fairness before enabling intake. A future per-visitor proxy policy must authenticate its metadata; choosing a header name is insufficient. No forwarded-header trust setting is provided. See [Deno connection metadata](https://docs.deno.com/api/deno/http-server/) and [Supabase gateway architecture](https://supabase.com/docs/guides/functions). No launch lock is relaxed by this repair.

@@ -24,7 +24,7 @@ import {
   jsonResponse,
   questionnaireApproved,
   rateLimited,
-  clientKey,
+  connectionRateKey,
   readBodyWithLimit,
   resolveOrigin,
   serviceClient,
@@ -53,7 +53,7 @@ interface ReceiptRow {
   notification_updated_at: string | null;
 }
 
-async function durableRateLimited(req: Request): Promise<boolean | null> {
+async function durableRateLimited(rateKey: string): Promise<boolean | null> {
   const url = Deno.env.get("SUPABASE_URL");
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const salt = Deno.env.get("RATE_LIMIT_SALT");
@@ -62,7 +62,7 @@ async function durableRateLimited(req: Request): Promise<boolean | null> {
   try {
     const digest = await crypto.subtle.digest(
       "SHA-256",
-      new TextEncoder().encode(`${salt}:${clientKey(req)}`),
+      new TextEncoder().encode(`${salt}:${rateKey}`),
     );
     const hash = Array.from(new Uint8Array(digest), (byte) =>
       byte.toString(16).padStart(2, "0"),
@@ -122,7 +122,7 @@ function replayResponse(row: ReceiptRow, draft: unknown, origin: string): Respon
   return jsonResponse(receiptFromRow(row, true), 200, origin);
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(async (req: Request, info?: Deno.ServeHandlerInfo<Deno.NetAddr>) => {
   const origin = resolveOrigin(req);
 
   if (req.method === "OPTIONS") {
@@ -178,7 +178,8 @@ Deno.serve(async (req: Request) => {
   // A durable, salted counter is used when the project is configured. If it is
   // unavailable, production must fail closed: the in-memory limiter cannot
   // coordinate across instances and is reserved for the explicit test mode.
-  const durableLimited = await durableRateLimited(req);
+  const rateKey = connectionRateKey(info);
+  const durableLimited = await durableRateLimited(rateKey);
   if (durableLimited === true) {
     return jsonResponse(
       { error: "Too many submissions from this connection. Please try again shortly." },
@@ -188,7 +189,7 @@ Deno.serve(async (req: Request) => {
   }
   if (durableLimited === null) {
     if (Deno.env.get("ENVIRONMENT") === "test") {
-      if (rateLimited(clientKey(req))) {
+      if (rateLimited(rateKey)) {
         return jsonResponse(
           { error: "Too many submissions from this connection. Please try again shortly." },
           429,
