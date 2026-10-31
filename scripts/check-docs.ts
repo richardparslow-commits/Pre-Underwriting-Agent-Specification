@@ -3,7 +3,7 @@
  * when a stale count/claim survives a remediation. This is a structural check,
  * not a legal or semantic approval.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { QUESTION_BANK } from "../src/features/interview/questionBank";
 import {
   reconciliationSummary,
@@ -18,6 +18,14 @@ const held = QUESTION_BANK.filter(
 const signedOff = QUESTION_BANK.filter((question) => question.sourceVerified).length;
 const partial = SOURCE_GAPS.filter((gap) => gap.disposition === "merge_into").length;
 const outOfScope = SOURCE_GAPS.filter((gap) => gap.disposition === "out_of_scope").length;
+
+// Derived, not pinned: a new migration must appear in the deployment checklist
+// or this check fails. A hard-coded range silently stopped at 0009 while 0010
+// was already required by the retry worker.
+const migrations = readdirSync("supabase/migrations")
+  .filter((file) => /^\d{4}_.+\.sql$/.test(file))
+  .sort();
+const migrationRange = `0001–${migrations.at(-1)?.slice(0, 4) ?? "0001"}`;
 
 const facts = {
   bankRows: QUESTION_BANK.length,
@@ -141,7 +149,7 @@ requireText("docs/OPERATIONS.md", [
   "MARKETING_LICENSED_STATES",
   "sendMarketingMessage",
   "BLOCKED",
-  "0001–0009",
+  migrationRange,
 ]);
 
 requireText(".env.example", [

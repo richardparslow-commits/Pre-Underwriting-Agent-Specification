@@ -33,7 +33,10 @@ import {
 const MAX_BODY_BYTES = 8 * 1024;
 const RATE_LIMIT = 5;
 const RATE_WINDOW_SECONDS = 10 * 60;
-const REFERENCE_PATTERN = /^LPP-\d{4}-[0-9A-Z]{6,12}$/;
+// Generated references are exactly six characters (see generateReference).
+// Every other function uses the same shape; a wider pattern here would accept
+// strings no case can have.
+const REFERENCE_PATTERN = /^LPP-\d{4}-[0-9A-Z]{6}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._:-]{8,128}$/;
 

@@ -128,6 +128,30 @@ await query(
   [caseId, "LPP-2026-TEST01", "2026-10-27T12:00:00.000Z", "idem-key-0001", JSON.stringify(payload)],
 );
 
+// A case whose audit trail is deliberately longer than the review window: one
+// consequential action followed by more opens than the window holds.
+await query(
+  `insert into public.cases
+    (id, reference, submitted_at, server_received_at, idempotency_key, questionnaire_version, status, crisis_disclosure, residence_state, payload)
+   values ($1,'LPP-2026-BURIED',$2,$2,'idem-key-buried','2026.10-draft.9','submitted',false,'TX',$3::jsonb)`,
+  [
+    "22222222-2222-4222-8222-222222222222",
+    "2026-10-27T12:00:00.000Z",
+    JSON.stringify({ ...payload, reference: "LPP-2026-BURIED" }),
+  ],
+);
+await query(
+  `insert into public.case_review_log (case_id, action, actor, note, created_at)
+   values ('22222222-2222-4222-8222-222222222222','marked_reviewed','reviewer@example.com','first review', now() - interval '30 days')`,
+);
+for (let index = 0; index < 21; index += 1) {
+  await query(
+    `insert into public.case_review_log (case_id, action, actor, note, created_at)
+     values ('22222222-2222-4222-8222-222222222222','opened','reviewer@example.com',null, now() - interval '20 days' + ($1 || ' seconds')::interval)`,
+    [String(index)],
+  );
+}
+
 async function claims(aal, id = reviewer, email = "reviewer@example.com") {
   await exec(`select set_config('request.jwt.claims', '${JSON.stringify({ sub: id, email, aal })}', false);`);
 }
@@ -214,6 +238,21 @@ for (const [name, sql] of [
 await pass("aal2 reviewer opens a case through the audited RPC", () => query("select public.open_case_for_review('LPP-2026-TEST01') result"), (rows) => rows[0].result?.case?.reference === "LPP-2026-TEST01" && rows[0].result?.review_log?.[0]?.action === "opened");
 await pass("missing case returns no payload", () => query("select public.open_case_for_review('LPP-2026-MISSING') result"), (rows) => rows[0].result === null);
 await pass("second open is also audited", () => query("select public.open_case_for_review('LPP-2026-TEST01') result"), (rows) => rows[0].result?.review_log?.filter((entry) => entry.action === "opened").length === 2);
+await pass(
+  "a consequential action remains accessible beyond the first history page",
+  async () => {
+    const [opened] = await query("select public.open_case_for_review('LPP-2026-BURIED') result");
+    const cursor = opened.result?.review_log_cursor;
+    if (!cursor) return false;
+    const [older] = await query(
+      "select public.get_case_review_history($1, $2::timestamptz, $3::bigint) result",
+      ["LPP-2026-BURIED", cursor.created_at, cursor.id],
+    );
+    return opened.result.review_log.length === 20 &&
+      older.result.entries.some((entry) => entry.action === "marked_reviewed" && entry.note === "first review");
+  },
+  (found) => found === true,
+);
 await pass("reviewer can add a correction through its RPC", () => query("select public.record_case_correction('LPP-2026-TEST01','Test correction')"), () => true);
 await pass("audited case read includes the correction", () => query("select public.open_case_for_review('LPP-2026-TEST01') result"), (rows) => rows[0].result?.corrections?.[0]?.detail === "Test correction");
 

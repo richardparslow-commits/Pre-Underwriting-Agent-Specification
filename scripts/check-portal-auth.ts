@@ -34,6 +34,10 @@ function requireMarker(
 }
 
 const gate = read("src/features/portal/MfaGate.tsx");
+requireMarker("src/features/portal/MfaGate.tsx", gate, "src={qrCode}", "the QR image must use the data URL auth-js already returns");
+if (gate.includes("encodeURIComponent(qrCode)")) {
+  failures.push("The MFA gate must not re-encode the QR data URL returned by auth-js.");
+}
 requireMarker(
   "src/features/portal/MfaGate.tsx",
   gate,

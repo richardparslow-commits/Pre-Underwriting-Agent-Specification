@@ -8,7 +8,7 @@
  */
 import { assert, assertEquals } from "jsr:@std/assert@1.0.6";
 import { SERVER_BANK } from "../_shared/bank.generated.ts";
-import { validateDraft } from "../_shared/case.ts";
+import { connectionRateKey, validateDraft } from "../_shared/case.ts";
 import {
   buildAnswers,
   buildConsents,
@@ -36,6 +36,38 @@ Deno.test("accepts a complete canonical draft and rebuilds source rows", () => {
   assertEquals(draft.answers.length, SERVER_BANK.length);
   assertEquals(draft.lead.state, "TX");
   assertEquals(draft.adultAttested, true);
+});
+
+Deno.test("a compound answer's prose is rebuilt, not trusted from the caller", () => {
+  // Unbranched so the row is applicable in the default fixture.
+  const compound = SERVER_BANK.find(
+    (question) => question.compound && question.fields.length > 0 && !question.askWhen,
+  );
+  assert(compound);
+  const field = compound.fields[0]!;
+
+  const draft = accepted(
+    buildValidDraft({
+      answers: buildAnswers({
+        [compound.id]: {
+          disposition: "answered",
+          // A crafted body could put a different claim beside the fields the
+          // reviewer reads. The server must ignore this prose.
+          answerText: "I have never had this condition",
+          fields: [{ id: field.id, label: field.label, value: "Test detail" }],
+        },
+      }),
+    }),
+  );
+
+  const answer = draft.answers.find((entry) => entry.questionId === compound.id);
+  assertEquals(answer?.answerText, "Details provided");
+  assertEquals(answer?.fields?.[0]?.value, "Test detail");
+});
+
+Deno.test("rate-limit identity uses a verified connection peer or a shared fallback", () => {
+  assertEquals(connectionRateKey({ remoteAddr: { transport: "tcp", hostname: "203.0.113.9" } }), "peer:203.0.113.9");
+  assertEquals(connectionRateKey(), "shared:unverified-peer");
 });
 
 Deno.test("rejects a held HIV row presented as answered", () => {

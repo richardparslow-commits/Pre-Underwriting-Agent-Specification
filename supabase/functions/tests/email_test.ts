@@ -1,6 +1,7 @@
 import { assertEquals, assert } from "jsr:@std/assert@1.0.6";
 import {
   buildNotification,
+  notificationBlocker,
   notificationDetailForStorage,
   sendCaseNotification,
 } from "../_shared/email.ts";
@@ -22,6 +23,21 @@ Deno.test("notification carries a reference and portal link, never health data",
       false,
       `notification leaked: ${forbidden}`,
     );
+  }
+});
+
+Deno.test("a notification needs both a provider and a portal origin", () => {
+  const previous = Deno.env.get("RESEND_API_KEY");
+  try {
+    Deno.env.delete("RESEND_API_KEY");
+    assertEquals(notificationBlocker("https://example.test"), "Email provider not configured");
+
+    Deno.env.set("RESEND_API_KEY", "test-key");
+    assertEquals(notificationBlocker("   "), "Portal origin not configured");
+    assertEquals(notificationBlocker("https://example.test"), null);
+  } finally {
+    if (previous === undefined) Deno.env.delete("RESEND_API_KEY");
+    else Deno.env.set("RESEND_API_KEY", previous);
   }
 });
 

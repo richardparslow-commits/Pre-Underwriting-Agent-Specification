@@ -30,7 +30,11 @@ import {
   serviceClient,
   validateDraft,
 } from "../_shared/case.ts";
-import { notificationDetailForStorage, sendCaseNotification } from "../_shared/email.ts";
+import {
+  notificationBlocker,
+  notificationDetailForStorage,
+  sendCaseNotification,
+} from "../_shared/email.ts";
 
 import { sameSubmissionContent } from "../_shared/submission-content.ts";
 
@@ -333,6 +337,38 @@ Deno.serve(async (req: Request, info?: Deno.ServeHandlerInfo<Deno.NetAddr>) => {
   }
 
   // ---- Then notify under a lease. A retry can never send concurrently ------
+  // With no provider there is nothing to send, and claiming would stamp the
+  // first-attempt time (0010), starting the provider idempotency window and
+  // making the case unretryable 24 hours later. Record the honest state without
+  // taking a lease, so it keeps the seven-day `not_sent` recovery path.
+  const destination = portalOrigin();
+  const blocker = notificationBlocker(destination);
+  if (blocker) {
+    const { error } = await supabase.rpc("complete_case_notification", {
+      p_reference: reference,
+      p_state: "not_sent",
+      p_detail: notificationDetailForStorage({ state: "not_sent", detail: blocker }),
+      p_message_id: null,
+    });
+    if (error) console.error("Notification status update failed", error.code);
+
+    return jsonResponse(
+      {
+        reference,
+        submittedAt,
+        status: "submitted",
+        notification: {
+          state: "not_sent",
+          updatedAt: new Date().toISOString(),
+          detail: blocker,
+          attempts: 0,
+        },
+      },
+      201,
+      origin,
+    );
+  }
+
   const worker = `submit-case:${crypto.randomUUID()}`;
   const claim = await supabase.rpc("claim_case_notification", {
     p_reference: reference,
@@ -362,7 +398,7 @@ Deno.serve(async (req: Request, info?: Deno.ServeHandlerInfo<Deno.NetAddr>) => {
   const result = await sendCaseNotification({
     reference,
     submittedAt,
-    portalOrigin: portalOrigin(),
+    portalOrigin: destination,
     idempotencyKey: reference,
   });
 

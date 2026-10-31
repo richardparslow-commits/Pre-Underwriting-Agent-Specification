@@ -307,6 +307,9 @@ const DISPOSITIONS = new Set([
 
 const ANSWER_STATES = new Set(["yes", "no", "unknown", "declined", "not_applicable"]);
 
+/** Canonical summary for a compound row; the detail lives in its fields. */
+const COMPOUND_SUMMARY = "Details provided";
+
 const SERVER_BY_ID = new Map(SERVER_BANK.map((question) => [question.id, question]));
 
 /**
@@ -1014,8 +1017,27 @@ export function validateDraft(body: unknown): ValidationResult {
       continue;
     }
 
-    if (question.compound && entry.fields.length === 0) {
-      return { ok: false, reason: "The compound question is incomplete" };
+    // A compound answer is its structured fields, which are validated above
+    // against the bank's declared ids. The prose is not trusted: a crafted body
+    // could otherwise carry one value in `fields` and a different claim in
+    // `answerText`, both shown to the reviewer. The summary is canonical and
+    // matches what the browser's review screen displays.
+    if (question.compound) {
+      if (entry.fields.length === 0) {
+        return { ok: false, reason: "The compound question is incomplete" };
+      }
+      answers.push(
+        canonicalAnswer(
+          question,
+          "answered",
+          undefined,
+          entry.values,
+          entry.fields,
+          entry.details,
+          COMPOUND_SUMMARY,
+        ),
+      );
+      continue;
     }
 
     if (entry.answerText === "No answer recorded" || entry.answerText === "Not answered") {

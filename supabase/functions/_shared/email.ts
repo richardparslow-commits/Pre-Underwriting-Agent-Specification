@@ -68,6 +68,17 @@ export function buildNotification(input: {
 }
 
 /**
+ * Why a notification cannot be transmitted, or null when it can. This is the
+ * single place that decides whether a send is possible, so the intake handler
+ * and `sendCaseNotification` cannot disagree about it.
+ */
+export function notificationBlocker(portalOrigin: string): string | null {
+  if (!(Deno.env.get("RESEND_API_KEY") ?? "").trim()) return "Email provider not configured";
+  if (!portalOrigin.trim()) return "Portal origin not configured";
+  return null;
+}
+
+/**
  * Sends the notification. Returns an honest state:
  *   not_sent — no provider configured, nothing was transmitted
  *   accepted — the provider accepted the message for delivery
@@ -87,13 +98,11 @@ export async function sendCaseNotification(input: {
   /** Stable across retries so the provider can deduplicate a resent message. */
   idempotencyKey?: string;
 }): Promise<NotificationResult> {
-  const apiKey = Deno.env.get("RESEND_API_KEY");
-  if (!apiKey) {
-    return { state: "not_sent", detail: "Email provider not configured" };
-  }
-  if (!input.portalOrigin) {
-    return { state: "not_sent", detail: "Portal origin not configured" };
-  }
+  const blocker = notificationBlocker(input.portalOrigin);
+  if (blocker) return { state: "not_sent", detail: blocker };
+
+  // Non-empty: notificationBlocker() returned null above.
+  const apiKey = Deno.env.get("RESEND_API_KEY") ?? "";
 
   const message = buildNotification(input);
   const from =
