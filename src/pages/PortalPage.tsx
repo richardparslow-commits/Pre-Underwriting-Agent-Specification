@@ -96,9 +96,11 @@ function SignInCard({ auth }: { auth: ReturnType<typeof useReviewerAuth> }) {
           </Alert>
         ) : null}
         {auth.error ? (
-          <Alert tone="danger" className="mt-4">
-            {auth.error}
-          </Alert>
+          <div role="alert">
+            <Alert tone="danger" className="mt-4">
+              {auth.error}
+            </Alert>
+          </div>
         ) : null}
 
         <p className="mt-6 border-t border-border pt-4 text-[0.7rem] leading-relaxed text-muted-foreground">

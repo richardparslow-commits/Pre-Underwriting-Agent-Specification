@@ -1,5 +1,10 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/config/site";
+import { createReviewerSignInFeedback } from "@/lib/reviewerSignInFeedback";
+
+export const reviewerSignInFeedback = createReviewerSignInFeedback(
+  typeof window === "undefined" ? undefined : window,
+);
 
 /**
  * Lovable Cloud / Supabase client.
