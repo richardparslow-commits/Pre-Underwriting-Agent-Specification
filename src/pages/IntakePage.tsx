@@ -1,19 +1,19 @@
-import { useRouterIntakeHistory } from "../features/interview/useRouterIntakeHistory";
-import { useEffect, useState } from "react";
-import { useInterview } from "@/features/interview/useInterview";
+import { useIntakeSession } from "../features/interview/intakeSessionContext";
+import { useEffect } from "react";
 import { QUESTION_BY_ID } from "@/features/interview/questionBank";
 import { LeadForm } from "@/features/intake/LeadForm";
 import { PermissionStep } from "@/features/intake/PermissionStep";
 import { InterviewScreen } from "@/features/intake/InterviewScreen";
 import { ReviewScreen } from "@/features/intake/ReviewScreen";
 import { ConfirmationScreen } from "@/features/intake/ConfirmationScreen";
-import { submitCase } from "@/lib/api";
 
 export default function IntakePage() {
-  const navigation = useRouterIntakeHistory();
-  const interview = useInterview(navigation);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    interview,
+    submitting,
+    error,
+    submit: handleSubmit,
+  } = useIntakeSession();
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -23,32 +23,11 @@ export default function IntakePage() {
     ? QUESTION_BY_ID[interview.currentQuestionId]
     : undefined;
 
-  async function handleSubmit() {
-    if (!interview.draft) {
-      setError("Please confirm that you have reviewed your answers first.");
-      return;
-    }
-
-    setSubmitting(true);
-    setError(null);
-
-    try {
-      const receipt = await submitCase(interview.draft, interview.submissionKey);
-      interview.markSubmitted(receipt);
-    } catch (submitError) {
-      setError(
-        submitError instanceof Error
-          ? submitError.message
-          : "The case could not be submitted. Nothing was sent.",
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   return (
     <div className="container py-10 sm:py-14">
-      <div className={interview.step === "interview" ? "" : "mx-auto max-w-3xl"}>
+      <div
+        className={interview.step === "interview" ? "" : "mx-auto max-w-3xl"}
+      >
         {interview.step === "lead" ? (
           <LeadForm
             lead={interview.lead}
@@ -89,7 +68,11 @@ export default function IntakePage() {
             <p className="prose-note">
               This is unexpected. Return to your details and start again.
             </p>
-            <button type="button" className="link-quiet" onClick={interview.startOver}>
+            <button
+              type="button"
+              className="link-quiet"
+              onClick={interview.startOver}
+            >
               Start again
             </button>
           </div>
@@ -109,14 +92,19 @@ export default function IntakePage() {
               onEditLead={interview.backToLead}
               onToggleAck={interview.confirmReview}
               onSubmit={handleSubmit}
-              onBack={() => interview.goToQuestion(interview.currentQuestionId ?? "")}
+              onBack={() =>
+                interview.goToQuestion(interview.currentQuestionId ?? "")
+              }
             />
           </div>
         ) : null}
 
         {interview.step === "submitted" && interview.receipt ? (
           <div className="mx-auto max-w-4xl">
-            <ConfirmationScreen receipt={interview.receipt} onStartOver={interview.startOver} />
+            <ConfirmationScreen
+              receipt={interview.receipt}
+              onStartOver={interview.startOver}
+            />
           </div>
         ) : null}
       </div>
