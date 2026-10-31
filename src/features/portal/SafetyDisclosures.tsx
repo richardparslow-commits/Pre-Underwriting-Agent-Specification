@@ -19,6 +19,8 @@ export function SafetyDisclosures(
   const [total, setTotal] = useState<number | null>(null);
   const [next, setNext] = useState<SafetyCursor | null>(null);
   const [busy, setBusy] = useState(true);
+  const [refreshing, setRefreshing] = useState(true);
+  const [needsRefresh, setNeedsRefresh] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const generation = useRef(0);
@@ -28,17 +30,18 @@ export function SafetyDisclosures(
     const version = ++generation.current;
     inFlight.current = true;
     setBusy(true);
+    setRefreshing(true);
     setError(null);
-    setTotal(null);
-    setItems([]);
-    setNext(null);
+    // Preserve known links until a fresh head succeeds, including on failure.
     void loadPage().then((page) => {
       if (version !== generation.current) return;
       setItems(page.items);
       setTotal(page.total);
       setNext(page.nextCursor);
+      setNeedsRefresh(!page.nextCursor && page.items.length !== page.total);
     }).catch(() => {
       if (version === generation.current) {
+        setNeedsRefresh(true);
         setError(
           "Safety disclosures across the queue could not be checked. Cases with disclosures may not be shown here. Please retry.",
         );
@@ -47,12 +50,19 @@ export function SafetyDisclosures(
       if (version === generation.current) {
         inFlight.current = false;
         setBusy(false);
+        setRefreshing(false);
       }
     });
     return () => {
       generation.current++;
     };
   }, [refreshKey, retry, loadPage]);
+
+  function refresh() {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setRetry((value) => value + 1);
+  }
 
   async function more() {
     if (!next || inFlight.current) return;
@@ -63,13 +73,23 @@ export function SafetyDisclosures(
     try {
       const page = await loadPage(next);
       if (version !== generation.current) return;
-      setItems((current) => {
-        const known = new Set(current.map((item) => item.reference));
-        return [
-          ...current,
-          ...page.items.filter((item) => !known.has(item.reference)),
-        ];
-      });
+      const known = new Set(items.map((item) => item.reference));
+      const combined = [...items];
+      for (const item of page.items) {
+        if (!known.has(item.reference)) {
+          known.add(item.reference);
+          combined.push(item);
+        }
+      }
+      setItems(combined);
+      // An older cursor cannot reach cases that arrived above the first page.
+      // Keep the warning sticky until a successful fresh-head read replaces it.
+      if (
+        page.total !== total ||
+        (!page.nextCursor && combined.length !== page.total)
+      ) {
+        setNeedsRefresh(true);
+      }
       setTotal(page.total);
       setNext(page.nextCursor);
     } catch {
@@ -104,7 +124,18 @@ export function SafetyDisclosures(
           )
           : null}
         {error ? <p role="alert">{error}</p> : null}
-        {total === 0 && !busy && !error
+        {busy && total !== null && refreshing
+          ? <p role="status">Refreshing safety disclosures…</p>
+          : null}
+        {needsRefresh && total !== null
+          ? (
+            <p role="alert">
+              The disclosure list may have changed. Some references may be
+              missing. Refresh safety disclosures to load the latest references.
+            </p>
+          )
+          : null}
+        {total === 0 && !busy && !error && !needsRefresh
           ? (
             <p>
               No recorded safety disclosures were found across the queue at the
@@ -112,7 +143,7 @@ export function SafetyDisclosures(
             </p>
           )
           : null}
-        {total !== null && total > 0
+        {total !== null && (total > 0 || items.length > 0)
           ? (
             <>
               <p>
@@ -134,7 +165,18 @@ export function SafetyDisclosures(
                 ))}
               </ul>
               <p className="mt-2">
-                Showing {items.length} of {total} disclosure references.
+                {needsRefresh
+                  ? (
+                    <>
+                      Showing {items.length}{" "}
+                      previously loaded disclosure references.
+                    </>
+                  )
+                  : (
+                    <>
+                      Showing {items.length} of {total} disclosure references.
+                    </>
+                  )}
               </p>
             </>
           )
@@ -148,23 +190,25 @@ export function SafetyDisclosures(
               disabled={busy}
               onClick={() => void more()}
             >
-              {busy ? "Loading disclosures…" : "Load older safety disclosures"}
+              {busy && !refreshing
+                ? "Loading disclosures…"
+                : "Load older safety disclosures"}
             </Button>
           )
           : null}
-        {error && total === null
-          ? (
-            <Button
-              className="mt-3"
-              size="sm"
-              variant="outline"
-              disabled={busy}
-              onClick={() => setRetry((value) => value + 1)}
-            >
-              Retry safety check
-            </Button>
-          )
-          : null}
+        <Button
+          className="mt-3"
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={refresh}
+        >
+          {refreshing
+            ? "Refreshing safety disclosures…"
+            : error && total === null
+            ? "Retry safety check"
+            : "Refresh safety disclosures"}
+        </Button>
         <p className="mt-2">
           The site does not monitor emergencies. This is a list of recorded
           disclosures, not a live safety assessment.
