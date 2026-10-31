@@ -304,10 +304,16 @@ export interface ReviewLogEntry {
  * immutable snapshot; it never rewrites the original answer.
  */
 export interface CorrectionRecord {
-  id: number;
+  /** Live bigint IDs are strings; local preview records may use safe numbers. */
+  id: string | number;
   detail: string;
   recordedBy: string;
   recordedAt: string;
+}
+
+export interface CorrectionCursor {
+  at: string;
+  id: string;
 }
 
 export interface MarketingRevocationRecord {
@@ -327,6 +333,8 @@ export interface CaseRecord extends CaseDraft {
   /** Undefined means an older server could not establish history completeness. */
   reviewHistoryCursor?: ReviewHistoryCursor | null;
   corrections: CorrectionRecord[];
+  /** Undefined means an older server could not establish completeness. */
+  correctionsCursor?: CorrectionCursor | null;
   /** Append-only withdrawal evidence; the submitted consent snapshot is unchanged. */
   marketingRevocations: MarketingRevocationRecord[];
   draftSummary: DraftSummary;

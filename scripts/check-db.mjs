@@ -9,7 +9,7 @@
  * Run with `npm run check:db`.
  */
 import { PGlite } from "@electric-sql/pglite";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 const db = new PGlite();
 let failures = 0;
@@ -67,19 +67,9 @@ await exec(`
   grant usage on schema public to anon, authenticated, service_role;
 `);
 
-const migrations = [
-  "0001_pre_underwriting.sql",
-  "0002_case_corrections.sql",
-  "0003_reliability_and_access.sql",
-  "0004_reviewer_write_paths.sql",
-  "0005_case_summary_view.sql",
-  "0006_notification_terminal_state.sql",
-  "0007_marketing_revocation.sql",
-  "0008_marketing_revocation_idempotency.sql",
-  "0009_audited_case_access.sql",
-  "0010_notification_retry_window.sql",
-  "0011_queue_read_only.sql",
-].map((name) => readFileSync(`supabase/migrations/${name}`, "utf8"));
+const migrations = readdirSync("supabase/migrations")
+  .filter(name => name.endsWith(".sql")).sort()
+  .map(name => readFileSync(`supabase/migrations/${name}`, "utf8"));
 
 // Every migration must be safe to re-run.
 for (let round = 1; round <= 2; round += 1) {
