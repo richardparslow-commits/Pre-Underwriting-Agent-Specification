@@ -27,6 +27,7 @@ import { notificationDetailForStorage, sendCaseNotification } from "../_shared/e
 const MAX_ATTEMPTS = 5;
 const BATCH_SIZE = 20;
 const MIN_AGE_MS = 2 * 60 * 1000;
+const CLAIM_LEASE_MS = 10 * 60 * 1000;
 const MAX_AGE_DAYS = 7;
 /** Matches the provider's documented Idempotency-Key window. */
 const FIRST_ATTEMPT_WINDOW_HOURS = 24;
@@ -81,6 +82,8 @@ Deno.serve(async (req: Request) => {
   const now = Date.now();
   const olderThan = new Date(now - MIN_AGE_MS).toISOString();
   const newerThan = new Date(now - MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const dueAt = new Date(now).toISOString();
+  const leaseExpiredBefore = new Date(now - CLAIM_LEASE_MS).toISOString();
   // Second precision keeps the PostgREST filter unambiguous. The claim function
   // enforces the same bound, so this filter is a batch-starvation guard only.
   const firstAttemptCutoff = new Date(now - FIRST_ATTEMPT_WINDOW_HOURS * 60 * 60 * 1000)
@@ -100,6 +103,10 @@ Deno.serve(async (req: Request) => {
     .or(
       `notification_first_attempted_at.is.null,notification_first_attempted_at.gt.${firstAttemptCutoff}`,
     )
+    // Apply backoff and lease eligibility before the batch limit; the claim
+    // RPC still rechecks them atomically when each row is processed.
+    .or(`notification_next_attempt_at.is.null,notification_next_attempt_at.lte.${dueAt}`)
+    .or(`notification_claimed_at.is.null,notification_claimed_at.lt.${leaseExpiredBefore}`)
     .order("submitted_at", { ascending: true })
     .limit(BATCH_SIZE);
 
