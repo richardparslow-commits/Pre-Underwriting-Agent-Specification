@@ -26,7 +26,7 @@
     "test:engine": "tsx --test src/features/interview/engine.test.ts",
     "test:submission-ui": "tsx --test src/features/intake/submission-ui.test.tsx src/features/interview/submissionRetry.test.tsx",
     "test:validation": "tsx --test src/features/intake/validation.test.ts",
-    "test:reviewer-visibility": "tsx --test src/features/portal/reviewerVisibility.test.tsx src/features/portal/correctionHistory.test.tsx src/features/portal/safetyPaging.test.tsx src/features/portal/useCaseQueue.test.tsx src/lib/reviewerSignInFeedback.test.ts",
+    "test:reviewer-visibility": "tsx --test src/features/portal/reviewerVisibility.test.tsx src/features/portal/correctionHistory.test.tsx src/features/portal/safetyPaging.test.tsx src/features/portal/useCaseQueue.test.tsx src/lib/reviewerSignInFeedback.test.ts src/lib/queuePaging.test.ts",
     "check:reviewer-visibility": "node --test scripts/check-reviewer-visibility.mjs",
     "check:db": "node scripts/check-db.mjs",
     "report:reconciliation": "tsx scripts/report-reconciliation.ts"

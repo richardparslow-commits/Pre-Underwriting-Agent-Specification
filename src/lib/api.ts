@@ -1,3 +1,4 @@
+import { readCaseQueue } from "./queuePaging";
 import { initialCorrections, readCorrections, type CorrectionPage } from "./correctionHistory";
 import { initialReviewHistory, readReviewHistory, readSafetyDisclosures } from "./reviewerVisibility";
 import type { ReviewHistoryPage, SafetyCursor, SafetyPage } from "./reviewerVisibility";
@@ -68,19 +69,6 @@ interface CaseRow {
   notification_detail: string | null;
   notification_updated_at: string | null;
   crisis_disclosure: boolean;
-}
-
-/** Queue projection. Deliberately has no payload or answer field. */
-interface CaseSummaryRow {
-  reference: string;
-  submitted_at: string;
-  status: CaseStatus;
-  notification_state: NotificationState;
-  crisis_disclosure: boolean;
-  first_name: string | null;
-  last_name: string | null;
-  residence_state: string | null;
-  unanswered: number;
 }
 
 function notificationFromRow(
@@ -410,22 +398,6 @@ export async function submitCase(
 // Reviewer portal
 // ---------------------------------------------------------------------------
 
-const QUEUE_PAGE_SIZE = 25;
-
-function summaryToItem(row: CaseSummaryRow): CaseListItem {
-  return {
-    reference: row.reference,
-    submittedAt: row.submitted_at,
-    status: row.status,
-    notificationState: row.notification_state,
-    crisisDisclosure: row.crisis_disclosure,
-    firstName: row.first_name ?? "",
-    lastName: row.last_name ?? "",
-    residenceState: row.residence_state ?? "",
-    unanswered: Number(row.unanswered) || 0,
-  };
-}
-
 /**
  * One page of the reviewer queue.
  *
@@ -456,42 +428,7 @@ export async function listCases(cursor?: string): Promise<CasePage> {
 
   if (!supabase) throw new Error("Sign-in is not configured.");
 
-  // The queue is a metadata projection. Never select `payload` here: that
-  // would transfer every health answer for a whole page before the reviewer
-  // opens any of them and would bypass the per-case `opened` audit.
-  let query = supabase
-    .from("case_summaries")
-    .select(
-      "reference, submitted_at, status, notification_state, crisis_disclosure, first_name, last_name, residence_state, unanswered",
-      { count: "exact" },
-    )
-    .order("submitted_at", { ascending: false })
-    .order("reference", { ascending: false })
-    .limit(QUEUE_PAGE_SIZE + 1);
-
-  if (cursor) {
-    const separator = cursor.indexOf("|");
-    const submittedAt = cursor.slice(0, separator);
-    const reference = cursor.slice(separator + 1);
-    if (separator < 1 || !reference) throw new Error("The case cursor is not valid.");
-    query = query.or(
-      `submitted_at.lt.${submittedAt},and(submitted_at.eq.${submittedAt},reference.lt.${reference})`,
-    );
-  }
-
-  const { data, error, count } = await query;
-  if (error) throw new Error("Cases could not be loaded.");
-
-  const rows = (data ?? []) as CaseSummaryRow[];
-  const page = rows.slice(0, QUEUE_PAGE_SIZE);
-  const last = page[page.length - 1];
-  const hasMore = rows.length > QUEUE_PAGE_SIZE;
-
-  return {
-    items: page.map(summaryToItem),
-    total: count ?? page.length,
-    nextCursor: hasMore && last ? `${last.submitted_at}|${last.reference}` : null,
-  };
+  return readCaseQueue(supabase, cursor);
 }
 
 /** Independent of normal queue pagination; no full case payload is selected. */
