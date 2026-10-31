@@ -1,3 +1,4 @@
+import { initialCorrections, readCorrections, type CorrectionPage } from "./correctionHistory";
 import { initialReviewHistory, readReviewHistory, readSafetyDisclosures } from "./reviewerVisibility";
 import type { ReviewHistoryPage, SafetyCursor, SafetyPage } from "./reviewerVisibility";
 import { PREVIEW_MODE, SUBMIT_CASE_URL, SUPABASE_ANON_KEY, SITE } from "@/config/site";
@@ -11,7 +12,7 @@ import type {
   CaseDraft,
   CaseRecord,
   CaseStatus,
-  CorrectionRecord,
+  CorrectionCursor,
   MarketingRevocationRecord,
   NotificationRecord,
   NotificationState,
@@ -514,11 +515,20 @@ export async function listCaseReviewHistory(reference: string, cursor?: ReviewHi
   return readReviewHistory(supabase, reference, cursor);
 }
 
+export async function listCaseCorrections(reference: string, cursor: CorrectionCursor): Promise<CorrectionPage> {
+  if (PREVIEW_MODE) {
+    ensurePreviewSeed();
+    return { items: previewCases.get(reference)?.corrections ?? [], nextCursor: null };
+  }
+  if (!supabase) throw new Error("Corrections could not be loaded: sign-in is not configured.");
+  return readCorrections(supabase, reference, cursor);
+}
+
 export async function getCase(reference: string): Promise<CaseRecord | null> {
   if (PREVIEW_MODE) {
     ensurePreviewSeed();
     const record = previewCases.get(reference);
-    return record ? { ...record, reviewHistoryCursor: null } : null;
+    return record ? { ...record, reviewHistoryCursor: null, correctionsCursor: null } : null;
   }
 
   if (!supabase) throw new Error("Sign-in is not configured.");
@@ -541,14 +551,7 @@ export async function getCase(reference: string): Promise<CaseRecord | null> {
   const record = fromRow(result.case);
   const { reviewLog, reviewHistoryCursor } = initialReviewHistory(result);
 
-  const corrections: CorrectionRecord[] = Array.isArray(result.corrections)
-    ? result.corrections.map((entry) => ({
-        id: Number(entry.id),
-        detail: String(entry.detail ?? ""),
-        recordedBy: String(entry.recorded_by ?? ""),
-        recordedAt: String(entry.created_at ?? ""),
-      }))
-    : [];
+  const { corrections, correctionsCursor } = initialCorrections(result);
 
   const marketingRevocations: MarketingRevocationRecord[] = Array.isArray(result.revocations)
     ? result.revocations.map((entry) => ({
@@ -562,7 +565,7 @@ export async function getCase(reference: string): Promise<CaseRecord | null> {
 
   return {
     ...record, reviewLog, corrections, marketingRevocations,
-    reviewHistoryCursor,
+    reviewHistoryCursor, correctionsCursor,
   };
 }
 

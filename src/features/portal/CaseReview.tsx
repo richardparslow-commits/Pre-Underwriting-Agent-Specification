@@ -25,6 +25,7 @@ import { recordCorrection, recordReview } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { ReviewHistory } from "./ReviewHistory";
+import { CorrectionHistory } from "./CorrectionHistory";
 import { StatusTimeline } from "@/features/intake/StatusTimeline";
 
 const DISPOSITION: Record<Disposition, { label: string; tone: "ok" | "warn" | "danger" | "neutral" | "outline" }> = {
@@ -528,19 +529,12 @@ export function CaseReview({
               the submitted answers, with who recorded it and when. The original snapshot is never
               edited.
             </p>
-            <ul className="mt-3 space-y-3">
-              {record.corrections.length === 0 ? (
-                <li className="text-xs text-muted-foreground">No corrections recorded.</li>
-              ) : null}
-              {record.corrections.map((correction) => (
-                <li key={correction.id} className="text-xs">
-                  <p className="leading-relaxed text-foreground">{correction.detail}</p>
-                  <p className="mt-1 text-muted-foreground">
-                    {correction.recordedBy} · {formatDate(correction.recordedAt)}
-                  </p>
-                </li>
-              ))}
-            </ul>
+            <CorrectionHistory
+              key={`${record.reference}:${record.reviewLog[0]?.id ?? record.reviewLog[0]?.at ?? ""}`}
+              reference={record.reference}
+              entries={record.corrections}
+              cursor={record.correctionsCursor}
+            />
 
             {correctionOpen ? (
               <div className="mt-4 space-y-2 border-t border-border pt-4">
