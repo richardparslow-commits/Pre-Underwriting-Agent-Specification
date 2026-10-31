@@ -295,6 +295,16 @@ magic link falls back to the project site URL. A forwarded notification email gr
 without that session. If a reviewer loses the authenticator, an operator must
 remove the factor before a replacement can be enrolled.
 
+A second tab preserves an existing unverified TOTP setup instead of deleting it.
+It can finish with a code from the already-scanned authenticator, or recheck after
+the original tab completes setup. It never copies the original tab's QR/secret
+or grants access just because a factor is listed as verified. With the one-factor
+limit, a setup whose QR was lost before scanning needs operator recovery: confirm
+which reviewer and setup are affected and arrange removal of that pending factor
+through the normal account administration process. The portal never performs
+that removal automatically. No MFA factor limit or assurance policy is relaxed.
+
+
 ### 3. Deploy the functions
 
 Set secrets (never in this repository):
