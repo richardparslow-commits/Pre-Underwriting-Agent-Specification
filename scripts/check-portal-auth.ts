@@ -47,9 +47,11 @@ requireMarker("src/pages/PortalPage.tsx", portal, "of {total} case", "the queue 
 
 const api = read("src/lib/api.ts");
 requireMarker("src/lib/api.ts", api, "shouldCreateUser: false", "a magic link must not create an account");
-requireMarker("src/lib/api.ts", api, "count: \"exact\"", "the queue needs an exact total");
+const queuePaging = read("src/lib/queuePaging.ts");
+requireMarker("src/lib/api.ts", api, "readCaseQueue(supabase, cursor)", "the live API must use the tested queue transport");
+requireMarker("src/lib/queuePaging.ts", queuePaging, "count: \"exact\", head: true", "the queue needs an independent exact count without transferring rows");
 requireMarker("src/lib/api.ts", api, "nextCursor", "the queue needs a cursor for older cases");
-requireMarker("src/lib/api.ts", api, ".limit(QUEUE_PAGE_SIZE + 1)", "the queue must detect whether another page exists");
+requireMarker("src/lib/queuePaging.ts", queuePaging, ".limit(QUEUE_PAGE_SIZE + 1)", "the queue must detect whether another page exists");
 requireMarker(
   "src/lib/api.ts",
   api,
