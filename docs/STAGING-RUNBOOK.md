@@ -408,3 +408,9 @@ Redact addresses and any token. Record command, expected value and actual value 
 | 12 | Backlog privacy | signed-in read denied | |
 
 **A run is complete only when the table is filled in, the evidence directory exists, and no check is marked passed without an output.** This runbook does not by itself close `SC-03`, `AS-07` or any legal or clinical gate.
+
+## Forwarded-header bypass regression
+
+Run `deno test --allow-env --lock=deno.lock supabase/functions/tests/rate-limit-identity_test.ts`. The real public handlers use a synthetic database transport: the first 10 valid case submissions (or 5 valid withdrawals) reach the synthetic write path, then repeated requests with changed forwarded-IP headers, source ports and idempotency keys receive 429. The tests also cover absent runtime peer metadata and never send mail or hosted writes.
+
+On hosted staging, retain `QUESTIONNAIRE_APPROVED=false`; do not unlock intake to test its limit. Verify locked 503 before and after function replacement. Any hosted withdrawal probe must use a clearly synthetic, nonexistent case/contact pair and must not notify a marketing vendor. Inspect only aggregate quotas and the absence of test business records. Hosted gateway peers or the missing-peer fallback can share quota across users; assess capacity before launch.
