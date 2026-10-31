@@ -30,6 +30,12 @@ service. The following are deliberate, visible gaps:
 | Retention / deletion job | Deletion and expiry functions are implemented in `0003_reliability_and_access.sql`; the schedule stays unset (`retention_months = null`) until counsel approves it. |
 | Carrier screening, quoting, rate classes | Intentionally absent. |
 
+**Heal priority repair batch (29 Oct 2026):** [deployment and regression notes](docs/HEAL-PRIORITY-REPAIRS.md)
+cover read-only queue permissions, edited-payload replay conflicts and explicit
+lead-field limits. Deploy forward migration `0011` with the updated intake
+function/browser build; these changes have not been applied to a hosted project.
+Other Heal defects and the existing launch gates remain open.
+
 Preview mode (the default) is fully local: no backend, no email, no data leaves
 the browser tab.
 
@@ -105,6 +111,7 @@ supabase/
   migrations/0008_marketing_revocation_idempotency.sql
   migrations/0009_audited_case_access.sql
   migrations/0010_notification_retry_window.sql
+  migrations/0011_queue_read_only.sql
   ops/retry-schedule.sql         operator-applied pg_cron schedule
   functions/submit-case/         public intake, server-generated reference
   functions/revoke-marketing/    public opt-out, reference plus contact match
@@ -287,6 +294,16 @@ for local live mode, or `https://<site>/portal` in production); otherwise the
 magic link falls back to the project site URL. A forwarded notification email grants nothing
 without that session. If a reviewer loses the authenticator, an operator must
 remove the factor before a replacement can be enrolled.
+
+A second tab preserves an existing unverified TOTP setup instead of deleting it.
+It can finish with a code from the already-scanned authenticator, or recheck after
+the original tab completes setup. It never copies the original tab's QR/secret
+or grants access just because a factor is listed as verified. With the one-factor
+limit, a setup whose QR was lost before scanning needs operator recovery: confirm
+which reviewer and setup are affected and arrange removal of that pending factor
+through the normal account administration process. The portal never performs
+that removal automatically. No MFA factor limit or assurance policy is relaxed.
+
 
 ### 3. Deploy the functions
 
@@ -514,3 +531,18 @@ entity, its role and its vendors. The specification’s launch gates — counsel
 review of the sensitive questions, authorized wording, TCPA disclosure, state and
 carrier restrictions, retention schedule and vendor arrangements — remain
 outstanding and are tracked in [docs/LAUNCH-GATES.md](docs/LAUNCH-GATES.md).
+
+
+## Heal reviewer visibility repairs
+
+[Review-history pagination and queue-wide safety disclosures](docs/HEAL-REVIEWER-VISIBILITY.md)
+require forward migration `0012` and the matching portal build. These fixes are
+separate from the `0011` queue-permissions/submission-integrity repair. The
+application remains in testing; deployment evidence and other Heal defects
+remain outstanding.
+
+### Public endpoint rate-limit identity
+
+The public submission and marketing-withdrawal functions use `Deno.serve` connection metadata (`info.remoteAddr`) to select their salted durable quota. They never trust `X-Forwarded-For`, `Forwarded`, `X-Real-IP` or `CF-Connecting-IP`; source TCP ports and request content cannot create fresh quotas. If the runtime supplies no usable TCP peer, requests share the conservative `shared:unverified-peer` quota. Submission retains 10 requests per 600 seconds; withdrawal retains its separate 5 per 600 seconds. Missing durable configuration still fails closed in production.
+
+A transport peer can be a hosting gateway, so several visitors can share a quota. This deliberately favors bounded anonymous writes over guessing a visitor IP. Verify hosted capacity/fairness before enabling intake. A future per-visitor proxy policy must authenticate its metadata; choosing a header name is insufficient. No forwarded-header trust setting is provided. See [Deno connection metadata](https://docs.deno.com/api/deno/http-server/) and [Supabase gateway architecture](https://supabase.com/docs/guides/functions). No launch lock is relaxed by this repair.

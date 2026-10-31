@@ -23,7 +23,7 @@
  */
 
 import {
-  clientKey,
+  connectionRateKey,
   jsonResponse,
   readBodyWithLimit,
   resolveOrigin,
@@ -126,7 +126,7 @@ export function validateRevocation(body: unknown): ValidationResult {
   };
 }
 
-async function durableRateLimited(req: Request): Promise<boolean | null> {
+async function durableRateLimited(rateKey: string): Promise<boolean | null> {
   const url = Deno.env.get("SUPABASE_URL");
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const salt = Deno.env.get("RATE_LIMIT_SALT");
@@ -135,7 +135,7 @@ async function durableRateLimited(req: Request): Promise<boolean | null> {
   try {
     const digest = await crypto.subtle.digest(
       "SHA-256",
-      new TextEncoder().encode(`${salt}:revoke-marketing:${clientKey(req)}`),
+      new TextEncoder().encode(`${salt}:revoke-marketing:${rateKey}`),
     );
     const hash = Array.from(new Uint8Array(digest), (byte) =>
       byte.toString(16).padStart(2, "0"),
@@ -172,7 +172,7 @@ function corsPreflight(origin: string): Response {
   });
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(async (req: Request, info?: Deno.ServeHandlerInfo<Deno.NetAddr>) => {
   const origin = resolveOrigin(req);
 
   if (req.method === "OPTIONS") {
@@ -221,7 +221,8 @@ Deno.serve(async (req: Request) => {
 
   // Validate before spending a rate-limit slot: a malformed request should not
   // let an attacker exhaust a real customer's revocation attempts.
-  const durableLimited = await durableRateLimited(req);
+  const rateKey = connectionRateKey(info);
+  const durableLimited = await durableRateLimited(rateKey);
   if (durableLimited === true) {
     return jsonResponse(
       { error: "Too many requests from this connection. Please try again shortly." },

@@ -1,6 +1,9 @@
+import { readCaseQueue } from "./queuePaging";
+import { initialCorrections, readCorrections, type CorrectionPage } from "./correctionHistory";
+import { initialReviewHistory, readReviewHistory, readSafetyDisclosures } from "./reviewerVisibility";
+import type { ReviewHistoryPage, SafetyCursor, SafetyPage } from "./reviewerVisibility";
 import { PREVIEW_MODE, SUBMIT_CASE_URL, SUPABASE_ANON_KEY, SITE } from "@/config/site";
 import { supabase } from "@/integrations/supabase/client";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildConsentRecords, SUBMISSION_ACKNOWLEDGEMENT_TEXT, CONSENT_VERSION } from "@/features/consent/consentTexts";
 import { buildDraftSummary } from "@/features/interview/engine";
 import { QUESTION_BY_ID } from "@/features/interview/questionBank";
@@ -10,11 +13,12 @@ import type {
   CaseDraft,
   CaseRecord,
   CaseStatus,
-  CorrectionRecord,
+  CorrectionCursor,
   MarketingRevocationRecord,
   NotificationRecord,
   NotificationState,
   ReviewLogEntry,
+  ReviewHistoryCursor,
   SubmittedAnswer,
   SubmissionReceipt,
 } from "@/features/interview/types";
@@ -65,19 +69,6 @@ interface CaseRow {
   notification_detail: string | null;
   notification_updated_at: string | null;
   crisis_disclosure: boolean;
-}
-
-/** Queue projection. Deliberately has no payload or answer field. */
-interface CaseSummaryRow {
-  reference: string;
-  submitted_at: string;
-  status: CaseStatus;
-  notification_state: NotificationState;
-  crisis_disclosure: boolean;
-  first_name: string | null;
-  last_name: string | null;
-  residence_state: string | null;
-  unanswered: number;
 }
 
 function notificationFromRow(
@@ -407,22 +398,6 @@ export async function submitCase(
 // Reviewer portal
 // ---------------------------------------------------------------------------
 
-const QUEUE_PAGE_SIZE = 25;
-
-function summaryToItem(row: CaseSummaryRow): CaseListItem {
-  return {
-    reference: row.reference,
-    submittedAt: row.submitted_at,
-    status: row.status,
-    notificationState: row.notification_state,
-    crisisDisclosure: row.crisis_disclosure,
-    firstName: row.first_name ?? "",
-    lastName: row.last_name ?? "",
-    residenceState: row.residence_state ?? "",
-    unanswered: Number(row.unanswered) || 0,
-  };
-}
-
 /**
  * One page of the reviewer queue.
  *
@@ -452,62 +427,45 @@ export async function listCases(cursor?: string): Promise<CasePage> {
   }
 
   if (!supabase) throw new Error("Sign-in is not configured.");
-  return listLiveCases(supabase, cursor);
+
+  return readCaseQueue(supabase, cursor);
 }
 
-/** Fetch a live page and an unfiltered count of rows visible under the reviewer's RLS. */
-export async function listLiveCases(client: SupabaseClient, cursor?: string): Promise<CasePage> {
-  // The queue is a metadata projection. Never select `payload` here: that
-  // would transfer every health answer for a whole page before the reviewer
-  // opens any of them and would bypass the per-case `opened` audit.
-  let query = client
-    .from("case_summaries")
-    .select(
-      "reference, submitted_at, status, notification_state, crisis_disclosure, first_name, last_name, residence_state, unanswered",
-      { count: "exact" },
-    )
-    .order("submitted_at", { ascending: false })
-    .order("reference", { ascending: false })
-    .limit(QUEUE_PAGE_SIZE + 1);
-
-  if (cursor) {
-    const separator = cursor.indexOf("|");
-    const submittedAt = cursor.slice(0, separator);
-    const reference = cursor.slice(separator + 1);
-    if (separator < 1 || !reference) throw new Error("The case cursor is not valid.");
-    query = query.or(
-      `submitted_at.lt.${submittedAt},and(submitted_at.eq.${submittedAt},reference.lt.${reference})`,
-    );
+/** Independent of normal queue pagination; no full case payload is selected. */
+export async function listSafetyDisclosures(cursor?: SafetyCursor): Promise<SafetyPage> {
+  if (PREVIEW_MODE) {
+    ensurePreviewSeed();
+    const items = [...previewCases.values()].filter((record) => record.crisisDisclosure)
+      .map(({ reference, submittedAt, status }) => ({ reference, submittedAt, status }));
+    return { items, total: items.length, nextCursor: null };
   }
+  if (!supabase) throw new Error("Safety disclosures could not be checked: sign-in is not configured.");
+  return readSafetyDisclosures(supabase, cursor);
+}
 
-  // The cursor limits the page query's count to older rows. On later pages,
-  // obtain a separate queue-wide count under the same reviewer RLS policies.
-  const [result, totalResult] = await Promise.all([
-    query,
-    cursor
-      ? client.from("case_summaries").select("reference", { count: "exact", head: true })
-      : Promise.resolve(null),
-  ]);
-  const { data, error, count } = result;
-  const total = totalResult ? totalResult.count : count;
-  if (error || totalResult?.error || total === null) throw new Error("Cases could not be loaded.");
+export async function listCaseReviewHistory(reference: string, cursor?: ReviewHistoryCursor): Promise<ReviewHistoryPage> {
+  if (PREVIEW_MODE) {
+    ensurePreviewSeed();
+    return { items: previewCases.get(reference)?.reviewLog ?? [], nextCursor: null };
+  }
+  if (!supabase) throw new Error("Review history could not be loaded: sign-in is not configured.");
+  return readReviewHistory(supabase, reference, cursor);
+}
 
-  const rows = (data ?? []) as CaseSummaryRow[];
-  const page = rows.slice(0, QUEUE_PAGE_SIZE);
-  const last = page[page.length - 1];
-  const hasMore = rows.length > QUEUE_PAGE_SIZE;
-
-  return {
-    items: page.map(summaryToItem),
-    total,
-    nextCursor: hasMore && last ? `${last.submitted_at}|${last.reference}` : null,
-  };
+export async function listCaseCorrections(reference: string, cursor: CorrectionCursor): Promise<CorrectionPage> {
+  if (PREVIEW_MODE) {
+    ensurePreviewSeed();
+    return { items: previewCases.get(reference)?.corrections ?? [], nextCursor: null };
+  }
+  if (!supabase) throw new Error("Corrections could not be loaded: sign-in is not configured.");
+  return readCorrections(supabase, reference, cursor);
 }
 
 export async function getCase(reference: string): Promise<CaseRecord | null> {
   if (PREVIEW_MODE) {
     ensurePreviewSeed();
-    return previewCases.get(reference) ?? null;
+    const record = previewCases.get(reference);
+    return record ? { ...record, reviewHistoryCursor: null, correctionsCursor: null } : null;
   }
 
   if (!supabase) throw new Error("Sign-in is not configured.");
@@ -522,29 +480,15 @@ export async function getCase(reference: string): Promise<CaseRecord | null> {
 
   const result = data as {
     case: CaseRow;
-    review_log: Array<{ action: string; actor: string; created_at: string; note: string | null }>;
-    review_log_total?: number;
+    review_log_cursor?: unknown;
+    review_log: Array<{ id?: string; action: string; actor: string; created_at: string; note: string | null }>;
     corrections: Array<{ id: number; detail: string; recorded_by: string; created_at: string }>;
     revocations: Array<{ channel: string; reason: string | null; source: string; recorded_by: string; created_at: string }>;
   };
   const record = fromRow(result.case);
-  const reviewLog: ReviewLogEntry[] = Array.isArray(result.review_log)
-    ? result.review_log.map((entry) => ({
-        action: entry.action as ReviewLogEntry["action"],
-        actor: String(entry.actor ?? ""),
-        at: String(entry.created_at ?? ""),
-        note: typeof entry.note === "string" ? entry.note : undefined,
-      }))
-    : [];
+  const { reviewLog, reviewHistoryCursor } = initialReviewHistory(result);
 
-  const corrections: CorrectionRecord[] = Array.isArray(result.corrections)
-    ? result.corrections.map((entry) => ({
-        id: Number(entry.id),
-        detail: String(entry.detail ?? ""),
-        recordedBy: String(entry.recorded_by ?? ""),
-        recordedAt: String(entry.created_at ?? ""),
-      }))
-    : [];
+  const { corrections, correctionsCursor } = initialCorrections(result);
 
   const marketingRevocations: MarketingRevocationRecord[] = Array.isArray(result.revocations)
     ? result.revocations.map((entry) => ({
@@ -557,11 +501,8 @@ export async function getCase(reference: string): Promise<CaseRecord | null> {
     : [];
 
   return {
-    ...record,
-    reviewLog,
-    reviewLogTotal: Number(result.review_log_total ?? reviewLog.length),
-    corrections,
-    marketingRevocations,
+    ...record, reviewLog, corrections, marketingRevocations,
+    reviewHistoryCursor, correctionsCursor,
   };
 }
 

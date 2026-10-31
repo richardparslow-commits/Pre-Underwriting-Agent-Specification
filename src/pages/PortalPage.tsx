@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  AlertTriangle,
   ArrowRight,
   Loader2,
   LockKeyhole,
@@ -14,10 +13,11 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/form";
 import { Alert, Badge } from "@/components/ui/surface";
 import { SITE } from "@/config/site";
+import { SafetyDisclosures } from "@/features/portal/SafetyDisclosures";
 import { MfaGate } from "@/features/portal/MfaGate";
 import { useReviewerAuth } from "@/features/portal/useReviewerAuth";
-import { runQueueLoad } from "@/features/portal/queueLoad";
-import { listCases, type CaseListItem } from "@/lib/api";
+import { listCases } from "@/lib/api";
+import { useCaseQueue } from "@/features/portal/useCaseQueue";
 import type { CaseStatus, NotificationState } from "@/features/interview/types";
 import { formatDate } from "@/lib/utils";
 
@@ -97,9 +97,11 @@ function SignInCard({ auth }: { auth: ReturnType<typeof useReviewerAuth> }) {
           </Alert>
         ) : null}
         {auth.error ? (
-          <Alert tone="danger" className="mt-4">
-            {auth.error}
-          </Alert>
+          <div role="alert">
+            <Alert tone="danger" className="mt-4">
+              {auth.error}
+            </Alert>
+          </div>
         ) : null}
 
         <p className="mt-6 border-t border-border pt-4 text-[0.7rem] leading-relaxed text-muted-foreground">
@@ -115,37 +117,12 @@ function SignInCard({ auth }: { auth: ReturnType<typeof useReviewerAuth> }) {
 
 export default function PortalPage() {
   const auth = useReviewerAuth();
-  const [cases, setCases] = useState<CaseListItem[] | null>(null);
-  const [total, setTotal] = useState(0);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const queueBusy = useRef(false);
-
-  const load = useCallback((cursor?: string) => runQueueLoad(queueBusy, listCases, {
-    started: (appending) => {
-      if (appending) setLoadingMore(true);
-      else setLoading(true);
-      setError(null);
-    },
-    received: (page, appending) => {
-      setCases((current) => (appending ? [...(current ?? []), ...page.items] : page.items));
-      setTotal(page.total);
-      setNextCursor(page.nextCursor);
-    },
-    failed: (loadError) => {
-      setError(loadError instanceof Error ? loadError.message : "Cases could not be loaded.");
-    },
-    finished: () => {
-      setLoading(false);
-      setLoadingMore(false);
-    },
-  }, cursor), []);
-
-  useEffect(() => {
-    if (auth.signedIn) void load();
-  }, [auth.signedIn, load]);
+  const [safetyRefresh, setSafetyRefresh] = useState(0);
+  const { cases, total, nextCursor, error, loading, loadingMore, load } = useCaseQueue(
+    auth.signedIn && !auth.loading,
+    listCases,
+    auth.email,
+  );
 
   if (auth.loading) {
     return (
@@ -194,8 +171,6 @@ export default function PortalPage() {
     );
   }
 
-  const crisisCases = (cases ?? []).filter((item) => item.crisisDisclosure);
-
   return (
     <div className="container py-10 sm:py-14">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -208,7 +183,12 @@ export default function PortalPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading || loadingMore}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { void load(); setSafetyRefresh((value) => value + 1); }}
+            disabled={loading || loadingMore}
+          >
             {loading ? <Loader2 className="animate-spin" aria-hidden /> : <RefreshCw aria-hidden />}
             Refresh
           </Button>
@@ -226,19 +206,7 @@ export default function PortalPage() {
         </Alert>
       ) : null}
 
-      {crisisCases.length > 0 ? (
-        <Alert tone="danger" className="mt-6" title="Current safety disclosure">
-          <div className="flex gap-2">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-            <p>
-              {crisisCases.length} case{crisisCases.length === 1 ? "" : "s"} include a disclosure of
-              current thoughts of self-harm. Review{" "}
-              {crisisCases.map((item) => item.reference).join(", ")} first. The site did not and does
-              not monitor an emergency.
-            </p>
-          </div>
-        </Alert>
-      ) : null}
+      <SafetyDisclosures refreshKey={safetyRefresh} />
 
       {error ? (
         <Alert tone="danger" className="mt-6">

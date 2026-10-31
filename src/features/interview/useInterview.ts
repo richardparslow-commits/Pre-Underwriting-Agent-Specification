@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
+import type { IntakeNavigation } from "./useIntakeHistory";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   buildCaseDraft,
   crisisDisclosed,
@@ -22,12 +23,17 @@ import { QUESTION_BY_ID } from "./questionBank";
 import {
   buildConsentRecords,
   CONSENT_VERSION,
-  SUBMISSION_ACKNOWLEDGEMENT_TEXT,
   type ConsentSelection,
   type ConsentTimestamps,
+  SUBMISSION_ACKNOWLEDGEMENT_TEXT,
 } from "@/features/consent/consentTexts";
 
-export type IntakeStep = "lead" | "permission" | "interview" | "review" | "submitted";
+export type IntakeStep =
+  | "lead"
+  | "permission"
+  | "interview"
+  | "review"
+  | "submitted";
 
 export interface ConsentState extends ConsentSelection {
   timestamps: ConsentTimestamps;
@@ -58,7 +64,7 @@ export interface InterviewHook {
   prefilledIds: string[];
   receipt: SubmissionReceipt | null;
   draft: CaseDraft | null;
-  /** Stable per-draft key; a retry reuses it so the server can deduplicate. */
+  /** Stable intake operation key: retries deduplicate; edits after a saved request conflict. */
   submissionKey: string;
   currentQuestionId: string | null;
   crisis: boolean;
@@ -83,8 +89,8 @@ export interface InterviewHook {
  * The interview state lives in memory only. Health answers are intentionally
  * never written to localStorage, sessionStorage, analytics or the URL.
  */
-export function useInterview(): InterviewHook {
-  const [step, setStep] = useState<IntakeStep>("lead");
+export function useInterview(navigation?: IntakeNavigation): InterviewHook {
+  const [localStep, setLocalStep] = useState<IntakeStep>("lead");
   const [lead, setLead] = useState<Partial<LeadDetails>>({
     preferredContact: "email",
     state: "",
@@ -93,44 +99,70 @@ export function useInterview(): InterviewHook {
   });
   const [consent, setConsentState] = useState<ConsentState>(EMPTY_CONSENT);
   const [answers, setAnswers] = useState<Answers>({});
-  const [acknowledgements, setAcknowledgements] = useState<SubmissionAcknowledgement[]>([]);
+  const [acknowledgements, setAcknowledgements] = useState<
+    SubmissionAcknowledgement[]
+  >([]);
+  // Retain the first confirmation for this unchanged review in memory. An
+  // uncertain submit may already be saved; re-ticking must send identical evidence.
+  const reviewConfirmation = useRef<SubmissionAcknowledgement | null>(null);
   const [prefilledIds, setPrefilledIds] = useState<string[]>([]);
   const [receipt, setReceipt] = useState<SubmissionReceipt | null>(null);
+  const requestedStep = navigation?.step ?? localStep;
+  // Browser history cannot reopen a completed submission or bypass a withdrawn
+  // permission. History is navigation metadata, never evidence of consent.
+  const requiresPermission = navigation &&
+    (requestedStep === "interview" || requestedStep === "review") && !consent.intakePermission;
+  const step = receipt ? "submitted" : requiresPermission ? "permission" : requestedStep;
+  const setStep = navigation?.go ?? setLocalStep;
   const [submissionKey, setSubmissionKey] = useState(() => crypto.randomUUID());
-  const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(null);
+  const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(
+    null,
+  );
   const [startedAt] = useState(() => new Date().toISOString());
 
   const progress = useMemo(() => progressFor(answers), [answers]);
   const visible = useMemo(() => visibleQuestions(answers), [answers]);
   const crisis = useMemo(() => crisisDisclosed(answers), [answers]);
 
-  const setLeadField = useCallback((field: keyof LeadDetails, value: string) => {
-    setLead((current) => ({ ...current, [field]: value }));
+  const invalidateReview = useCallback(() => {
+    reviewConfirmation.current = null;
     setAcknowledgements([]);
   }, []);
+
+  const setLeadField = useCallback(
+    (field: keyof LeadDetails, value: string) => {
+      setLead((current) => ({ ...current, [field]: value }));
+      invalidateReview();
+    },
+    [invalidateReview],
+  );
 
   const setAdultAttested = useCallback((value: boolean) => {
     setLead((current) => ({ ...current, adultAttested: value }));
-    setAcknowledgements([]);
-  }, []);
+    invalidateReview();
+  }, [invalidateReview]);
 
-  const setConsent = useCallback((key: keyof ConsentSelection, value: boolean) => {
-    setConsentState((current) => {
-      const timestamps = { ...current.timestamps };
-      const consentId = CONSENT_ID_BY_KEY[key];
-      if (value) {
-        timestamps[consentId] = new Date().toISOString();
-      } else {
-        delete timestamps[consentId];
-      }
-      return { ...current, [key]: value, timestamps };
-    });
-  }, []);
+  const setConsent = useCallback(
+    (key: keyof ConsentSelection, value: boolean) => {
+      invalidateReview();
+      setConsentState((current) => {
+        const timestamps = { ...current.timestamps };
+        const consentId = CONSENT_ID_BY_KEY[key];
+        if (value) {
+          timestamps[consentId] = new Date().toISOString();
+        } else {
+          delete timestamps[consentId];
+        }
+        return { ...current, [key]: value, timestamps };
+      });
+    },
+    [invalidateReview],
+  );
 
   // Returning from the review screen should not ask for permission twice.
   const begin = useCallback(
     () => setStep(consent.intakePermission ? "interview" : "permission"),
-    [consent.intakePermission],
+    [consent.intakePermission, setStep],
   );
 
   const givePermission = useCallback(() => {
@@ -144,49 +176,74 @@ export function useInterview(): InterviewHook {
     const dateOfBirth = lead.dateOfBirth?.trim();
     const prefill: Answers = {};
     if (residence && state && !answers["ID-03"]) {
-      prefill[residence.id] = { value: state, updatedAt: new Date().toISOString() };
+      prefill[residence.id] = {
+        value: state,
+        updatedAt: new Date().toISOString(),
+      };
     }
     if (birth && dateOfBirth && !answers["ID-01"]) {
-      prefill[birth.id] = { value: dateOfBirth, updatedAt: new Date().toISOString() };
+      prefill[birth.id] = {
+        value: dateOfBirth,
+        updatedAt: new Date().toISOString(),
+      };
     }
     if (Object.keys(prefill).length > 0) {
+      invalidateReview();
       setAnswers((current) => ({ ...current, ...prefill }));
       setPrefilledIds(Object.keys(prefill));
     }
 
     setStep("interview");
     setCurrentQuestionId((current) => current ?? visible[0]?.id ?? null);
-  }, [answers, consent.intakePermission, lead.state, visible]);
+  }, [
+    answers,
+    consent.intakePermission,
+    lead.state,
+    lead.dateOfBirth,
+    visible,
+    invalidateReview,
+    setStep,
+  ]);
 
-  const backToLead = useCallback(() => setStep("lead"), []);
+  const backToLead = useCallback(() => setStep("lead"), [setStep]);
 
-  const setAnswer = useCallback((questionId: string, patch: Partial<AnswerRecord>) => {
-    setAnswers((current) => {
-      const previous = current[questionId] ?? {};
-      const next = {
-        ...current,
-        [questionId]: { ...previous, ...patch, updatedAt: new Date().toISOString() },
-      };
-      // Closing a parent branch removes the descendant answers immediately, so
-      // withdrawn health detail cannot survive into the review screen or case.
-      return pruneBranchClosedAnswers(next);
-    });
-    // Any edit invalidates a prior review confirmation: the customer must see
-    // the new complete picture before it is submitted.
-    setAcknowledgements([]);
-  }, []);
+  const setAnswer = useCallback(
+    (questionId: string, patch: Partial<AnswerRecord>) => {
+      setAnswers((current) => {
+        const previous = current[questionId] ?? {};
+        const next = {
+          ...current,
+          [questionId]: {
+            ...previous,
+            ...patch,
+            updatedAt: new Date().toISOString(),
+          },
+        };
+        // Closing a parent branch removes the descendant answers immediately, so
+        // withdrawn health detail cannot survive into the review screen or case.
+        return pruneBranchClosedAnswers(next);
+      });
+      // Any edit invalidates a prior review confirmation: the customer must see
+      // the new complete picture before it is submitted.
+      invalidateReview();
+    },
+    [invalidateReview],
+  );
 
   const goToQuestion = useCallback((questionId: string) => {
     setCurrentQuestionId(questionId);
     setStep("interview");
-  }, []);
+  }, [setStep]);
 
   const move = useCallback(
     (direction: 1 | -1) => {
       setCurrentQuestionId((current) => {
         if (!current) return visible[0]?.id ?? null;
         const index = visible.findIndex((question) => question.id === current);
-        const nextIndex = Math.max(0, Math.min(visible.length - 1, index + direction));
+        const nextIndex = Math.max(
+          0,
+          Math.min(visible.length - 1, index + direction),
+        );
         const next = visible[nextIndex];
         if (next) return next.id;
         return current;
@@ -204,24 +261,24 @@ export function useInterview(): InterviewHook {
       return;
     }
     move(1);
-  }, [currentQuestionId, move, visible]);
+  }, [currentQuestionId, move, visible, setStep]);
 
   const previousQuestion = useCallback(() => move(-1), [move]);
 
-  const finishInterview = useCallback(() => setStep("review"), []);
+  const finishInterview = useCallback(() => setStep("review"), [setStep]);
 
   const confirmReview = useCallback((confirmed: boolean) => {
-    setAcknowledgements(() => {
-      if (!confirmed) return [];
-      return [
-        {
-          id: "submission_requested",
-          text: SUBMISSION_ACKNOWLEDGEMENT_TEXT,
-          textVersion: CONSENT_VERSION,
-          timestamp: new Date().toISOString(),
-        },
-      ];
-    });
+    if (!confirmed) {
+      setAcknowledgements([]);
+      return;
+    }
+    reviewConfirmation.current ??= {
+      id: "submission_requested",
+      text: SUBMISSION_ACKNOWLEDGEMENT_TEXT,
+      textVersion: CONSENT_VERSION,
+      timestamp: new Date().toISOString(),
+    };
+    setAcknowledgements([reviewConfirmation.current]);
   }, []);
 
   const draft = useMemo<CaseDraft | null>(() => {
@@ -258,23 +315,32 @@ export function useInterview(): InterviewHook {
     setReceipt(next);
     setStep("submitted");
     window.scrollTo({ top: 0, behavior: "auto" });
-  }, []);
+  }, [setStep]);
 
   const startOver = useCallback(() => {
-    setStep("lead");
-    setLead({ preferredContact: "email", state: "", dateOfBirth: "", adultAttested: false });
+    if (navigation) navigation.reset();
+    else setStep("lead");
+    setLead({
+      preferredContact: "email",
+      state: "",
+      dateOfBirth: "",
+      adultAttested: false,
+    });
     setConsentState(EMPTY_CONSENT);
     setAnswers({});
-    setAcknowledgements([]);
+    invalidateReview();
     setPrefilledIds([]);
     setReceipt(null);
     setSubmissionKey(crypto.randomUUID());
     setCurrentQuestionId(null);
-  }, []);
+  }, [invalidateReview, navigation, setStep]);
 
   // A question can disappear (a branch closes) or a held row can never appear.
   const safeCurrentId = useMemo(() => {
-    if (currentQuestionId && visible.some((question) => question.id === currentQuestionId)) {
+    if (
+      currentQuestionId &&
+      visible.some((question) => question.id === currentQuestionId)
+    ) {
       return currentQuestionId;
     }
     return visible[0]?.id ?? null;

@@ -188,7 +188,7 @@ forbidText("src/features/portal/CaseReview.tsx", [
 ]);
 
 // The queue must read the payload-free summary view. Keep the check scoped to
-// listCases so getCase can still fetch the detail it is allowed to open.
+// listCases and its transport so getCase can still open audited case details.
 const apiSource = read("src/lib/api.ts");
 const listCasesStart = apiSource.indexOf("export async function listCases");
 const getCaseStart = apiSource.indexOf("export async function getCase");
@@ -196,7 +196,11 @@ const listCasesSource =
   listCasesStart >= 0 && getCaseStart > listCasesStart
     ? apiSource.slice(listCasesStart, getCaseStart)
     : "";
-const listCasesCode = listCasesSource
+requireText("src/lib/api.ts", [
+  'import { readCaseQueue } from "./queuePaging"',
+  "return readCaseQueue(supabase, cursor)",
+]);
+const listCasesCode = `${listCasesSource}\n${read("src/lib/queuePaging.ts")}`
   .replace(/\/\*[\s\S]*?\*\//g, "")
   .replace(/\/\/.*$/gm, "");
 if (!listCasesCode.includes('from("case_summaries")')) {

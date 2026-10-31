@@ -9,7 +9,7 @@
  * Run with `npm run check:db`.
  */
 import { PGlite } from "@electric-sql/pglite";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 const db = new PGlite();
 let failures = 0;
@@ -67,23 +67,20 @@ await exec(`
   grant usage on schema public to anon, authenticated, service_role;
 `);
 
-const migrations = [
-  "0001_pre_underwriting.sql",
-  "0002_case_corrections.sql",
-  "0003_reliability_and_access.sql",
-  "0004_reviewer_write_paths.sql",
-  "0005_case_summary_view.sql",
-  "0006_notification_terminal_state.sql",
-  "0007_marketing_revocation.sql",
-  "0008_marketing_revocation_idempotency.sql",
-  "0009_audited_case_access.sql",
-  "0010_notification_retry_window.sql",
-].map((name) => readFileSync(`supabase/migrations/${name}`, "utf8"));
+const migrations = readdirSync("supabase/migrations")
+  .filter(name => name.endsWith(".sql")).sort()
+  .map(name => readFileSync(`supabase/migrations/${name}`, "utf8"));
 
 // Every migration must be safe to re-run.
 for (let round = 1; round <= 2; round += 1) {
   for (const [index, sql] of migrations.entries()) {
     await pass(`migration ${index + 1} run ${round}`, () => exec(sql), () => true);
+    // Reproduce Supabase/default ACLs retained by CREATE OR REPLACE VIEW.
+    // Include a column grant: revoking table privileges alone cannot remove it.
+    if (round === 1 && index === 4) {
+      await exec(`grant all on public.case_summaries to authenticated;
+        grant update (status) on public.case_summaries to authenticated;`);
+    }
   }
 }
 
@@ -219,24 +216,42 @@ await expectError(
   () => query("select payload from public.case_summaries limit 1"),
   "does not exist",
 );
+// Exercise writes against the owner-executed view, not just the base table.
+await pass(
+  "authenticated queue access is SELECT-only, including column grants",
+  () => query(`select
+    has_table_privilege('authenticated', 'public.case_summaries', 'SELECT') readable,
+    has_table_privilege('authenticated', 'public.case_summaries', 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') writable,
+    has_any_column_privilege('authenticated', 'public.case_summaries', 'INSERT,UPDATE,REFERENCES') column_writable`),
+  (rows) => rows[0].readable && !rows[0].writable && !rows[0].column_writable,
+);
+for (const [name, sql] of [
+  ["update", "update public.case_summaries set status='reviewed' where reference='LPP-2026-TEST01'"],
+  ["delete", "delete from public.case_summaries where reference='LPP-2026-TEST01'"],
+  ["insert", "insert into public.case_summaries (reference, submitted_at, status, notification_state, crisis_disclosure) values ('LPP-2026-NOWRIT', now(), 'submitted', 'queued', false)"],
+]) {
+  // Roll back even a regression's successful write so later checks stay valid.
+  await exec("begin");
+  await expectError(`reviewer cannot ${name} through queue view`, () => query(sql), "permission denied");
+  await exec("rollback");
+}
 await pass("aal2 reviewer opens a case through the audited RPC", () => query("select public.open_case_for_review('LPP-2026-TEST01') result"), (rows) => rows[0].result?.case?.reference === "LPP-2026-TEST01" && rows[0].result?.review_log?.[0]?.action === "opened");
 await pass("missing case returns no payload", () => query("select public.open_case_for_review('LPP-2026-MISSING') result"), (rows) => rows[0].result === null);
 await pass("second open is also audited", () => query("select public.open_case_for_review('LPP-2026-TEST01') result"), (rows) => rows[0].result?.review_log?.filter((entry) => entry.action === "opened").length === 2);
 await pass(
-  "a consequential action survives more opens than the window holds",
-  () => query("select public.open_case_for_review('LPP-2026-BURIED') result"),
-  (rows) => {
-    const result = rows[0].result ?? {};
-    const log = result.review_log ?? [];
-    return (
-      result.review_log_total === 23 &&
-      log.length === 20 &&
-      log.some((entry) => entry.action === "marked_reviewed") &&
-      log[0]?.action === "marked_reviewed" &&
-      !("is_open" in (log[0] ?? {})) &&
-      !("id" in (log[0] ?? {}))
+  "a consequential action remains accessible beyond the first history page",
+  async () => {
+    const [opened] = await query("select public.open_case_for_review('LPP-2026-BURIED') result");
+    const cursor = opened.result?.review_log_cursor;
+    if (!cursor) return false;
+    const [older] = await query(
+      "select public.get_case_review_history($1, $2::timestamptz, $3::bigint) result",
+      ["LPP-2026-BURIED", cursor.created_at, cursor.id],
     );
+    return opened.result.review_log.length === 20 &&
+      older.result.entries.some((entry) => entry.action === "marked_reviewed" && entry.note === "first review");
   },
+  (found) => found === true,
 );
 await pass("reviewer can add a correction through its RPC", () => query("select public.record_case_correction('LPP-2026-TEST01','Test correction')"), () => true);
 await pass("audited case read includes the correction", () => query("select public.open_case_for_review('LPP-2026-TEST01') result"), (rows) => rows[0].result?.corrections?.[0]?.detail === "Test correction");
@@ -716,6 +731,13 @@ await expectError(
   "permission denied",
 );
 await exec("reset role;");
+
+// The deployment's read-only verification query must also execute and pass.
+await pass(
+  "staging catalog checks include and pass the queue write-denial checks",
+  () => query(readFileSync("supabase/ops/staging-runbook-checks.sql", "utf8")),
+  (rows) => rows.some((row) => row.check_name.startsWith("0011")) && rows.every((row) => row.passed),
+);
 
 // --------------------------------------------------------- retention/delete
 await pass("retention is disabled while no schedule is approved", () => query("select public.purge_expired_cases() n"), (rows) => rows[0].n === 0);

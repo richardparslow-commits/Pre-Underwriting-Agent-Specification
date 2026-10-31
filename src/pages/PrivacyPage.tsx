@@ -1,3 +1,4 @@
+import { ResumeInterview } from "../components/site/ResumeInterview";
 import { Link } from "react-router-dom";
 import { Alert, Badge } from "@/components/ui/surface";
 import { MARKETING_ENABLED, SITE } from "@/config/site";
@@ -58,24 +59,29 @@ export default function PrivacyPage() {
           <p className="eyebrow">Privacy practices</p>
           <Badge tone="warn">Draft — pending counsel review</Badge>
         </div>
-        <h1 className="text-3xl leading-tight sm:text-4xl">How your information is handled</h1>
+        <h1 className="text-3xl leading-tight sm:text-4xl">
+          How your information is handled
+        </h1>
         <p className="prose-note">
-          Written in plain language for the pre-underwriting interview at {SITE.brand}. Version{" "}
-          {PRIVACY_PRACTICES_VERSION}.
+          Written in plain language for the pre-underwriting interview at{" "}
+          {SITE.brand}. Version {PRIVACY_PRACTICES_VERSION}.
         </p>
       </header>
 
       <Alert tone="warn" className="mt-8">
-        This is draft product copy prepared for legal review. It is not a complete privacy notice or
-        a substitute for one, and it does not replace a counsel-approved authorization. Do not treat
-        it as legal advice or as a compliance certification.
+        This is draft product copy prepared for legal review. It is not a
+        complete privacy notice or a substitute for one, and it does not replace
+        a counsel-approved authorization. Do not treat it as legal advice or as
+        a compliance certification.
       </Alert>
 
       <div className="mt-10 space-y-8">
         {SECTIONS.map((section) => (
           <section key={section.title} className="space-y-2">
             <h2 className="text-xl leading-snug">{section.title}</h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">{section.body}</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {section.body}
+            </p>
           </section>
         ))}
       </div>
@@ -90,8 +96,8 @@ export default function PrivacyPage() {
           . Initial regulatory baseline: {SITE.regulatoryBaseline}.
         </p>
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Not an insurer. Submitting this interview creates no coverage and no application to a
-          carrier. Optional marketing is governed by the{" "}
+          Not an insurer. Submitting this interview creates no coverage and no
+          application to a carrier. Optional marketing is governed by the{" "}
           <Link to="/messaging-terms" className="link-quiet">
             Messaging Terms
           </Link>
@@ -104,9 +110,7 @@ export default function PrivacyPage() {
       </section>
 
       <div className="mt-8">
-        <Link to="/start" className="link-quiet text-sm">
-          Return to the interview
-        </Link>
+        <ResumeInterview />
       </div>
     </div>
   );

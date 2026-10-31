@@ -10,6 +10,7 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.118.0";
 import { QUESTIONNAIRE_VERSION, SERVER_BANK } from "./bank.generated.ts";
 import { CONSENT_POLICY } from "./policy.generated.ts";
+import { leadTextErrors } from "./lead-validation.ts";
 
 // -----------------------------------------------------------------------------
 // CORS
@@ -625,6 +626,9 @@ export function validateDraft(body: unknown): ValidationResult {
 
   if (!isRecord(body.lead)) return { ok: false, reason: "Invalid contact details" };
   const leadInput = body.lead;
+  // Reject supplied values before optionalText can collapse overflow to absent.
+  const leadError = Object.values(leadTextErrors(leadInput))[0];
+  if (leadError) return { ok: false, reason: leadError };
 
   const firstName = text(leadInput.firstName, 100);
   const lastName = text(leadInput.lastName, 100);
@@ -1198,17 +1202,22 @@ const RATE_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMIT = 10;
 const hits = new Map<string, number[]>();
 
-export function clientKey(req: Request): string {
-  // The platform sets `cf-connecting-ip`; `x-forwarded-for` is a chain the
-  // caller can prepend to. Prefer the platform header so a rotated
-  // `x-forwarded-for` cannot choose its own rate-limit bucket. The forwarded
-  // header remains the fallback for local and self-hosted runs.
-  const connecting = req.headers.get("cf-connecting-ip")?.trim();
-  if (connecting) return connecting;
-
-  const forwarded = req.headers.get("x-forwarded-for") ?? "";
-  const first = forwarded.split(",")[0]?.trim();
-  return first || "unknown";
+/**
+ * Only the server's connection metadata can select a quota. Forwarded/real-IP
+ * request headers are untrusted, even when they have a platform-looking name.
+ * Behind a gateway, callers can share a peer quota. If the runtime omits the
+ * peer, all requests share a conservative fallback; never invent a new identity
+ * from headers, ports, idempotency keys, user agents or request content.
+ */
+export function connectionRateKey(info?: {
+  remoteAddr?: { transport?: string; hostname?: string };
+}): string {
+  const address = info?.remoteAddr;
+  const hostname = address?.hostname?.trim().toLowerCase();
+  if (address?.transport !== "tcp" || !hostname || hostname.length > 255 || /\s/.test(hostname)) {
+    return "shared:unverified-peer";
+  }
+  return `peer:${hostname}`;
 }
 
 export function rateLimited(key: string, now = Date.now()): boolean {

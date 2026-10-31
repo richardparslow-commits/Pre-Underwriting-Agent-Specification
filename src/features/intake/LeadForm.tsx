@@ -16,6 +16,7 @@ import { US_STATES } from "./usStates";
 import { formatUsPhone, validateLead, type LeadErrors } from "./validation";
 import type { ConsentSelection } from "@/features/consent/consentTexts";
 import type { LeadDetails } from "@/features/interview/types";
+import { LEAD_TEXT_RULES } from "../../../supabase/functions/_shared/lead-validation";
 import { cn } from "@/lib/utils";
 
 interface LeadFormProps {
@@ -98,12 +99,23 @@ export function LeadForm({
         </p>
       </header>
 
+      {Object.keys(errors).length > 0 ? (
+        <Alert tone="danger" title="Check your contact details">
+          <ul className="list-disc pl-5">
+            {Object.entries(errors).map(([field, message]) => (
+              <li key={field}>{message}</li>
+            ))}
+          </ul>
+        </Alert>
+      ) : null}
+
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
           <Label htmlFor="firstName">First name</Label>
           <Input
             id="firstName"
             name="firstName"
+            maxLength={LEAD_TEXT_RULES.firstName.max}
             autoComplete="given-name"
             value={lead.firstName ?? ""}
             onChange={(event) => onField("firstName", event.target.value)}
@@ -117,6 +129,7 @@ export function LeadForm({
           <Input
             id="lastName"
             name="lastName"
+            maxLength={LEAD_TEXT_RULES.lastName.max}
             autoComplete="family-name"
             value={lead.lastName ?? ""}
             onChange={(event) => onField("lastName", event.target.value)}
@@ -173,6 +186,7 @@ export function LeadForm({
           <Input
             id="email"
             name="email"
+            maxLength={LEAD_TEXT_RULES.email.max}
             type="email"
             inputMode="email"
             autoComplete="email"
@@ -230,6 +244,7 @@ export function LeadForm({
             <Input
               id="phone"
               name="phone"
+              maxLength={LEAD_TEXT_RULES.phone.max}
               type="tel"
               inputMode="tel"
               autoComplete="tel"
@@ -246,11 +261,18 @@ export function LeadForm({
             <Input
               id="preferredContactTime"
               name="preferredContactTime"
+              maxLength={LEAD_TEXT_RULES.preferredContactTime.max}
               placeholder="Weekday mornings"
               value={lead.preferredContactTime ?? ""}
               onChange={(event) => onField("preferredContactTime", event.target.value)}
+              aria-invalid={Boolean(errors.preferredContactTime)}
+              aria-describedby="preferredContactTime-limit"
               className="mt-1.5"
             />
+            <p id="preferredContactTime-limit" className="field-help">
+              Up to {LEAD_TEXT_RULES.preferredContactTime.max} characters.
+            </p>
+            <FieldError>{errors.preferredContactTime}</FieldError>
             <p className="field-help">
               Include your time zone. We do not guess it from the area code.
             </p>
@@ -297,11 +319,18 @@ export function LeadForm({
             <Input
               id="coverageAmount"
               name="coverageAmount"
+              maxLength={LEAD_TEXT_RULES.coverageAmount.max}
               placeholder="$500,000"
               value={lead.coverageAmount ?? ""}
               onChange={(event) => onField("coverageAmount", event.target.value)}
+              aria-invalid={Boolean(errors.coverageAmount)}
+              aria-describedby="coverageAmount-limit"
               className="mt-1.5"
             />
+            <p id="coverageAmount-limit" className="field-help">
+              Up to {LEAD_TEXT_RULES.coverageAmount.max} characters.
+            </p>
+            <FieldError>{errors.coverageAmount}</FieldError>
           </div>
           <div>
             <Label htmlFor="coveragePurpose">Purpose</Label>

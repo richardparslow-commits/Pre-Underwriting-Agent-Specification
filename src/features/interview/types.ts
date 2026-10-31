@@ -285,7 +285,14 @@ export type CaseStatus =
   | "reviewed"
   | "needs_clarification";
 
+export interface ReviewHistoryCursor {
+  at: string;
+  /** PostgreSQL bigint remains text so cursor ties never lose precision. */
+  id: string;
+}
+
 export interface ReviewLogEntry {
+  id?: string;
   action: "opened" | "marked_reviewed" | "requested_clarification";
   actor: string;
   at: string;
@@ -297,10 +304,16 @@ export interface ReviewLogEntry {
  * immutable snapshot; it never rewrites the original answer.
  */
 export interface CorrectionRecord {
-  id: number;
+  /** Live bigint IDs are strings; local preview records may use safe numbers. */
+  id: string | number;
   detail: string;
   recordedBy: string;
   recordedAt: string;
+}
+
+export interface CorrectionCursor {
+  at: string;
+  id: string;
 }
 
 export interface MarketingRevocationRecord {
@@ -317,9 +330,11 @@ export interface CaseRecord extends CaseDraft {
   status: CaseStatus;
   notification: NotificationRecord;
   reviewLog: ReviewLogEntry[];
-  /** Total audit entries stored, so the window can be described honestly. */
-  reviewLogTotal?: number;
+  /** Undefined means an older server could not establish history completeness. */
+  reviewHistoryCursor?: ReviewHistoryCursor | null;
   corrections: CorrectionRecord[];
+  /** Undefined means an older server could not establish completeness. */
+  correctionsCursor?: CorrectionCursor | null;
   /** Append-only withdrawal evidence; the submitted consent snapshot is unchanged. */
   marketingRevocations: MarketingRevocationRecord[];
   draftSummary: DraftSummary;

@@ -1,10 +1,12 @@
+import { ResumeInterview } from "../components/site/ResumeInterview";
 import { Link } from "react-router-dom";
 import { Alert, Badge } from "@/components/ui/surface";
 import { MARKETING, MARKETING_ENABLED, SITE } from "@/config/site";
 import { DISCLOSURE_VERSION } from "@/features/consent/consentTexts";
 
 function channelList(): string {
-  if (MARKETING.calls && MARKETING.texts) return "marketing telephone calls and marketing text messages";
+  if (MARKETING.calls && MARKETING.texts)
+    return "marketing telephone calls and marketing text messages";
   if (MARKETING.calls) return "marketing telephone calls";
   return "marketing text messages";
 }
@@ -12,7 +14,9 @@ function channelList(): string {
 function technologyNotes(): string[] {
   const notes: string[] = [];
   if (MARKETING.calls && MARKETING.autodialer) {
-    notes.push("Calls may be placed using an automatic telephone dialing system.");
+    notes.push(
+      "Calls may be placed using an automatic telephone dialing system.",
+    );
   }
   if (MARKETING.calls && MARKETING.aiVoice) {
     notes.push(
@@ -71,9 +75,9 @@ export default function MessagingTermsPage() {
       </header>
 
       <Alert tone="warn" className="mt-8">
-        This is draft product copy prepared for legal review. It is not legal advice or a
-        compliance certification, and it does not replace the consent disclosure shown in the
-        interview.
+        This is draft product copy prepared for legal review. It is not legal
+        advice or a compliance certification, and it does not replace the
+        consent disclosure shown in the interview.
       </Alert>
 
       <section className="panel mt-8 space-y-3 p-6">
@@ -81,12 +85,15 @@ export default function MessagingTermsPage() {
         {MARKETING_ENABLED ? (
           <>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              {SITE.brand} currently operates {channelList()}. Marketing is offered only for the
-              channels shown in the interview, and only when a telephone number has been provided
-              for that purpose.
+              {SITE.brand} currently operates {channelList()}. Marketing is
+              offered only for the channels shown in the interview, and only
+              when a telephone number has been provided for that purpose.
             </p>
             {notes.map((note) => (
-              <p key={note} className="text-sm leading-relaxed text-muted-foreground">
+              <p
+                key={note}
+                className="text-sm leading-relaxed text-muted-foreground"
+              >
                 {note}
               </p>
             ))}
@@ -98,9 +105,10 @@ export default function MessagingTermsPage() {
           </>
         ) : (
           <p className="text-sm leading-relaxed text-muted-foreground">
-            No marketing calls or texts are offered in this version. The interview does not request
-            marketing consent, and submitting it never requires marketing consent. These terms are
-            published so the program is documented before any channel is enabled.
+            No marketing calls or texts are offered in this version. The
+            interview does not request marketing consent, and submitting it
+            never requires marketing consent. These terms are published so the
+            program is documented before any channel is enabled.
           </p>
         )}
       </section>
@@ -110,7 +118,9 @@ export default function MessagingTermsPage() {
           {SECTIONS.map((section) => (
             <section key={section.title} className="space-y-2">
               <h2 className="text-xl leading-snug">{section.title}</h2>
-              <p className="text-sm leading-relaxed text-muted-foreground">{section.body}</p>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {section.body}
+              </p>
             </section>
           ))}
           <p className="text-sm leading-relaxed text-muted-foreground">
@@ -127,13 +137,13 @@ export default function MessagingTermsPage() {
         <h2 className="text-lg">Operator and contact</h2>
         {SITE.legalEntity ? (
           <p className="text-sm leading-relaxed text-muted-foreground">
-            {SITE.legalEntity}, doing business as {SITE.brand}. Initial regulatory baseline:{" "}
-            {SITE.regulatoryBaseline}.
+            {SITE.legalEntity}, doing business as {SITE.brand}. Initial
+            regulatory baseline: {SITE.regulatoryBaseline}.
           </p>
         ) : (
           <p className="text-sm leading-relaxed text-muted-foreground">
-            The operating legal entity is not named here yet. Marketing remains disabled until it
-            is confirmed and configured.
+            The operating legal entity is not named here yet. Marketing remains
+            disabled until it is confirmed and configured.
           </p>
         )}
         <p className="text-sm leading-relaxed text-muted-foreground">
@@ -149,9 +159,7 @@ export default function MessagingTermsPage() {
         <Link to="/privacy" className="link-quiet">
           Privacy practices
         </Link>
-        <Link to="/start" className="link-quiet">
-          Return to the interview
-        </Link>
+        <ResumeInterview />
       </div>
     </div>
   );

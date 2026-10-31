@@ -56,10 +56,18 @@ jobs:
       - name: Interview engine regression test
         run: npm run test:engine
 
+      - name: Reviewer visibility database and UI regressions
+        run: |
+          npm run check:reviewer-visibility
+          npm run test:reviewer-visibility
+
       # The lead form repeats the server's contact rules. A phone preference
       # without a usable number must fail before the interview starts.
       - name: Lead validation regression test
         run: npm run test:validation
+
+      - name: Submission UI regression test
+        run: npm run test:submission-ui
 
       # Isolated PostgreSQL replay: reviewer writes must stay RPC-only and a
       # delivery event that arrives before its case must remain retryable.

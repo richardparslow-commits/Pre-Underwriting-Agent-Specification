@@ -8,7 +8,7 @@
  */
 import { assert, assertEquals } from "jsr:@std/assert@1.0.6";
 import { SERVER_BANK } from "../_shared/bank.generated.ts";
-import { clientKey, validateDraft } from "../_shared/case.ts";
+import { connectionRateKey, validateDraft } from "../_shared/case.ts";
 import {
   buildAnswers,
   buildConsents,
@@ -65,16 +65,9 @@ Deno.test("a compound answer's prose is rebuilt, not trusted from the caller", (
   assertEquals(answer?.fields?.[0]?.value, "Test detail");
 });
 
-Deno.test("the rate-limit key prefers the platform header over a caller chain", () => {
-  const platform = new Request("http://localhost/submit-case", {
-    headers: { "cf-connecting-ip": "203.0.113.9", "x-forwarded-for": "1.2.3.4, 10.0.0.1" },
-  });
-  assertEquals(clientKey(platform), "203.0.113.9");
-
-  const local = new Request("http://localhost/submit-case", {
-    headers: { "x-forwarded-for": "1.2.3.4, 10.0.0.1" },
-  });
-  assertEquals(clientKey(local), "1.2.3.4");
+Deno.test("rate-limit identity uses a verified connection peer or a shared fallback", () => {
+  assertEquals(connectionRateKey({ remoteAddr: { transport: "tcp", hostname: "203.0.113.9" } }), "peer:203.0.113.9");
+  assertEquals(connectionRateKey(), "shared:unverified-peer");
 });
 
 Deno.test("rejects a held HIV row presented as answered", () => {

@@ -13,7 +13,6 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/form";
 import { Alert, Badge } from "@/components/ui/surface";
-import { SITE } from "@/config/site";
 import { SECTIONS } from "@/features/interview/sections";
 import type {
   CaseRecord,
@@ -25,6 +24,8 @@ import type {
 import { recordCorrection, recordReview } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { ReviewHistory } from "./ReviewHistory";
+import { CorrectionHistory } from "./CorrectionHistory";
 import { StatusTimeline } from "@/features/intake/StatusTimeline";
 
 const DISPOSITION: Record<Disposition, { label: string; tone: "ok" | "warn" | "danger" | "neutral" | "outline" }> = {
@@ -43,12 +44,6 @@ const NOTIFICATION: Record<NotificationState, { label: string; tone: "ok" | "war
   accepted: { label: "Provider accepted", tone: "warn" },
   delivered: { label: "Delivery confirmed", tone: "ok" },
   failed: { label: "Failed", tone: "danger" },
-};
-
-const ACTION_LABEL: Record<ReviewLogEntry["action"], string> = {
-  opened: "Opened",
-  marked_reviewed: "Marked reviewed",
-  requested_clarification: "Clarification requested",
 };
 
 type Filter = "all" | "attention" | "held" | "not_asked";
@@ -534,19 +529,12 @@ export function CaseReview({
               the submitted answers, with who recorded it and when. The original snapshot is never
               edited.
             </p>
-            <ul className="mt-3 space-y-3">
-              {record.corrections.length === 0 ? (
-                <li className="text-xs text-muted-foreground">No corrections recorded.</li>
-              ) : null}
-              {record.corrections.map((correction) => (
-                <li key={correction.id} className="text-xs">
-                  <p className="leading-relaxed text-foreground">{correction.detail}</p>
-                  <p className="mt-1 text-muted-foreground">
-                    {correction.recordedBy} · {formatDate(correction.recordedAt)}
-                  </p>
-                </li>
-              ))}
-            </ul>
+            <CorrectionHistory
+              key={`${record.reference}:${record.reviewLog[0]?.id ?? record.reviewLog[0]?.at ?? ""}`}
+              reference={record.reference}
+              entries={record.corrections}
+              cursor={record.correctionsCursor}
+            />
 
             {correctionOpen ? (
               <div className="mt-4 space-y-2 border-t border-border pt-4">
@@ -603,33 +591,12 @@ export function CaseReview({
             )}
           </section>
 
-          <section className="panel p-5">
-            <h2 className="text-base font-medium">Human review log</h2>
-            {(record.reviewLogTotal ?? record.reviewLog.length) > record.reviewLog.length ? (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Showing the latest {record.reviewLog.length} of {record.reviewLogTotal} entries.
-                Earlier actions remain recorded; consequential actions are always shown first.
-              </p>
-            ) : null}
-            <ul className="mt-3 space-y-2">
-              {record.reviewLog.length === 0 ? (
-                <li className="text-xs text-muted-foreground">No review activity recorded yet.</li>
-              ) : null}
-              {record.reviewLog.map((entry, index) => (
-                <li key={`${entry.at}-${index}`} className="text-xs">
-                  <p className="text-foreground">{ACTION_LABEL[entry.action]}</p>
-                  <p className="text-muted-foreground">
-                    {entry.actor} · {formatDate(entry.at)}
-                  </p>
-                  {entry.note ? <p className="mt-1 leading-relaxed text-muted-foreground">{entry.note}</p> : null}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-3 border-t border-border pt-3 text-[0.7rem] leading-relaxed text-muted-foreground">
-              Every consequential action stays with {SITE.owner}. This portal records review; it does
-              not make an eligibility decision.
-            </p>
-          </section>
+          <ReviewHistory
+            key={`${record.reference}:${record.reviewLog[0]?.id ?? record.reviewLog[0]?.at ?? ""}`}
+            reference={record.reference}
+            entries={record.reviewLog}
+            cursor={record.reviewHistoryCursor}
+          />
 
           <details className="panel p-5">
             <summary className="flex cursor-pointer items-center justify-between text-sm font-medium">
