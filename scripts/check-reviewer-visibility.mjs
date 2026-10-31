@@ -192,6 +192,56 @@ test("history rejects malformed cursor pairs and unknown cases", async () => {
   });
 });
 
+test("all 121 corrections remain reachable with tied timestamps and bigint IDs", async () => {
+  await query("select setval('public.case_corrections_id_seq',9007199254740993,true)");
+  await query(`insert into public.case_corrections (case_id,detail,recorded_by,created_at)
+    select $1,'Synthetic correction '||n,'reviewer@example.test','2026-01-01'::timestamptz
+    from generate_series(1,121) n`, [caseId]);
+  await query(`insert into public.case_corrections (case_id,detail,recorded_by)
+    select id,'Other case private correction','reviewer@example.test'
+    from public.cases where reference='LPP-2026-HIST02'`);
+  const first = await authorized(() => rpc("open_case_for_review", ["LPP-2026-HIST01"]));
+  assert.equal(first.corrections.length, 50);
+  assert.ok(first.corrections_cursor, "older corrections must have a continuation cursor");
+  const expected = (await query("select id::text id from public.case_corrections where case_id=$1", [caseId])).map(row => row.id);
+  let entries = first.corrections;
+  let cursor = first.corrections_cursor;
+  let pages = 0;
+  while (cursor) {
+    assert.ok(++pages < 5, "correction pagination must terminate");
+    assert.equal(typeof cursor.id, "string");
+    const page = await authorized(() => rpc("get_case_corrections", ["LPP-2026-HIST01", cursor.created_at, cursor.id]));
+    assert.ok(page.entries.length <= 50);
+    entries = entries.concat(page.entries);
+    cursor = page.next_cursor;
+  }
+  assert.equal(entries.length, 121);
+  assert.deepEqual(new Set(entries.map(row => row.id)), new Set(expected));
+  assert.equal(new Set(entries.map(row => row.id)).size, 121);
+  assert.ok(entries.some(row => row.detail === "Synthetic correction 1"));
+  assert.ok(entries.every(row => typeof row.id === "string" && row.detail !== "Other case private correction"));
+});
+
+test("correction reads are audited, reject invalid cursors, and fail closed", async () => {
+  const count = async () => (await query("select count(*)::int n from public.case_review_log where case_id=$1", [caseId]))[0].n;
+  const before = await count();
+  await authorized(() => rpc("get_case_corrections", ["LPP-2026-HIST01", null, null]));
+  assert.equal(await count(), before + 1);
+  await authorized(async () => {
+    for (const [at, id] of [["2026-01-01", null], [null, "1"], ["2026-01-01", "0"], ["infinity", "1"]]) {
+      await assert.rejects(rpc("get_case_corrections", ["LPP-2026-HIST01", at, id]), /cursor/i);
+    }
+    await assert.rejects(rpc("get_case_corrections", ["LPP-2026-ABSENT", null, null]), /not found/i);
+  });
+  await db.exec(`create function public.test_fail_correction_audit() returns trigger language plpgsql as $$ begin raise exception 'Audit unavailable'; end $$;
+    create trigger test_fail_correction_audit before insert on public.case_review_log for each row execute function public.test_fail_correction_audit();`);
+  try {
+    await assert.rejects(authorized(() => rpc("get_case_corrections", ["LPP-2026-HIST01", null, null])), /Audit unavailable/);
+  } finally {
+    await db.exec("drop trigger test_fail_correction_audit on public.case_review_log; drop function public.test_fail_correction_audit();");
+  }
+});
+
 test("safety query reports zero only after a successful queue-wide query", async () => {
   const page = await authorized(() =>
     rpc("get_queue_safety_disclosures", [null, null])
@@ -278,6 +328,7 @@ for (
         rpc("get_queue_safety_disclosures", [null, null]),
         message,
       );
+      await assert.rejects(rpc("get_case_corrections", ["LPP-2026-HIST01", null, null]), message);
     });
   });
 }
@@ -292,6 +343,7 @@ test("private history helper and direct review-log reads are not public access p
       query("select note from public.case_review_log"),
       /permission denied/i,
     );
+    await assert.rejects(rpc("case_corrections_page", [caseId, null, null]), /permission denied/i);
   });
 });
 
@@ -300,4 +352,7 @@ test("deployment catalog checks execute without reading case data", async () => 
   const rows = await query(readFileSync("supabase/ops/reviewer-visibility-checks.sql", "utf8"));
   assert.equal(rows.length, 6);
   assert.ok(rows.every((row) => row.passed), JSON.stringify(rows));
+  const corrections = await query(readFileSync("supabase/ops/correction-history-checks.sql", "utf8"));
+  assert.equal(corrections.length, 3);
+  assert.ok(corrections.every(row => row.passed), JSON.stringify(corrections));
 });
