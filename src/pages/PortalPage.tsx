@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertTriangle,
@@ -16,6 +16,7 @@ import { Alert, Badge } from "@/components/ui/surface";
 import { SITE } from "@/config/site";
 import { MfaGate } from "@/features/portal/MfaGate";
 import { useReviewerAuth } from "@/features/portal/useReviewerAuth";
+import { runQueueLoad } from "@/features/portal/queueLoad";
 import { listCases, type CaseListItem } from "@/lib/api";
 import type { CaseStatus, NotificationState } from "@/features/interview/types";
 import { formatDate } from "@/lib/utils";
@@ -120,24 +121,27 @@ export default function PortalPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const queueBusy = useRef(false);
 
-  const load = useCallback(async (cursor?: string) => {
-    const appending = Boolean(cursor);
-    if (appending) setLoadingMore(true);
-    else setLoading(true);
-    setError(null);
-    try {
-      const page = await listCases(cursor);
+  const load = useCallback((cursor?: string) => runQueueLoad(queueBusy, listCases, {
+    started: (appending) => {
+      if (appending) setLoadingMore(true);
+      else setLoading(true);
+      setError(null);
+    },
+    received: (page, appending) => {
       setCases((current) => (appending ? [...(current ?? []), ...page.items] : page.items));
       setTotal(page.total);
       setNextCursor(page.nextCursor);
-    } catch (loadError) {
+    },
+    failed: (loadError) => {
       setError(loadError instanceof Error ? loadError.message : "Cases could not be loaded.");
-    } finally {
+    },
+    finished: () => {
       setLoading(false);
       setLoadingMore(false);
-    }
-  }, []);
+    },
+  }, cursor), []);
 
   useEffect(() => {
     if (auth.signedIn) void load();
@@ -296,7 +300,7 @@ export default function PortalPage() {
             <Button
               variant="outline"
               onClick={() => void load(nextCursor)}
-              disabled={loadingMore}
+              disabled={loading || loadingMore}
             >
               {loadingMore ? <Loader2 className="animate-spin" aria-hidden /> : null}
               Load more cases

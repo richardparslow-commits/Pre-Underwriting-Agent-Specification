@@ -1,5 +1,6 @@
 import { PREVIEW_MODE, SUBMIT_CASE_URL, SUPABASE_ANON_KEY, SITE } from "@/config/site";
 import { supabase } from "@/integrations/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildConsentRecords, SUBMISSION_ACKNOWLEDGEMENT_TEXT, CONSENT_VERSION } from "@/features/consent/consentTexts";
 import { buildDraftSummary } from "@/features/interview/engine";
 import { QUESTION_BY_ID } from "@/features/interview/questionBank";
@@ -451,11 +452,15 @@ export async function listCases(cursor?: string): Promise<CasePage> {
   }
 
   if (!supabase) throw new Error("Sign-in is not configured.");
+  return listLiveCases(supabase, cursor);
+}
 
+/** Fetch a live page and an unfiltered count of rows visible under the reviewer's RLS. */
+export async function listLiveCases(client: SupabaseClient, cursor?: string): Promise<CasePage> {
   // The queue is a metadata projection. Never select `payload` here: that
   // would transfer every health answer for a whole page before the reviewer
   // opens any of them and would bypass the per-case `opened` audit.
-  let query = supabase
+  let query = client
     .from("case_summaries")
     .select(
       "reference, submitted_at, status, notification_state, crisis_disclosure, first_name, last_name, residence_state, unanswered",
@@ -475,8 +480,17 @@ export async function listCases(cursor?: string): Promise<CasePage> {
     );
   }
 
-  const { data, error, count } = await query;
-  if (error) throw new Error("Cases could not be loaded.");
+  // The cursor limits the page query's count to older rows. On later pages,
+  // obtain a separate queue-wide count under the same reviewer RLS policies.
+  const [result, totalResult] = await Promise.all([
+    query,
+    cursor
+      ? client.from("case_summaries").select("reference", { count: "exact", head: true })
+      : Promise.resolve(null),
+  ]);
+  const { data, error, count } = result;
+  const total = totalResult ? totalResult.count : count;
+  if (error || totalResult?.error || total === null) throw new Error("Cases could not be loaded.");
 
   const rows = (data ?? []) as CaseSummaryRow[];
   const page = rows.slice(0, QUEUE_PAGE_SIZE);
@@ -485,7 +499,7 @@ export async function listCases(cursor?: string): Promise<CasePage> {
 
   return {
     items: page.map(summaryToItem),
-    total: count ?? page.length,
+    total,
     nextCursor: hasMore && last ? `${last.submitted_at}|${last.reference}` : null,
   };
 }
