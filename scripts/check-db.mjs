@@ -643,6 +643,75 @@ await pass(
     ),
   (rows) => rows[0].n === 0,
 );
+// Legacy 10-digit rows can coexist with their canonical 11-digit equivalents.
+// The worker passes each exact outbox key, so acknowledging one must not
+// accidentally acknowledge the other, or leave the legacy row queued forever.
+await exec(`
+  insert into public.contact_suppressions (channel, address_normalized, reason)
+  values ('phone', '5125550101', 'legacy fixture'),
+         ('phone', '15125550101', 'canonical fixture'),
+         ('phone', '5125550102', 'legacy failure fixture'),
+         ('phone', '15125550102', 'canonical failure fixture');
+`);
+await pass(
+  "legacy outbox key is synced without changing its canonical twin",
+  async () => {
+    const marked = await query("select public.mark_marketing_suppression_synced('phone','5125550101','test-crm') synced");
+    const rows = await query("select address_normalized, status from public.marketing_suppression_sync where channel='phone' and address_normalized in ('5125550101','15125550101') order by address_normalized");
+    const pending = await query("select count(*)::int n from public.pending_marketing_suppressions(500) where channel='phone' and address_normalized='5125550101'");
+    return { marked: marked[0].synced, rows, pending: pending[0].n };
+  },
+  (result) => result.marked === true && result.pending === 0 &&
+    result.rows.length === 2 && result.rows[0].status === "pending" && result.rows[1].status === "synced",
+);
+await pass(
+  "legacy failure increments only the exact outbox row",
+  async () => {
+    const marked = await query("select public.mark_marketing_suppression_failed('phone','5125550102','test failure') failed");
+    const rows = await query("select address_normalized, status, attempts from public.marketing_suppression_sync where channel='phone' and address_normalized in ('5125550102','15125550102') order by address_normalized");
+    return { marked: marked[0].failed, rows };
+  },
+  (result) => result.marked === true && result.rows.length === 2 &&
+    result.rows[0].status === "pending" && result.rows[0].attempts === 0 &&
+    result.rows[1].status === "failed" && result.rows[1].attempts === 1,
+);
+await pass(
+  "a legacy suppression without a canonical twin is propagated once across two sync runs",
+  async () => {
+    await query("insert into public.contact_suppressions (channel, address_normalized, reason) values ('phone','5125550103','legacy-only fixture')");
+    let vendorCalls = 0;
+    for (let run = 0; run < 2; run += 1) {
+      const rows = await query("select address_normalized from public.pending_marketing_suppressions(500) where channel='phone' and address_normalized='5125550103'");
+      for (const row of rows) {
+        vendorCalls += 1; // Synthetic vendor accepted; no network request is made.
+        const marked = await query("select public.mark_marketing_suppression_synced('phone',$1,'test-crm') synced", [row.address_normalized]);
+        if (!marked[0].synced) throw new Error("Acknowledgement failed");
+      }
+    }
+    return vendorCalls;
+  },
+  (calls) => calls === 1,
+);
+await pass(
+  "five failures exhaust retries for a legacy key, not its canonical twin",
+  async () => {
+    for (let attempt = 1; attempt < 5; attempt += 1) {
+      await query("select public.mark_marketing_suppression_failed('phone','5125550102','test failure')");
+    }
+    const rows = await query("select address_normalized, status, attempts from public.marketing_suppression_sync where channel='phone' and address_normalized in ('5125550102','15125550102') order by address_normalized");
+    const pending = await query("select count(*)::int n from public.pending_marketing_suppressions(500) where channel='phone' and address_normalized='5125550102'");
+    return { rows, pending: pending[0].n };
+  },
+  (result) => result.pending === 0 && result.rows.length === 2 &&
+    result.rows[0].status === "pending" && result.rows[0].attempts === 0 &&
+    result.rows[1].status === "failed" && result.rows[1].attempts === 5,
+);
+await pass(
+  "missing outbox key cannot acknowledge another row",
+  () => query("select public.mark_marketing_suppression_synced('phone','5125550111','test-crm') synced, public.mark_marketing_suppression_failed('phone','5125550111','test failure') failed"),
+  (rows) => rows[0].synced === false && rows[0].failed === false,
+);
+
 await pass(
   "replaying the same customer revocation is accepted",
   () =>
