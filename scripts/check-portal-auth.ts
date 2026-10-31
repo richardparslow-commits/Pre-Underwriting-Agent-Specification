@@ -22,40 +22,112 @@ function read(path: string): string {
   return readFileSync(resolve(path), "utf8");
 }
 
-function requireMarker(path: string, content: string, marker: string, why: string) {
+function requireMarker(
+  path: string,
+  content: string,
+  marker: string,
+  why: string,
+) {
   if (!content.includes(marker)) {
     failures.push(`${path} is missing ${JSON.stringify(marker)} — ${why}`);
   }
 }
 
 const gate = read("src/features/portal/MfaGate.tsx");
-requireMarker("src/features/portal/MfaGate.tsx", gate, "mfa.listFactors", "the portal cannot discover an existing factor");
-requireMarker("src/features/portal/MfaGate.tsx", gate, "mfa.enroll", "a reviewer with no factor cannot enrol");
-requireMarker("src/features/portal/MfaGate.tsx", gate, "mfa.challenge", "an enrolled factor cannot be challenged");
-requireMarker("src/features/portal/MfaGate.tsx", gate, "mfa.verify", "a challenge cannot be completed");
-requireMarker("src/features/portal/MfaGate.tsx", gate, "mfa.unenroll", "abandoned enrolments would accumulate");
+requireMarker(
+  "src/features/portal/MfaGate.tsx",
+  gate,
+  "useMfaSetup",
+  "the gate must use the tested MFA controller",
+);
+const mfa = read("src/features/portal/useMfaSetup.ts");
+for (const marker of [
+  "mfa.listFactors",
+  "mfa.enroll",
+  "mfa.challenge",
+  "mfa.verify",
+]) {
+  requireMarker(
+    "src/features/portal/useMfaSetup.ts",
+    mfa,
+    marker,
+    "reviewers need the supported SDK setup/verification path",
+  );
+}
+requireMarker(
+  "src/features/portal/MfaGate.tsx",
+  gate,
+  "setup is already in progress",
+  "a second tab must preserve pending setup",
+);
+if (/\.unenroll\s*\(/.test(gate + mfa))
+  failures.push(
+    "The MFA gate must not automatically remove another tab's pending factor.",
+  );
 
 const portal = read("src/pages/PortalPage.tsx");
-requireMarker("src/pages/PortalPage.tsx", portal, "<MfaGate", "the portal must render the in-app step-up");
-if (portal.includes("Enrol an authenticator in your account security settings")) {
+requireMarker(
+  "src/pages/PortalPage.tsx",
+  portal,
+  "<MfaGate",
+  "the portal must render the in-app step-up",
+);
+if (
+  portal.includes("Enrol an authenticator in your account security settings")
+) {
   failures.push(
     "src/pages/PortalPage.tsx still tells the reviewer to enrol somewhere else; the portal must do it",
   );
 }
-requireMarker("src/pages/PortalPage.tsx", portal, "Load more cases", "the queue must page instead of truncating");
-requireMarker("src/pages/PortalPage.tsx", portal, "of {total} case", "the queue must show how many cases exist");
+requireMarker(
+  "src/pages/PortalPage.tsx",
+  portal,
+  "Load more cases",
+  "the queue must page instead of truncating",
+);
+requireMarker(
+  "src/pages/PortalPage.tsx",
+  portal,
+  "of {total} case",
+  "the queue must show how many cases exist",
+);
 
 const api = read("src/lib/api.ts");
-requireMarker("src/lib/api.ts", api, "shouldCreateUser: false", "a magic link must not create an account");
-const queuePaging = read("src/lib/queuePaging.ts");
-requireMarker("src/lib/api.ts", api, "readCaseQueue(supabase, cursor)", "the live API must use the tested queue transport");
-requireMarker("src/lib/queuePaging.ts", queuePaging, "count: \"exact\", head: true", "the queue needs an independent exact count without transferring rows");
-requireMarker("src/lib/api.ts", api, "nextCursor", "the queue needs a cursor for older cases");
-requireMarker("src/lib/queuePaging.ts", queuePaging, ".limit(QUEUE_PAGE_SIZE + 1)", "the queue must detect whether another page exists");
 requireMarker(
   "src/lib/api.ts",
   api,
-  ".rpc(\"open_case_for_review\"",
+  "shouldCreateUser: false",
+  "a magic link must not create an account",
+);
+const queuePaging = read("src/lib/queuePaging.ts");
+requireMarker(
+  "src/lib/api.ts",
+  api,
+  "readCaseQueue(supabase, cursor)",
+  "the live API must use the tested queue transport",
+);
+requireMarker(
+  "src/lib/queuePaging.ts",
+  queuePaging,
+  'count: "exact", head: true',
+  "the queue needs an independent exact count without transferring rows",
+);
+requireMarker(
+  "src/lib/api.ts",
+  api,
+  "nextCursor",
+  "the queue needs a cursor for older cases",
+);
+requireMarker(
+  "src/lib/queuePaging.ts",
+  queuePaging,
+  ".limit(QUEUE_PAGE_SIZE + 1)",
+  "the queue must detect whether another page exists",
+);
+requireMarker(
+  "src/lib/api.ts",
+  api,
+  '.rpc("open_case_for_review"',
   "sensitive case and marketing withdrawal evidence must load through the audited RPC",
 );
 
@@ -68,7 +140,12 @@ requireMarker(
 );
 
 const config = read("supabase/config.toml");
-requireMarker("supabase/config.toml", config, "enable_signup = false", "self-service sign-ups must stay off");
+requireMarker(
+  "supabase/config.toml",
+  config,
+  "enable_signup = false",
+  "self-service sign-ups must stay off",
+);
 requireMarker(
   "supabase/config.toml",
   config,
