@@ -559,7 +559,8 @@ remain outstanding.
 forward migration `0015` keeps an unacknowledged suppression in the outbox for
 the next scheduled run. [Overlapping workers now claim separate rows](docs/HEAL-SUPPRESSION-SYNC-CLAIM.md)
 through `0016`. [A provider bounce stays authoritative](docs/HEAL-NOTIFICATION-PROVIDER-FAILURE.md)
-over a late send result through `0017`. Marketing stays disabled and intake stays locked.
+over a late send result through `0017`. [A malformed targeted retry is refused](docs/HEAL-RETRY-REFERENCE.md)
+instead of running the due batch. Marketing stays disabled and intake stays locked.
 
 ### Public endpoint rate-limit identity
 

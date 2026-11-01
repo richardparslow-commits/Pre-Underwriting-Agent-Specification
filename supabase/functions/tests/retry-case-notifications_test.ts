@@ -182,3 +182,46 @@ Deno.test("an invalid reviewer URL stops retries before any claim or provider at
     assertEquals(claims, []);
     assertEquals(sends, []);
   }));
+
+// Heal s2-malformed-retry-reference-runs-batch: a targeted call must never
+// fall through to the scheduled batch because its reference does not parse.
+Deno.test("a malformed reference is refused without retrying the due batch", () =>
+  withFixture(async ({ rows, requests, claims, sends, invoke }) => {
+    const now = Date.now();
+    rows.push({
+      reference: "LPP-2026-000001", submitted_at: iso(now - 300_000),
+      notification_state: "failed", notification_attempts: 1,
+      notification_next_attempt_at: null, notification_claimed_at: null,
+      notification_first_attempted_at: iso(now - 300_000),
+    });
+    const response = await invoke({ reference: "LPP-2026-NOPE" });
+    assertEquals(response.status, 400);
+    assertEquals(await response.json(), { error: "Invalid case reference" });
+    assertEquals(requests, []);
+    assertEquals(claims, []);
+    assertEquals(sends, []);
+  }));
+
+Deno.test("an unparseable or oversized retry body is refused before any claim", () =>
+  withFixture(async ({ requests, claims, sends, invoke }) => {
+    const oversized = await invoke({ reference: `LPP-2026-${"A".repeat(5000)}` });
+    assertEquals(oversized.status, 400);
+    assertEquals(requests, []);
+    assertEquals(claims, []);
+    assertEquals(sends, []);
+  }));
+
+Deno.test("a scheduled call without a reference still runs the due batch", () =>
+  withFixture(async ({ rows, claims, sends, invoke }) => {
+    const now = Date.now();
+    const reference = "LPP-2026-000002";
+    rows.push({
+      reference, submitted_at: iso(now - 300_000), notification_state: "failed",
+      notification_attempts: 1, notification_next_attempt_at: null,
+      notification_claimed_at: null, notification_first_attempted_at: iso(now - 300_000),
+    });
+    const response = await invoke({});
+    assertEquals(await response.json(), { inspected: 1, sent: 1, failed: 0, skipped: 0 });
+    assertEquals(claims, [reference]);
+    assertEquals(sends, [reference]);
+  }));
