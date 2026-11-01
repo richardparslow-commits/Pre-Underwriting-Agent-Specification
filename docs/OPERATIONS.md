@@ -52,6 +52,12 @@ first APP_ORIGIN plus `/portal`. Do not alter APP_ORIGIN's request allowlist mer
 to change the email destination. The reviewer membership and MFA checks still
 apply when following any notification link.
 
+The shared sender limits the complete provider request, including its response
+body, to eight seconds. A timeout aborts the request and records an unconfirmed
+`failed` attempt for the existing backoff/retry path; it does not prove the
+provider refused or never received the message. A saved submission still returns
+its case reference. See [the timeout regression and rollout notes](HEAL-EMAIL-TIMEOUT.md).
+
 The notification worker claims a case with a lease, sends with the case
 reference as the provider idempotency key, and records the result. A targeted
 call must carry a well-formed `LPP-YYYY-XXXXXX` reference: a malformed,

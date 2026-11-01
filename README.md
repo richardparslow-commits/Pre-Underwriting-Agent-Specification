@@ -562,6 +562,11 @@ through `0016`. [A provider bounce stays authoritative](docs/HEAL-NOTIFICATION-P
 over a late send result through `0017`. [A malformed targeted retry is refused](docs/HEAL-RETRY-REFERENCE.md)
 instead of running the due batch. Marketing stays disabled and intake stays locked.
 
+[Stalled email requests now have an eight-second deadline](docs/HEAL-EMAIL-TIMEOUT.md),
+including response-body reading. A saved case returns its reference with an
+unconfirmed notification failure for the existing retry path. This backend-only
+repair requires a separate deployment of both notification send functions.
+
 ### Public endpoint rate-limit identity
 
 The public submission and marketing-withdrawal functions use `Deno.serve` connection metadata (`info.remoteAddr`) to select their salted durable quota. They never trust `X-Forwarded-For`, `Forwarded`, `X-Real-IP` or `CF-Connecting-IP`; source TCP ports and request content cannot create fresh quotas. If the runtime supplies no usable TCP peer, requests share the conservative `shared:unverified-peer` quota. Submission retains 10 requests per 600 seconds; withdrawal retains its separate 5 per 600 seconds. Missing durable configuration still fails closed in production.

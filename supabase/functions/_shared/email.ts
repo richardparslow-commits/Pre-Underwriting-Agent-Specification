@@ -12,6 +12,9 @@
 /** Approved review mailbox. This is the only address the product may notify. */
 export const APPROVED_RECIPIENT = "richardparslow@lifepolicypilot.blog";
 
+/** Includes response headers and body; the saved case must get its receipt. */
+const PROVIDER_TIMEOUT_MS = 8_000;
+
 export interface NotificationResult {
   state: "accepted" | "queued" | "failed" | "not_sent";
   /** Safe operational detail. Never contains customer data. */
@@ -144,47 +147,72 @@ export async function sendCaseNotification(input: {
   const from = Deno.env.get("CASE_NOTIFY_FROM") ??
     "Life Policy Pilot <notifications@lifepolicypilot.blog>";
 
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(() => {
+      // Reject before aborting: a caught body-read abort must not look accepted.
+      reject(new Error("Provider deadline exceeded"));
+      controller.abort();
+    }, PROVIDER_TIMEOUT_MS);
+  });
   try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        // Resend honours Idempotency-Key for 24 hours. This does not guarantee
-        // deduplication when an uncertain acceptance is retried after that window.
-        "Idempotency-Key": input.idempotencyKey ?? input.reference,
-      },
-      body: JSON.stringify({
-        from,
-        to: [message.to],
-        subject: message.subject,
-        text: message.text,
-        // Lets the delivery webhook reconcile an event to a case without
-        // sending any customer data to the provider.
-        tags: [{ name: "case_reference", value: input.reference }],
-      }),
-    });
+    return await Promise.race([
+      (async (): Promise<NotificationResult> => {
+        const response = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            // Resend honours Idempotency-Key for 24 hours. This does not guarantee
+            // deduplication when an uncertain acceptance is retried after that window.
+            "Idempotency-Key": input.idempotencyKey ?? input.reference,
+          },
+          body: JSON.stringify({
+            from,
+            to: [message.to],
+            subject: message.subject,
+            text: message.text,
+            // Lets the delivery webhook reconcile an event to a case without
+            // sending any customer data to the provider.
+            tags: [{ name: "case_reference", value: input.reference }],
+          }),
+        });
 
-    if (!response.ok) {
-      // Status code only: the response body can echo the recipient address.
-      console.warn("Case notification rejected", response.status);
-      return { state: "failed", detail: `Provider status ${response.status}` };
-    }
+        if (!response.ok) {
+          // Status code only: the response body can echo the recipient address.
+          console.warn("Case notification rejected", response.status);
+          return {
+            state: "failed",
+            detail: `Provider status ${response.status}`,
+          };
+        }
 
-    const payload: unknown = await response.json().catch(() => null);
-    const messageId =
-      typeof payload === "object" && payload !== null && "id" in payload
-        ? String((payload as { id?: unknown }).id ?? "")
-        : "";
+        const payload: unknown = await response.json().catch(() => null);
+        const messageId =
+          typeof payload === "object" && payload !== null && "id" in payload
+            ? String((payload as { id?: unknown }).id ?? "")
+            : "";
 
-    return {
-      state: "accepted",
-      detail: "Accepted by the email provider",
-      messageId: messageId || undefined,
-    };
+        return {
+          state: "accepted",
+          detail: "Accepted by the email provider",
+          messageId: messageId || undefined,
+        };
+      })(),
+      deadline,
+    ]);
   } catch {
     console.warn("Case notification request failed");
-    return { state: "failed", detail: "Provider request failed" };
+    return {
+      state: "failed",
+      detail: controller.signal.aborted
+        ? "Provider request timed out; delivery is unconfirmed and queued for retry"
+        : "Provider request failed",
+    };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
