@@ -8,6 +8,7 @@
 
 import { assertEquals } from "jsr:@std/assert@1.0.6";
 import { buildConsents, buildValidDraft } from "./fixtures.ts";
+import { heldEmail } from "./held-email.ts";
 
 type Handler = (request: Request) => Response | Promise<Response>;
 
@@ -50,6 +51,77 @@ async function errorFrom(response: Response): Promise<string> {
   const body = (await response.json()) as { error?: string };
   return body.error ?? "";
 }
+
+Deno.test("a saved case returns its receipt after an email timeout and an unchanged retry does not duplicate it", async () => {
+  const values = {
+    QUESTIONNAIRE_APPROVED: "true",
+    SUPABASE_URL: "http://database.test",
+    SUPABASE_SERVICE_ROLE_KEY: "synthetic-key",
+    RESEND_API_KEY: "synthetic-key",
+    RATE_LIMIT_SALT: "synthetic-salt",
+    REVIEWER_PORTAL_URL: "https://example.test/reviewer",
+  };
+  const saved = new Map(
+    Object.keys(values).map((key) => [key, Deno.env.get(key)]),
+  );
+  const originalFetch = globalThis.fetch;
+  const held = heldEmail("headers");
+  let row: Record<string, unknown> | undefined;
+  let inserts = 0;
+  const json = (value: unknown) => Response.json(value);
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const request = new Request(input, init);
+    const url = new URL(request.url);
+    if (url.hostname === "api.resend.com") {
+      assertEquals(inserts, 1, "the case must be saved before notification");
+      return held.fetch(input, init);
+    }
+    if (url.pathname.endsWith("/consume_submission_rate")) return json(true);
+    if (url.pathname === "/rest/v1/cases" && request.method === "GET") {
+      return json(row ? [row] : []);
+    }
+    if (url.pathname === "/rest/v1/cases" && request.method === "POST") {
+      row = await request.json();
+      inserts++;
+      return new Response(null, { status: 201 });
+    }
+    if (url.pathname.endsWith("/claim_case_notification")) {
+      return json([{ notification_attempts: 1 }]);
+    }
+    if (url.pathname.endsWith("/complete_case_notification")) {
+      const body = await request.json();
+      row!.notification_state = body.p_state;
+      row!.notification_detail = body.p_detail;
+      row!.notification_attempts = 1;
+      return json(null);
+    }
+    throw new Error(`Unexpected synthetic request: ${url.pathname}`);
+  }) as typeof fetch;
+  try {
+    for (const [key, value] of Object.entries(values)) Deno.env.set(key, value);
+    const draft = buildValidDraft();
+    const response = await submit(draft, "stalled-email-0001");
+    const receipt = await response.json();
+    assertEquals(response.status, 201);
+    assertEquals(receipt.reference, row!.reference);
+    assertEquals(receipt.status, "submitted");
+    assertEquals(receipt.notification.state, "failed");
+    assertEquals(held.aborted(), true);
+    assertEquals(row!.notification_state, "failed");
+    const replay = await submit(draft, "stalled-email-0001");
+    const repeated = await replay.json();
+    assertEquals(replay.status, 200);
+    assertEquals(repeated.reference, receipt.reference);
+    assertEquals(inserts, 1);
+    assertEquals(held.keys, [receipt.reference]);
+  } finally {
+    held.close();
+    globalThis.fetch = originalFetch;
+    for (const [key, value] of saved) {
+      value === undefined ? Deno.env.delete(key) : Deno.env.set(key, value);
+    }
+  }
+});
 
 Deno.test("allows the idempotency header in the CORS preflight", async () => {
   if (!handler) throw new Error("submit-case handler was not captured");

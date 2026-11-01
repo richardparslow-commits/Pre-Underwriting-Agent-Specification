@@ -1,4 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert@1.0.6";
+import { heldEmail } from "./held-email.ts";
 import {
   buildNotification,
   notificationBlocker,
@@ -7,6 +8,49 @@ import {
 } from "../_shared/email.ts";
 
 const ORIGINAL_FETCH = globalThis.fetch;
+
+for (const phase of ["headers", "body"] as const) {
+  Deno.test(`a stalled provider ${phase} is aborted before the receipt deadline and can retry safely`, async () => {
+    const saved = new Map(
+      ["RESEND_API_KEY", "REVIEWER_PORTAL_URL"].map(
+        (key) => [key, Deno.env.get(key)],
+      ),
+    );
+    const held = heldEmail(phase);
+    const input = {
+      reference: "LPP-2026-SLOW01",
+      submittedAt: "2026-11-01T12:00:00Z",
+      portalOrigin: "https://example.test",
+    };
+    try {
+      Deno.env.set("RESEND_API_KEY", "synthetic-key");
+      Deno.env.delete("REVIEWER_PORTAL_URL");
+      globalThis.fetch = held.fetch;
+      const result = await sendCaseNotification(input);
+      assertEquals(result.state, "failed");
+      assertEquals(result.messageId, undefined);
+      assertEquals(held.aborted(), true);
+      assert(result.detail?.includes("timed out"));
+      let retryKey: string | null = null;
+      globalThis.fetch = ((_input, init) => {
+        retryKey = new Headers(init?.headers).get("Idempotency-Key");
+        return Promise.resolve(
+          Response.json({ id: "synthetic-recovered-message" }),
+        );
+      }) as typeof fetch;
+      const retry = await sendCaseNotification(input);
+      assertEquals(retry.state, "accepted");
+      assertEquals(retryKey, held.keys[0]);
+      assertEquals(retryKey, input.reference);
+    } finally {
+      held.close();
+      globalThis.fetch = ORIGINAL_FETCH;
+      for (const [key, value] of saved) {
+        value === undefined ? Deno.env.delete(key) : Deno.env.set(key, value);
+      }
+    }
+  });
+}
 
 function withReviewerUrl(value: string | undefined, run: () => void) {
   const previous = Deno.env.get("REVIEWER_PORTAL_URL");
