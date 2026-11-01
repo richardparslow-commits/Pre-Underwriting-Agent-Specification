@@ -553,6 +553,12 @@ separate from the `0011` queue-permissions/submission-integrity repair. The
 application remains in testing; deployment evidence and other Heal defects
 remain outstanding.
 
+## Heal suppression-sync recovery
+
+[A failed vendor sync no longer drops an opt-out](docs/HEAL-SUPPRESSION-SYNC-RETRY.md):
+forward migration `0015` keeps an unacknowledged suppression in the outbox for
+the next scheduled run. Marketing stays disabled and intake stays locked.
+
 ### Public endpoint rate-limit identity
 
 The public submission and marketing-withdrawal functions use `Deno.serve` connection metadata (`info.remoteAddr`) to select their salted durable quota. They never trust `X-Forwarded-For`, `Forwarded`, `X-Real-IP` or `CF-Connecting-IP`; source TCP ports and request content cannot create fresh quotas. If the runtime supplies no usable TCP peer, requests share the conservative `shared:unverified-peer` quota. Submission retains 10 requests per 600 seconds; withdrawal retains its separate 5 per 600 seconds. Missing durable configuration still fails closed in production.
