@@ -727,6 +727,56 @@ await pass(
   (rows) => rows[0].synced === false && rows[0].failed === false,
 );
 
+// Heal s2-overlapping-sync-double-counts-attempts: a second scheduled run must
+// not process a row another run already claimed, but a crashed run's lease must
+// return the row and both mark paths must release the claim.
+await query(
+  "insert into public.contact_suppressions (channel, address_normalized, reason) values ('phone','15125550105','claim fixture')",
+);
+await pass(
+  "a claimed suppression is not offered to an overlapping run",
+  async () => {
+    const first = await query("select address_normalized from public.claim_marketing_suppressions(500,'worker-a',600) where address_normalized='15125550105'");
+    const second = await query("select address_normalized from public.claim_marketing_suppressions(500,'worker-b',600) where address_normalized='15125550105'");
+    const row = await query("select claimed_by, claimed_at is not null claimed from public.marketing_suppression_sync where channel='phone' and address_normalized='15125550105'");
+    return { first: first.length, second: second.length, row: row[0] };
+  },
+  (result) => result.first === 1 && result.second === 0 &&
+    result.row.claimed === true && result.row.claimed_by === "worker-a",
+);
+await pass(
+  "an expired claim is reclaimed after a worker stops",
+  async () => {
+    await query("update public.marketing_suppression_sync set claimed_at = now() - interval '11 minutes' where channel='phone' and address_normalized='15125550105'");
+    const reclaimed = await query("select address_normalized from public.claim_marketing_suppressions(500,'worker-b',600) where address_normalized='15125550105'");
+    const row = await query("select claimed_by from public.marketing_suppression_sync where channel='phone' and address_normalized='15125550105'");
+    return { reclaimed: reclaimed.length, claimed_by: row[0].claimed_by };
+  },
+  (result) => result.reclaimed === 1 && result.claimed_by === "worker-b",
+);
+await pass(
+  "a failed sync releases the claim and counts one attempt",
+  async () => {
+    const marked = await query("select public.mark_marketing_suppression_failed('phone','5125550105','vendor 503') failed");
+    const row = await query("select status, attempts, claimed_at, claimed_by from public.marketing_suppression_sync where channel='phone' and address_normalized='15125550105'");
+    return { marked: marked[0].failed, row: row[0] };
+  },
+  (result) => result.marked === true && result.row.status === "failed" &&
+    result.row.attempts === 1 && result.row.claimed_at === null &&
+    result.row.claimed_by === null,
+);
+await pass(
+  "a recovered vendor syncs the reclaimed row and clears the claim",
+  async () => {
+    const claimed = await query("select address_normalized from public.claim_marketing_suppressions(500,'worker-c',600) where address_normalized='15125550105'");
+    const marked = await query("select public.mark_marketing_suppression_synced('phone','5125550105','test-crm') synced");
+    const row = await query("select status, claimed_at from public.marketing_suppression_sync where channel='phone' and address_normalized='15125550105'");
+    return { claimed: claimed.length, marked: marked[0].synced, row: row[0] };
+  },
+  (result) => result.claimed === 1 && result.marked === true &&
+    result.row.status === "synced" && result.row.claimed_at === null,
+);
+
 await pass(
   "replaying the same customer revocation is accepted",
   () =>
