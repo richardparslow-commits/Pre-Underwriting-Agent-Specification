@@ -103,10 +103,6 @@ export function InterviewScreen({
               );
             })}
           </ol>
-          <Button type="button" variant="outline" size="sm" onClick={onReview} className="w-full">
-            <ClipboardCheck aria-hidden />
-            Review my answers
-          </Button>
           <p className="text-[0.7rem] leading-relaxed text-muted-foreground">
             Your answers are held in this tab only. Closing it discards the interview.
           </p>
@@ -130,6 +126,13 @@ export function InterviewScreen({
             {position} of {total}
           </span>
           {current.status === "core" ? <Badge tone="outline">Source questionnaire</Badge> : null}
+        </div>
+
+        <div className="mb-6">
+          <Button type="button" variant="outline" onClick={onReview} className="w-full sm:w-auto">
+            <ClipboardCheck aria-hidden />
+            Review my answers
+          </Button>
         </div>
 
         <div className="space-y-6">
