@@ -24,7 +24,7 @@
     "generate:question-refs": "tsx scripts/generate-question-refs.ts",
     "test:consent": "tsx --test src/features/consent/marketingConsent.test.ts",
     "test:engine": "tsx --test src/features/interview/engine.test.ts",
-    "test:submission-ui": "tsx --test src/features/intake/submission-ui.test.tsx src/features/intake/reviewNavigation.test.tsx src/features/interview/submissionRetry.test.tsx src/features/interview/intakeHistory.test.tsx src/features/interview/intakeHistoryRouter.test.tsx src/features/interview/policyNavigation.test.tsx",
+    "test:submission-ui": "tsx --test src/features/intake/submission-ui.test.tsx src/features/intake/reviewNavigation.test.tsx src/features/intake/contactPreference.test.tsx src/features/interview/submissionRetry.test.tsx src/features/interview/intakeHistory.test.tsx src/features/interview/intakeHistoryRouter.test.tsx src/features/interview/policyNavigation.test.tsx",
     "test:validation": "tsx --test src/features/intake/validation.test.ts",
     "test:reviewer-visibility": "tsx --test src/features/portal/reviewerVisibility.test.tsx src/features/portal/correctionHistory.test.tsx src/features/portal/safetyPaging.test.tsx src/features/portal/useCaseQueue.test.tsx src/lib/reviewerSignInFeedback.test.ts src/lib/queuePaging.test.ts src/features/portal/mfaSetup.test.tsx",
     "check:reviewer-visibility": "node --test scripts/check-reviewer-visibility.mjs",
