@@ -59,6 +59,8 @@ deduplicates that key for 24 hours, so migration `0010` records
 after it. Backoff is unchanged: `failed` retries after 15 minutes and `not_sent`
 after one hour, up to five attempts, inside the seven-day submission window.
 
+Provider delivery events are authoritative: a provider-reported bounce (or delivery) cannot be overwritten by a later local send result. A local failure without a provider event can still recover on a retry (migration `0017`).
+
 A case that reaches the window boundary is not silently dropped. It appears in:
 
 ```sql
@@ -176,7 +178,7 @@ Rows stay `pending` or `failed` until the worker records success. Do not enable 
 
 The detailed, window-by-window procedure for migrations `0006`–`0010`, including the audited case read and marketing withdrawal exercises, is in the [staging deployment runbook](STAGING-RUNBOOK.md). The list below is the summary version.
 
-- [ ] Apply migrations 0001–0016 in order and record the applied versions. **Staging:** 0001–0005 were verified on 28 Oct 2026; verify the current status and evidence for 0006–0016 before proceeding. **Production:** not verified. Deploy the matching portal code and migrations together; verify AAL1/AAL2, non-reviewer and direct REST denial, and logging failure with labelled data.
+- [ ] Apply migrations 0001–0017 in order and record the applied versions. **Staging:** 0001–0005 were verified on 28 Oct 2026; verify the current status and evidence for 0006–0017 before proceeding. **Production:** not verified. Deploy the matching portal code and migrations together; verify AAL1/AAL2, non-reviewer and direct REST denial, and logging failure with labelled data.
 - [ ] Keep `QUESTIONNAIRE_APPROVED=false` until 0/92 rows become 92/92 signed off.
 - [ ] Set `RATE_LIMIT_SALT` to a random value and confirm the durable limiter is active; without it production returns 503 (fail closed). Only `ENVIRONMENT=test` uses the in-memory guard.
 - [ ] Store `project_url` and `cron_secret` in Vault, apply `supabase/ops/retry-schedule.sql`, and verify one scheduler tick.

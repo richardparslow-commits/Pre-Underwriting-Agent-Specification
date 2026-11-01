@@ -453,6 +453,59 @@ await pass(
   (rows) => rows[0].apply_email_event === "duplicate",
 );
 
+// Heal s3-bounce-during-submit-send-overwritten: a bounce can land while the
+// send is still awaited. The send's own completion must not replace it with
+// accepted, and a direct write must not either.
+await query(
+  `insert into public.cases
+     (reference, questionnaire_version, notification_state,
+      notification_claimed_at, notification_claimed_by, payload)
+   values ('LPP-2026-BOUNCE1','v','queued',now(),'submit-worker','{}'::jsonb)`,
+);
+await pass(
+  "a provider bounce applies to a send still in flight",
+  () => query("select public.apply_email_event('evt_bounce','email.bounced','LPP-2026-BOUNCE1','msg_bounce','failed')"),
+  (rows) => rows[0].apply_email_event === "applied",
+);
+await pass(
+  "the bounced case records provider failure",
+  () => query("select notification_state, notification_provider_state from public.cases where reference='LPP-2026-BOUNCE1'"),
+  (rows) => rows[0].notification_state === "failed" && rows[0].notification_provider_state === "failed",
+);
+await pass(
+  "a late accepted send completes without overwriting the bounce",
+  () => query("select public.complete_case_notification('LPP-2026-BOUNCE1','accepted','provider accepted','msg_bounce')"),
+  () => true,
+);
+await pass(
+  "the bounced case still reads failed",
+  () => query("select notification_state from public.cases where reference='LPP-2026-BOUNCE1'"),
+  (rows) => rows[0].notification_state === "failed",
+);
+await pass(
+  "the provider failure stays recorded on the bounced case",
+  () => query("select notification_provider_state from public.cases where reference='LPP-2026-BOUNCE1'"),
+  (rows) => rows[0].notification_provider_state === "failed",
+);
+await expectError(
+  "a direct write cannot flip a bounced case to accepted",
+  () => query("update public.cases set notification_state='accepted' where reference='LPP-2026-BOUNCE1'"),
+  "provider-reported failure",
+);
+await query(
+  "insert into public.cases (reference, questionnaire_version, notification_state, payload) values ('LPP-2026-LOCALFAIL','v','failed','{}'::jsonb)",
+);
+await pass(
+  "a local failure can still be replaced by a later accepted send",
+  () => query("select public.complete_case_notification('LPP-2026-LOCALFAIL','accepted','provider accepted')"),
+  () => true,
+);
+await pass(
+  "the locally failed case recovers",
+  () => query("select notification_state from public.cases where reference='LPP-2026-LOCALFAIL'"),
+  (rows) => rows[0].notification_state === "accepted",
+);
+
 // A late submit/retry completion can arrive after the provider webhook. The
 // completion path must not regress a delivered case or put it back in the
 // retry queue, and a genuine retry after failure must still be stored.
