@@ -25,14 +25,37 @@ export interface NotificationResult {
  * the approved allowlist. Anything else falls back to the constant.
  */
 export function resolveRecipient(): string {
-  const configured = (Deno.env.get("CASE_NOTIFY_TO") ?? "").trim().toLowerCase();
+  const configured = (Deno.env.get("CASE_NOTIFY_TO") ?? "").trim()
+    .toLowerCase();
   if (!configured) return APPROVED_RECIPIENT;
 
   const allowlist = [APPROVED_RECIPIENT];
   if (allowlist.includes(configured)) return configured;
 
-  console.warn("CASE_NOTIFY_TO is not in the approved recipient allowlist; using the default");
+  console.warn(
+    "CASE_NOTIFY_TO is not in the approved recipient allowlist; using the default",
+  );
   return APPROVED_RECIPIENT;
+}
+
+/** A deployment's reviewer page is independent of its public intake allowlist. */
+function reviewerPortalUrl(portalOrigin: string): string | null {
+  const configured = (Deno.env.get("REVIEWER_PORTAL_URL") ?? "").trim();
+  if (!configured) {
+    return portalOrigin.trim()
+      ? `${portalOrigin.trim().replace(/\/$/, "")}/portal`
+      : null;
+  }
+  try {
+    const url = new URL(configured);
+    if (
+      url.protocol !== "https:" || url.username || url.password || url.search ||
+      url.hash
+    ) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
 }
 
 export function buildNotification(input: {
@@ -40,8 +63,14 @@ export function buildNotification(input: {
   submittedAt: string;
   portalOrigin: string;
 }): { subject: string; text: string; to: string } {
-  const submitted = new Date(input.submittedAt).toISOString().replace(".000", "");
-  const portalUrl = `${input.portalOrigin.replace(/\/$/, "")}/portal`;
+  const submitted = new Date(input.submittedAt).toISOString().replace(
+    ".000",
+    "",
+  );
+  const portalUrl = reviewerPortalUrl(input.portalOrigin);
+  if (!portalUrl) {
+    throw new Error("Reviewer portal URL is not configured correctly");
+  }
 
   const text = [
     "A customer has submitted a pre-underwriting questionnaire for your review.",
@@ -62,7 +91,8 @@ export function buildNotification(input: {
 
   return {
     to: resolveRecipient(),
-    subject: `New Life Policy Pilot pre-underwriting submission — Case ${input.reference}`,
+    subject:
+      `New Life Policy Pilot pre-underwriting submission — Case ${input.reference}`,
     text,
   };
 }
@@ -73,8 +103,14 @@ export function buildNotification(input: {
  * and `sendCaseNotification` cannot disagree about it.
  */
 export function notificationBlocker(portalOrigin: string): string | null {
-  if (!(Deno.env.get("RESEND_API_KEY") ?? "").trim()) return "Email provider not configured";
-  if (!portalOrigin.trim()) return "Portal origin not configured";
+  if (!(Deno.env.get("RESEND_API_KEY") ?? "").trim()) {
+    return "Email provider not configured";
+  }
+  if (!reviewerPortalUrl(portalOrigin)) {
+    return (Deno.env.get("REVIEWER_PORTAL_URL") ?? "").trim()
+      ? "Reviewer portal URL is invalid"
+      : "Portal origin not configured";
+  }
   return null;
 }
 
@@ -105,8 +141,8 @@ export async function sendCaseNotification(input: {
   const apiKey = Deno.env.get("RESEND_API_KEY") ?? "";
 
   const message = buildNotification(input);
-  const from =
-    Deno.env.get("CASE_NOTIFY_FROM") ?? "Life Policy Pilot <notifications@lifepolicypilot.blog>";
+  const from = Deno.env.get("CASE_NOTIFY_FROM") ??
+    "Life Policy Pilot <notifications@lifepolicypilot.blog>";
 
   try {
     const response = await fetch("https://api.resend.com/emails", {
@@ -153,7 +189,9 @@ export async function sendCaseNotification(input: {
 }
 
 /** Serialises the operational detail stored in cases.notification_detail. */
-export function notificationDetailForStorage(result: NotificationResult): string {
+export function notificationDetailForStorage(
+  result: NotificationResult,
+): string {
   return JSON.stringify({
     provider: result.messageId ? "resend" : null,
     messageId: result.messageId ?? null,

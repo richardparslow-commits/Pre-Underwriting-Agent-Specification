@@ -22,7 +22,7 @@
  */
 
 import { jsonResponse, serviceClient } from "../_shared/case.ts";
-import { notificationDetailForStorage, sendCaseNotification } from "../_shared/email.ts";
+import { notificationBlocker, notificationDetailForStorage, sendCaseNotification } from "../_shared/email.ts";
 
 const MAX_ATTEMPTS = 5;
 const BATCH_SIZE = 20;
@@ -74,7 +74,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const origin = portalOrigin();
-  if (!origin) {
+  if (notificationBlocker(origin)) {
     return jsonResponse({ inspected: 0, sent: 0, failed: 0, skipped: 0, portal: "not_configured" }, 200, null);
   }
 

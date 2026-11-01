@@ -40,6 +40,7 @@ async function withFixture(run: (data: {
     SUPABASE_SERVICE_ROLE_KEY: "synthetic-service-key",
     RESEND_API_KEY: "synthetic-provider-key",
     APP_ORIGIN: "http://localhost:5173",
+    REVIEWER_PORTAL_URL: "",
     CRON_SECRET: "synthetic-cron-secret",
   };
   const saved = new Map(Object.keys(values).map((key) => [key, Deno.env.get(key)]));
@@ -163,3 +164,21 @@ Deno.test("a concurrent claim is still checked by the authoritative RPC", () => 
   assertEquals(claims, [reference]);
   assertEquals(sends, []);
 }));
+
+Deno.test("an invalid reviewer URL stops retries before any claim or provider attempt", () =>
+  withFixture(async ({ requests, claims, sends, invoke }) => {
+    Deno.env.set(
+      "REVIEWER_PORTAL_URL",
+      "https://preview.example.test/reviewer?token=synthetic",
+    );
+    assertEquals(await (await invoke()).json(), {
+      inspected: 0,
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+      portal: "not_configured",
+    });
+    assertEquals(requests.length, 0);
+    assertEquals(claims, []);
+    assertEquals(sends, []);
+  }));
