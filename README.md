@@ -311,6 +311,7 @@ Set secrets (never in this repository):
 
 ```
 APP_ORIGIN=https://your-site.example
+REVIEWER_PORTAL_URL=https://your-reviewer-site.example/reviewer # optional full reviewer URL for integrations
 SUPABASE_URL=...
 SUPABASE_SERVICE_ROLE_KEY=...
 RESEND_API_KEY=...                                   # optional until email is approved
@@ -322,6 +323,17 @@ RATE_LIMIT_SALT=...                                  # random; salts the hashed 
 QUESTIONNAIRE_APPROVED=false                          # stays false until every row is signed off
 ENVIRONMENT=production
 ```
+
+`APP_ORIGIN` remains the public request-origin allowlist. Set the independent
+`REVIEWER_PORTAL_URL` to the complete reviewer page when that page uses a different
+route or origin. Policy Compass's current unpublished preview uses
+`https://id-preview--357c0422-4982-4f24-9e20-31891a8661ca.lovable.app/reviewer`.
+Use HTTPS without credentials, query strings or fragments. An invalid explicit
+URL blocks notification attempts before a lease is claimed. With no override,
+the standalone app retains its existing first-APP_ORIGIN `/portal` link. Both
+submit-case and retry-case-notifications use the same destination resolver.
+This setting does not change authentication redirects, MFA, origin allowlisting
+or the questionnaire approval lock.
 
 `QUESTIONNAIRE_APPROVED=true` is a deliberate launch lock: until it is set, the
 public function returns 503 and writes nothing. Do not set it while

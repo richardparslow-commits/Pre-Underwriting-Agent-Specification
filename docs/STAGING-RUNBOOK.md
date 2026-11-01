@@ -107,6 +107,7 @@ Set secrets from a gitignored file or the dashboard. Required names:
 |---|---|
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | every service-role function |
 | `APP_ORIGIN` | portal origin used in the notification email |
+| `REVIEWER_PORTAL_URL` | optional full HTTPS reviewer link, such as the authorized Lovable preview `/reviewer`; leaves APP_ORIGIN's request allowlist unchanged |
 | `RATE_LIMIT_SALT` | durable submission and revocation limiting |
 | `CRON_SECRET` | both scheduled workers |
 | `RESEND_API_KEY`, `EMAIL_WEBHOOK_SECRET` | notification delivery (optional for step 5) |
