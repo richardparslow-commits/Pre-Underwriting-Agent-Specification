@@ -557,7 +557,8 @@ remain outstanding.
 
 [A failed vendor sync no longer drops an opt-out](docs/HEAL-SUPPRESSION-SYNC-RETRY.md):
 forward migration `0015` keeps an unacknowledged suppression in the outbox for
-the next scheduled run. Marketing stays disabled and intake stays locked.
+the next scheduled run. [Overlapping workers now claim separate rows](docs/HEAL-SUPPRESSION-SYNC-CLAIM.md)
+through `0016`. Marketing stays disabled and intake stays locked.
 
 ### Public endpoint rate-limit identity
 

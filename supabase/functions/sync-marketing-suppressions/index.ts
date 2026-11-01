@@ -90,13 +90,18 @@ Deno.serve(async (req: Request) => {
   }
 
   const supabase = serviceClient();
-  const { data, error } = await supabase.rpc("pending_marketing_suppressions", {
+  const worker = `suppression:${crypto.randomUUID()}`;
+  // Claim the batch atomically. An overlapping run skips rows this worker owns
+  // until the lease expires, so one outage cannot spend two attempts on a row.
+  const { data, error } = await supabase.rpc("claim_marketing_suppressions", {
     p_limit: BATCH_SIZE,
+    p_worker: worker,
+    p_lease_seconds: 600,
   });
 
   if (error) {
-    console.error("Suppression queue read failed", error.code);
-    return jsonResponse({ error: "Suppression queue read failed" }, 500, null);
+    console.error("Suppression claim failed", error.code);
+    return jsonResponse({ error: "Suppression claim failed" }, 500, null);
   }
 
   const rows = (data ?? []) as PendingSuppression[];
