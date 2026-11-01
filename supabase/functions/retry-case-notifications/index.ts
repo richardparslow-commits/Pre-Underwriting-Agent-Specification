@@ -43,18 +43,29 @@ interface RetryRow {
   notification_attempts: number;
 }
 
-async function requestedReference(req: Request): Promise<string | null> {
+type ReferenceRequest =
+  | { kind: "batch" }
+  | { kind: "single"; reference: string }
+  | { kind: "invalid" };
+
+async function requestedReference(req: Request): Promise<ReferenceRequest> {
   const raw = await req.text().catch(() => "");
-  if (!raw.trim()) return null;
-  if (raw.length > 4096) return null;
+  if (!raw.trim()) return { kind: "batch" };
+  if (raw.length > 4096) return { kind: "invalid" };
+  let body: unknown;
   try {
-    const body = JSON.parse(raw) as { reference?: unknown };
-    return typeof body.reference === "string" && /^LPP-\d{4}-[0-9A-Z]{6}$/.test(body.reference)
-      ? body.reference
-      : null;
+    body = JSON.parse(raw);
   } catch {
-    return null;
+    return { kind: "invalid" };
   }
+  if (typeof body !== "object" || body === null) return { kind: "invalid" };
+  const value = (body as { reference?: unknown }).reference;
+  // An empty body, or one without a reference, is the scheduled batch call.
+  if (value === undefined || value === null) return { kind: "batch" };
+  if (typeof value !== "string" || !/^LPP-\d{4}-[0-9A-Z]{6}$/.test(value)) {
+    return { kind: "invalid" };
+  }
+  return { kind: "single", reference: value };
 }
 
 Deno.serve(async (req: Request) => {
@@ -78,7 +89,12 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ inspected: 0, sent: 0, failed: 0, skipped: 0, portal: "not_configured" }, 200, null);
   }
 
-  const single = await requestedReference(req);
+  const requested = await requestedReference(req);
+  if (requested.kind === "invalid") {
+    // A mistyped targeted retry must not fall through to the due batch.
+    return jsonResponse({ error: "Invalid case reference" }, 400, null);
+  }
+  const single = requested.kind === "single" ? requested.reference : null;
   const now = Date.now();
   const olderThan = new Date(now - MIN_AGE_MS).toISOString();
   const newerThan = new Date(now - MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString();

@@ -53,7 +53,10 @@ to change the email destination. The reviewer membership and MFA checks still
 apply when following any notification link.
 
 The notification worker claims a case with a lease, sends with the case
-reference as the provider idempotency key, and records the result. The provider
+reference as the provider idempotency key, and records the result. A targeted
+call must carry a well-formed `LPP-YYYY-XXXXXX` reference: a malformed,
+unparseable or oversized body returns 400 before any claim or send, while an
+empty body or one without a `reference` runs the scheduled batch. The provider
 deduplicates that key for 24 hours, so migration `0010` records
 `notification_first_attempted_at` and refuses to claim a case more than 24 hours
 after it. Backoff is unchanged: `failed` retries after 15 minutes and `not_sent`
