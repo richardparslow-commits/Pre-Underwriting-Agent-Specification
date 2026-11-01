@@ -693,7 +693,7 @@ await pass(
   (calls) => calls === 1,
 );
 await pass(
-  "five failures exhaust retries for a legacy key, not its canonical twin",
+  "five failures keep a legacy key in the outbox for the next sync run",
   async () => {
     for (let attempt = 1; attempt < 5; attempt += 1) {
       await query("select public.mark_marketing_suppression_failed('phone','5125550102','test failure')");
@@ -702,9 +702,24 @@ await pass(
     const pending = await query("select count(*)::int n from public.pending_marketing_suppressions(500) where channel='phone' and address_normalized='5125550102'");
     return { rows, pending: pending[0].n };
   },
-  (result) => result.pending === 0 && result.rows.length === 2 &&
+  (result) => result.pending === 1 && result.rows.length === 2 &&
     result.rows[0].status === "pending" && result.rows[0].attempts === 0 &&
     result.rows[1].status === "failed" && result.rows[1].attempts === 5,
+);
+// Heal s3-opt-out-dropped-after-five-failures: the outbox must still offer the
+// row after an outage longer than five runs, and a later acknowledgement must
+// clear it. The old `attempts < 5` filter returned zero rows here.
+await pass(
+  "an exhausted suppression syncs once the vendor recovers",
+  async () => {
+    const marked = await query("select public.mark_marketing_suppression_synced('phone','5125550102','test-crm') synced");
+    const rows = await query("select address_normalized, status, attempts from public.marketing_suppression_sync where channel='phone' and address_normalized in ('5125550102','15125550102') order by address_normalized");
+    const pending = await query("select count(*)::int n from public.pending_marketing_suppressions(500) where channel='phone' and address_normalized='5125550102'");
+    return { marked: marked[0].synced, rows, pending: pending[0].n };
+  },
+  (result) => result.marked === true && result.pending === 0 &&
+    result.rows.length === 2 && result.rows[0].status === "pending" &&
+    result.rows[1].status === "synced" && result.rows[1].attempts === 5,
 );
 await pass(
   "missing outbox key cannot acknowledge another row",
