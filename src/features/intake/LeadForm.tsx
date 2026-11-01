@@ -54,6 +54,9 @@ export function LeadForm({
   })();
 
   const needsPhone = lead.preferredContact === "phone" || lead.preferredContact === "text";
+  const showPhoneDetails = needsPhone || Boolean(
+    lead.phone || lead.preferredContactTime || errors.phone || errors.preferredContactTime,
+  );
   const marketingHeading =
     MARKETING.calls && MARKETING.texts
       ? "Marketing calls and texts are optional"
@@ -237,7 +240,7 @@ export function LeadForm({
         <FieldError>{errors.preferredContact}</FieldError>
       </fieldset>
 
-      {needsPhone ? (
+      {showPhoneDetails ? (
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <Label htmlFor="phone">Telephone number</Label>
@@ -252,9 +255,17 @@ export function LeadForm({
               value={lead.phone ?? ""}
               onChange={(event) => onField("phone", formatUsPhone(event.target.value))}
               aria-invalid={Boolean(errors.phone)}
+              aria-describedby="phone-help"
               className="mt-1.5"
             />
-            <FieldError>{errors.phone}</FieldError>
+            <div id="phone-help">
+              {!needsPhone ? (
+                <p className="field-help">
+                  This number is optional for your chosen contact method. You can correct or clear it.
+                </p>
+              ) : null}
+              <FieldError>{errors.phone}</FieldError>
+            </div>
           </div>
           <div>
             <Label htmlFor="preferredContactTime">Best time to reach you</Label>
