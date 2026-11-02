@@ -316,7 +316,11 @@ export interface CorrectionCursor {
   id: string;
 }
 
+export interface WithdrawalCursor { at: string; id: string }
+
 export interface MarketingRevocationRecord {
+  /** Absent only for legacy, non-paged server responses. */
+  id?: string;
   channel: "phone" | "email";
   reason: string;
   source: string;
@@ -337,6 +341,9 @@ export interface CaseRecord extends CaseDraft {
   correctionsCursor?: CorrectionCursor | null;
   /** Append-only withdrawal evidence; the submitted consent snapshot is unchanged. */
   marketingRevocations: MarketingRevocationRecord[];
+  /** Undefined means an older backend cannot establish current phone withdrawal status. */
+  latestPhoneRevocation?: MarketingRevocationRecord | null;
+  revocationsCursor?: WithdrawalCursor | null;
   draftSummary: DraftSummary;
   /** True only for the clearly-labelled non-customer case used in previews. */
   sample?: boolean;

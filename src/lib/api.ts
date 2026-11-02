@@ -1,3 +1,4 @@
+import { initialWithdrawals, readWithdrawals, type WithdrawalPage } from "./withdrawalHistory";
 import { readCaseQueue } from "./queuePaging";
 import { initialCorrections, readCorrections, type CorrectionPage } from "./correctionHistory";
 import { initialReviewHistory, readReviewHistory, readSafetyDisclosures } from "./reviewerVisibility";
@@ -14,7 +15,7 @@ import type {
   CaseRecord,
   CaseStatus,
   CorrectionCursor,
-  MarketingRevocationRecord,
+  WithdrawalCursor,
   NotificationRecord,
   NotificationState,
   ReviewLogEntry,
@@ -461,11 +462,21 @@ export async function listCaseCorrections(reference: string, cursor: CorrectionC
   return readCorrections(supabase, reference, cursor);
 }
 
+export async function listCaseWithdrawals(reference: string, cursor: WithdrawalCursor): Promise<WithdrawalPage> {
+  if (PREVIEW_MODE) {
+    ensurePreviewSeed();
+    return { items: previewCases.get(reference)?.marketingRevocations ?? [], nextCursor: null };
+  }
+  if (!supabase) throw new Error("Withdrawals could not be loaded: sign-in is not configured.");
+  return readWithdrawals(supabase, reference, cursor);
+}
+
 export async function getCase(reference: string): Promise<CaseRecord | null> {
   if (PREVIEW_MODE) {
     ensurePreviewSeed();
     const record = previewCases.get(reference);
-    return record ? { ...record, reviewHistoryCursor: null, correctionsCursor: null } : null;
+    return record ? { ...record, reviewHistoryCursor: null, correctionsCursor: null,
+      revocationsCursor: null, latestPhoneRevocation: record.marketingRevocations.find(x=>x.channel === "phone") ?? null } : null;
   }
 
   if (!supabase) throw new Error("Sign-in is not configured.");
@@ -490,19 +501,9 @@ export async function getCase(reference: string): Promise<CaseRecord | null> {
 
   const { corrections, correctionsCursor } = initialCorrections(result);
 
-  const marketingRevocations: MarketingRevocationRecord[] = Array.isArray(result.revocations)
-    ? result.revocations.map((entry) => ({
-        channel: entry.channel === "email" ? "email" : "phone",
-        reason: String(entry.reason ?? ""),
-        source: String(entry.source ?? "operator"),
-        recordedBy: String(entry.recorded_by ?? ""),
-        recordedAt: String(entry.created_at ?? ""),
-      }))
-    : [];
-
   return {
-    ...record, reviewLog, corrections, marketingRevocations,
-    reviewHistoryCursor, correctionsCursor,
+    ...record, reviewLog, corrections, reviewHistoryCursor, correctionsCursor,
+    ...initialWithdrawals(result),
   };
 }
 

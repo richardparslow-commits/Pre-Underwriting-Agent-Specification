@@ -376,3 +376,71 @@ test("deployment catalog checks execute without reading case data", async () => 
   assert.equal(corrections.length, 3);
   assert.ok(corrections.every(row => row.passed), JSON.stringify(corrections));
 });
+
+const withdrawalReference = 'LPP-2026-WITH01';
+test('phone withdrawal remains explicit after 64 newer email withdrawals and every event stays reachable', async () => {
+  await query(`insert into public.cases(reference,questionnaire_version,payload) values ($1,'test','{}')`, [withdrawalReference]);
+  await query("select setval('public.marketing_revocations_id_seq',9007199254740993,true)");
+  await query(`insert into public.marketing_revocations(case_reference,channel,address_normalized,reason,recorded_by,created_at)
+    values ($1,'phone','+15125550123','Synthetic older phone withdrawal','reviewer@example.test','2025-01-01')`, [withdrawalReference]);
+  await query(`insert into public.marketing_revocations(case_reference,channel,address_normalized,reason,recorded_by,created_at)
+    select $1,'email','synthetic@example.test','Synthetic email withdrawal '||n,'reviewer@example.test','2026-01-01'::timestamptz
+    from generate_series(1,64) n`, [withdrawalReference]);
+  await query(`insert into public.marketing_revocations(case_reference,channel,address_normalized,reason,recorded_by)
+    values ('LPP-2026-HIST02','phone','+15125550124','Other case private withdrawal','reviewer@example.test')`);
+  const first = await authorized(() => rpc('open_case_for_review',[withdrawalReference]));
+  assert.equal(first.revocations.length,20);
+  assert.ok(first.revocations.every(x=>x.channel==='email'));
+  assert.equal(first.latest_phone_revocation.reason,'Synthetic older phone withdrawal');
+  assert.equal(first.latest_phone_revocation.channel,'phone');
+  let entries=first.revocations, cursor=first.revocations_cursor, pages=0;
+  assert.ok(cursor);
+  while(cursor) {
+    assert.ok(++pages<6);
+    assert.equal(typeof cursor.id,'string');
+    const page=await authorized(()=>rpc('get_case_marketing_revocations',[withdrawalReference,cursor.created_at,cursor.id]));
+    assert.ok(page.entries.length<=20);
+    entries=entries.concat(page.entries); cursor=page.next_cursor;
+  }
+  const expected=(await query('select id::text id from public.marketing_revocations where case_reference=$1',[withdrawalReference])).map(x=>x.id);
+  assert.equal(entries.length,65);
+  assert.deepEqual(new Set(entries.map(x=>x.id)),new Set(expected));
+  assert.equal(entries.filter(x=>x.channel==='phone').length,1);
+  assert.ok(entries.every(x=>!('address_normalized' in x) && x.reason!=='Other case private withdrawal'));
+  const clean=await authorized(()=>rpc('open_case_for_review',['LPP-2026-HIST01']));
+  assert.equal(clean.latest_phone_revocation,null);
+  assert.equal(clean.revocations_cursor,null);
+});
+
+test('withdrawal pages retain reviewer boundaries, cursor validation and mandatory audit', async () => {
+  for(const [role,aal,user,message] of [['anon','aal1',other,/permission denied/i],['authenticated','aal1',reviewer,/Not authorised/i],['authenticated','aal2',other,/Not authorised/i]]) {
+    await assert.rejects(asRole(role,aal,user,()=>rpc('get_case_marketing_revocations',[withdrawalReference,null,null])),message);
+  }
+  await authorized(async()=>{
+    await assert.rejects(rpc('case_marketing_revocations_page',[withdrawalReference,null,null]),/permission denied/i);
+    await assert.rejects(query('select reason from public.marketing_revocations'),/permission denied/i);
+    for(const [at,id] of [['2026-01-01',null],[null,'1'],['2026-01-01','0'],['infinity','1']]) {
+      await assert.rejects(rpc('get_case_marketing_revocations',[withdrawalReference,at,id]),/cursor/i);
+    }
+    await assert.rejects(rpc('get_case_marketing_revocations',['LPP-2026-ABSENT',null,null]),/not found/i);
+  });
+  const id=(await query('select id from public.cases where reference=$1',[withdrawalReference]))[0].id;
+  const count=async()=>(await query('select count(*)::int n from public.case_review_log where case_id=$1',[id]))[0].n;
+  const before=await count();
+  await authorized(()=>rpc('get_case_marketing_revocations',[withdrawalReference,null,null]));
+  assert.equal(await count(),before+1);
+  await db.exec(`create function public.test_fail_withdrawal_audit() returns trigger language plpgsql as $$ begin raise exception 'Audit unavailable'; end $$;
+    create trigger test_fail_withdrawal_audit before insert on public.case_review_log for each row execute function public.test_fail_withdrawal_audit();`);
+  try {
+    await assert.rejects(authorized(()=>rpc('get_case_marketing_revocations',[withdrawalReference,null,null])),/Audit unavailable/);
+    await assert.rejects(authorized(()=>rpc('open_case_for_review',[withdrawalReference])),/Audit unavailable/);
+  } finally {
+    await db.exec('drop trigger test_fail_withdrawal_audit on public.case_review_log; drop function public.test_fail_withdrawal_audit();');
+  }
+});
+
+test('withdrawal deployment catalog checks do not read customer data', async()=>{
+  const checks=await query(readFileSync('supabase/ops/withdrawal-history-checks.sql','utf8'));
+  assert.equal(checks.length,4);
+  assert.ok(checks.every(x=>x.passed),JSON.stringify(checks));
+});
