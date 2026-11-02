@@ -26,6 +26,8 @@ import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { ReviewHistory } from "./ReviewHistory";
 import { CorrectionHistory } from "./CorrectionHistory";
+import { WithdrawalHistory } from "./WithdrawalHistory";
+import { phoneWithdrawal } from "@/lib/withdrawalHistory";
 import { StatusTimeline } from "@/features/intake/StatusTimeline";
 
 const DISPOSITION: Record<Disposition, { label: string; tone: "ok" | "warn" | "danger" | "neutral" | "outline" }> = {
@@ -163,11 +165,11 @@ export function CaseReview({
 
   const notification = NOTIFICATION[record.notification.state];
   const unanswered = record.answers.filter((answer) => answer.disposition === "unresolved").length;
-  const latestPhoneRevocation = record.marketingRevocations.find(
-    (entry) => entry.channel === "phone",
-  );
+  const latestPhoneRevocation = phoneWithdrawal(record);
+  const phoneStatusKnown = record.latestPhoneRevocation !== undefined || Boolean(latestPhoneRevocation);
   const consentRows = record.consents.map((consent) => ({
     consent,
+    withdrawalUnknown: !phoneStatusKnown && (consent.id === "marketing_call" || consent.id === "marketing_text"),
     revoked:
       (consent.id === "marketing_call" || consent.id === "marketing_text") &&
       Boolean(latestPhoneRevocation),
@@ -448,12 +450,13 @@ export function CaseReview({
           <section className="panel p-5">
             <h2 className="text-base font-medium">Consent evidence</h2>
             <ul className="mt-3 space-y-3">
-              {consentRows.map(({ consent, revoked }) => (
+              {consentRows.map(({ consent, revoked, withdrawalUnknown }) => (
                 <li key={consent.id} className="text-xs">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm">{consent.label}</span>
-                    <Badge tone={revoked ? "danger" : consent.granted ? "ok" : "outline"}>
-                      {revoked ? "Revoked" : consent.granted ? "Given" : "Not given"}
+                    <Badge tone={revoked ? "danger" : withdrawalUnknown && consent.granted ? "warn" : consent.granted ? "ok" : "outline"}>
+                      {revoked ? "Revoked" : consent.granted && withdrawalUnknown
+                        ? "Given at submission; withdrawal status unavailable" : consent.granted ? "Given" : "Not given"}
                     </Badge>
                   </div>
                   <p className="mt-1 text-muted-foreground">
@@ -474,33 +477,23 @@ export function CaseReview({
                 </li>
               ))}
             </ul>
-            {record.marketingRevocations.length > 0 ? (
-              <div className="mt-4 border-t border-border pt-3">
-                <p className="text-sm font-medium">Marketing withdrawal evidence</p>
-                <ul className="mt-2 space-y-2">
-                  {record.marketingRevocations.map((entry) => (
-                    <li key={`${entry.channel}-${entry.recordedAt}`} className="text-xs">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge tone="danger">
-                          {entry.channel === "phone" ? "Phone" : "Email"}
-                        </Badge>
-                        <span>{formatDate(entry.recordedAt)}</span>
-                        <span className="text-muted-foreground">via {entry.source}</span>
-                      </div>
-                      {entry.reason ? (
-                        <p className="mt-1 leading-relaxed text-muted-foreground">
-                          {entry.reason}
-                        </p>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-2 text-[0.7rem] leading-relaxed text-muted-foreground">
-                  The submitted consent snapshot is unchanged. This withdrawal is append-only
-                  evidence and is enforced before any marketing send.
-                </p>
-              </div>
-            ) : null}
+            <div className="mt-4 border-t border-border pt-3">
+              <p className="text-sm font-medium">Marketing withdrawal evidence</p>
+              {latestPhoneRevocation ? <p className="mt-2 text-xs" role="status">
+                Latest phone withdrawal: {formatDate(latestPhoneRevocation.recordedAt)} · {latestPhoneRevocation.reason}
+              </p> : null}
+              {!phoneStatusKnown ? <p className="mt-2 text-xs text-danger" role="alert">
+                Current phone withdrawal status could not be checked. Refresh or contact support before relying on marketing consent.
+              </p> : null}
+              <WithdrawalHistory
+                key={`${record.reference}:${record.reviewLog[0]?.id ?? record.reviewLog[0]?.at ?? ""}`}
+                reference={record.reference} entries={record.marketingRevocations} cursor={record.revocationsCursor}
+              />
+              <p className="mt-2 text-[0.7rem] leading-relaxed text-muted-foreground">
+                The submitted consent snapshot is unchanged. Withdrawals are append-only evidence.
+                Current phone withdrawal status is checked separately from the pages shown here.
+              </p>
+            </div>
           </section>
 
           <section className="panel p-5">

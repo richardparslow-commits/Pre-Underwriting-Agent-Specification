@@ -595,3 +595,5 @@ This frontend repair requires no backend update; intake remains locked.
 challenge/verification retries and rechecks keep a matching local QR/key, while
 confirmed removal, replacement, success and account changes clear it. This
 frontend repair does not change MFA settings, factors or the public intake lock.
+
+Phone withdrawal evidence and audited history paging: [Heal withdrawal-history repair](docs/HEAL-WITHDRAWAL-HISTORY.md).
