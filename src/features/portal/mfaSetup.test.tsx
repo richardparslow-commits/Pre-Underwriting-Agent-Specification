@@ -267,3 +267,86 @@ test("missing connection fails closed", async () => {
     assert.equal(verified(), 0);
   });
 });
+
+for (const operation of ["challenge", "verify"] as const) {
+ for (const mode of ["response", "throw"] as const) {
+  test(`temporary ${operation} ${mode} error preserves this tab's setup for a fresh-code retry`, async()=>{
+   const {api,calls}=backend();const original=api[operation];
+   if(operation==='challenge') api.challenge=async()=>{if(mode==='throw')throw new Error('Synthetic private provider detail');return {data:null,error:{code:'unexpected_failure',message:'Synthetic private provider detail'}};};
+   else api.verify=async()=>{if(mode==='throw')throw new Error('Synthetic private provider detail');return {error:{code:'unexpected_failure',message:'Synthetic private provider detail'}};};
+   await fixture(api,async({read,verified})=>{
+    const owned={factorId:read().factorId,qrCode:read().qrCode,secret:read().secret};
+    await act(async()=>read().setCode('123456'));await act(async()=>read().verify());
+    assert.equal(read().phase,'enrolling');assert.equal(read().code,'');assert.equal(read().busy,false);
+    assert.deepEqual({factorId:read().factorId,qrCode:read().qrCode,secret:read().secret},owned);
+    assert.match(read().error!,/setup could not be checked/);assert.ok(!read().error?.includes('private provider'));
+    assert.equal(verified(),0);assert.equal(calls.enrolls,1);
+    if(operation==='challenge')api.challenge=original as MfaSetupApi['challenge'];else api.verify=original as MfaSetupApi['verify'];
+    await act(async()=>read().setCode('123456'));await act(async()=>read().verify());
+    assert.equal(verified(),1);assert.equal(read().secret,null);assert.equal(calls.enrolls,1);
+   });
+  });
+ }
+}
+
+test('rechecking the same owned unverified factor retains its one-time setup data',async()=>{
+ const {api,calls}=backend();await fixture(api,async({read,verified})=>{
+  const owned={factorId:read().factorId,qrCode:read().qrCode,secret:read().secret};
+  await act(async()=>read().begin());assert.equal(read().phase,'enrolling');
+  assert.deepEqual({factorId:read().factorId,qrCode:read().qrCode,secret:read().secret},owned);
+  assert.equal(calls.enrolls,1);assert.equal(verified(),0);
+ });
+});
+
+test('a failed recheck retains owned setup and a successful check can still observe completion',async()=>{
+ const {api,factors,calls}=backend();const list=api.listFactors;
+ await fixture(api,async({read,verified})=>{
+  const secret=read().secret;
+  api.listFactors=async()=>({data:null,error:{code:'network_error'}});
+  await act(async()=>read().begin());assert.equal(read().phase,'enrolling');assert.equal(read().secret,secret);assert.equal(read().code,'');assert.equal(read().busy,false);
+  assert.equal(calls.enrolls,1);assert.equal(verified(),0);
+  api.listFactors=list;factors[0]!.status='verified';
+  await act(async()=>read().begin());assert.equal(read().phase,'challenging');assert.equal(read().secret,null);assert.equal(read().qrCode,null);assert.equal(verified(),0);
+ });
+});
+
+test('a fresh recheck clears an old key when a different pending factor is observed',async()=>{
+ const {api,factors,calls}=backend();await fixture(api,async({read,verified})=>{
+  factors[0]={id:'other-synthetic-factor',factor_type:'totp',status:'unverified'};
+  await act(async()=>read().begin());assert.equal(read().phase,'pending');assert.equal(read().factorId,'other-synthetic-factor');
+  assert.equal(read().secret,null);assert.equal(read().qrCode,null);assert.equal(calls.enrolls,1);assert.equal(verified(),0);
+ });
+});
+
+test('a removed factor reported during challenge clears owned setup without verification',async()=>{
+ const {api,calls}=backend();api.challenge=async()=>({data:null,error:{code:'mfa_factor_not_found'}});
+ await fixture(api,async({read,verified})=>{
+  await act(async()=>read().setCode('123456'));await act(async()=>read().verify());
+  assert.equal(read().phase,'error');assert.equal(read().factorId,null);assert.equal(read().secret,null);assert.equal(read().qrCode,null);assert.equal(calls.verifies.length,0);assert.equal(verified(),0);
+ });
+});
+
+test('temporary errors on another tab pending setup never invent local setup data',async()=>{
+ const {api,calls}=backend([factor()]);api.challenge=async()=>({data:null,error:{code:'network_error'}});
+ await fixture(api,async({read,verified})=>{
+  await act(async()=>read().setCode('123456'));await act(async()=>read().verify());
+  assert.equal(read().phase,'pending');assert.equal(read().secret,null);assert.equal(read().qrCode,null);assert.equal(read().code,'');assert.equal(calls.enrolls,0);assert.equal(verified(),0);
+ });
+});
+
+test('temporary errors for a verified factor retain challenge access but never reveal setup data',async()=>{
+ const {api,calls}=backend([factor('verified')]);api.verify=async()=>({error:{code:'network_error'}});
+ await fixture(api,async({read,verified})=>{
+  await act(async()=>read().setCode('123456'));await act(async()=>read().verify());
+  assert.equal(read().phase,'challenging');assert.equal(read().secret,null);assert.equal(read().qrCode,null);assert.equal(read().code,'');assert.equal(calls.enrolls,0);assert.equal(verified(),0);
+ });
+});
+
+test('a fresh empty factor list replaces an absent enrollment instead of reusing its old key',async()=>{
+ const {api,factors,calls}=backend();await fixture(api,async({read,verified})=>{
+  factors.length=0;
+  api.enroll=async()=>{calls.enrolls++;factors.push({...factor(),id:'replacement-factor'});return {data:{id:'replacement-factor',totp:{qr_code:'<svg>replacement</svg>',secret:'REPLACEMENT_SYNTHETIC'}},error:null};};
+  await act(async()=>read().begin());
+  assert.equal(read().phase,'enrolling');assert.equal(read().factorId,'replacement-factor');assert.equal(read().secret,'REPLACEMENT_SYNTHETIC');assert.equal(calls.enrolls,2);assert.equal(verified(),0);
+ });
+});

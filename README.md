@@ -590,3 +590,8 @@ separate from Lovable preview sync; intake stays locked.
 Back cannot expose editable forms while sending, stale handlers cannot edit or
 reset that operation, and a failed response returns to unchanged review for retry.
 This frontend repair requires no backend update; intake remains locked.
+
+[Temporary MFA errors retain this tab's setup](docs/HEAL-MFA-TRANSIENT-RECOVERY.md):
+challenge/verification retries and rechecks keep a matching local QR/key, while
+confirmed removal, replacement, success and account changes clear it. This
+frontend repair does not change MFA settings, factors or the public intake lock.
