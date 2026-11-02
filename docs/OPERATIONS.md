@@ -162,15 +162,23 @@ MARKETING_SUPPRESSION_WEBHOOK_SECRET=<vendor-supplied secret>
 CRON_SECRET=<scheduler secret>
 ```
 
-Schedule `POST /functions/v1/sync-marketing-suppressions` with the `x-cron-secret` header. The worker claims rows through `claim_marketing_suppressions(100, worker, 600)`, sends only the normalised channel and address, and marks each row synced on a 2xx response or failed after a bounded error. An overlapping run skips rows another worker has claimed; a crashed worker's rows return when the ten-minute lease expires. A failed row stays in the work list and is offered again on the next run, including after a long vendor outage; `attempts` is diagnostic and not a permanent cap (migration `0015`). It is safe to re-run; the vendor request carries a deterministic idempotency key.
+Schedule `POST /functions/v1/sync-marketing-suppressions` with the `x-cron-secret` header. With migration `0018`, the worker uses `claim_next_marketing_suppression(worker,600)` immediately before each vendor request. It claims at most 100 rows and stops claiming new work after 25 seconds; each vendor request has an eight-second deadline. Only the current row is leased. A crashed worker's lease expires after ten minutes.
 
-Manual recovery is still available (the pending list is read-only and does not claim):
+Due rows are ordered by `next_attempt_at`, then creation time and exact stored key. A refusal or outage advances its next attempt with exponential backoff from one minute to one hour. This lets untouched opt-outs progress even when older refused rows are due again. Failure counts remain diagnostic, with no permanent cutoff. Persistent refusals require operator investigation; they are never silently discarded or acknowledged as successful.
+
+`complete_marketing_suppression(channel,stored_address,worker,claim_token,state,detail)` applies a result only once for the current owner and token before expiry. Re-queueing an opt-out invalidates the old claim. The vendor receives a canonical address (including the US country code for legacy ten-digit phones), while completion uses the exact original stored key. The deterministic idempotency key uses the canonical address too. Vendors must honor this key: database fencing prevents stale acknowledgements, but cannot recall an already-sent request or promise exactly-once vendor effects.
+
+Apply `0018` and deploy the matching worker together during an authorized backend rollout. An old worker loses access to the unfenced claim/result RPCs; a new worker without the migration fails before sending. Neither version mismatch should be left in service. Lovable preview sync does not apply this backend migration or deploy the worker.
+
+`pending_marketing_suppressions(100)` remains a read-only pending list and does not claim or represent due-work selection. Inspect scheduling/ownership privately as the database owner; do not export contact values into logs:
 
 ```sql
-select * from public.pending_marketing_suppressions(100);
-select public.mark_marketing_suppression_synced('phone', '+15125550134', 'vendor-name');
-select public.mark_marketing_suppression_failed('phone', '+15125550134', 'HTTP 500');
+select status,next_attempt_at,claimed_by,lease_expires_at,attempts,last_error
+from public.marketing_suppression_sync
+order by next_attempt_at,created_at;
 ```
+
+The legacy `mark_marketing_suppression_*` functions remain available only to the database owner for explicit administrative recovery after independent vendor evidence. Service workers must use the fenced completion RPC.
 
 Rows stay `pending` or `failed` until the worker records success. Do not enable marketing while any required suppression is unsynced. A reply of STOP to a text, a voicemail withdrawal or an email withdrawal still needs a live vendor intake; the web form is the only customer path currently implemented.
 
@@ -187,7 +195,7 @@ Rows stay `pending` or `failed` until the worker records success. Do not enable 
 
 The detailed, window-by-window procedure for migrations `0006`–`0010`, including the audited case read and marketing withdrawal exercises, is in the [staging deployment runbook](STAGING-RUNBOOK.md). The list below is the summary version.
 
-- [ ] Apply migrations 0001–0017 in order and record the applied versions. **Staging:** 0001–0005 were verified on 28 Oct 2026; verify the current status and evidence for 0006–0017 before proceeding. **Production:** not verified. Deploy the matching portal code and migrations together; verify AAL1/AAL2, non-reviewer and direct REST denial, and logging failure with labelled data.
+- [ ] Apply migrations 0001–0018 in order and record the applied versions. **Staging:** 0001–0005 were verified on 28 Oct 2026; verify the current status and evidence for 0006–0018 before proceeding. **Production:** not verified. Deploy the matching portal code and migrations together; verify AAL1/AAL2, non-reviewer and direct REST denial, and logging failure with labelled data.
 - [ ] Keep `QUESTIONNAIRE_APPROVED=false` until 0/92 rows become 92/92 signed off.
 - [ ] Set `RATE_LIMIT_SALT` to a random value and confirm the durable limiter is active; without it production returns 503 (fail closed). Only `ENVIRONMENT=test` uses the in-memory guard.
 - [ ] Store `project_url` and `cron_secret` in Vault, apply `supabase/ops/retry-schedule.sql`, and verify one scheduler tick.

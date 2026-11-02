@@ -572,3 +572,9 @@ repair requires a separate deployment of both notification send functions.
 The public submission and marketing-withdrawal functions use `Deno.serve` connection metadata (`info.remoteAddr`) to select their salted durable quota. They never trust `X-Forwarded-For`, `Forwarded`, `X-Real-IP` or `CF-Connecting-IP`; source TCP ports and request content cannot create fresh quotas. If the runtime supplies no usable TCP peer, requests share the conservative `shared:unverified-peer` quota. Submission retains 10 requests per 600 seconds; withdrawal retains its separate 5 per 600 seconds. Missing durable configuration still fails closed in production.
 
 A transport peer can be a hosting gateway, so several visitors can share a quota. This deliberately favors bounded anonymous writes over guessing a visitor IP. Verify hosted capacity/fairness before enabling intake. A future per-visitor proxy policy must authenticate its metadata; choosing a header name is insufficient. No forwarded-header trust setting is provided. See [Deno connection metadata](https://docs.deno.com/api/deno/http-server/) and [Supabase gateway architecture](https://supabase.com/docs/guides/functions). No launch lock is relaxed by this repair.
+
+[Fair suppression scheduling and fenced completion](docs/HEAL-SUPPRESSION-WORKER-FAIRNESS.md)
+in migration `0018` prevent older vendor refusals from starving new opt-outs,
+reject stale lease results, and normalize legacy phone numbers for the vendor.
+This requires a separately authorized migration and matching worker deployment.
+Lovable preview sync leaves the hosted backend unchanged.
