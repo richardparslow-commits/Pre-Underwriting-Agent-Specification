@@ -585,3 +585,8 @@ events and prevents automatic resend of provider-confirmed failures. The matchin
 retry worker filters them before its batch limit. Display errors remain
 unconfirmed rather than claiming rejection or delivery. Hosted rollout is
 separate from Lovable preview sync; intake stays locked.
+
+[Pending submissions hold their reviewed snapshot](docs/HEAL-PENDING-SUBMISSION.md):
+Back cannot expose editable forms while sending, stale handlers cannot edit or
+reset that operation, and a failed response returns to unchanged review for retry.
+This frontend repair requires no backend update; intake remains locked.

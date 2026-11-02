@@ -19,6 +19,20 @@ export default function IntakePage() {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [interview.step]);
 
+  if (submitting) {
+    return (
+      <div className="container py-10 sm:py-14">
+        <section className="panel mx-auto max-w-3xl space-y-3 p-6" role="status" aria-live="polite">
+          <h1 className="text-2xl">Submitting your reviewed answers</h1>
+          <p className="prose-note">
+            Please wait for the result. Editing and starting over are paused so the receipt
+            matches the answers you reviewed. This does not yet confirm that the case was saved.
+          </p>
+        </section>
+      </div>
+    );
+  }
+
   const current = interview.currentQuestionId
     ? QUESTION_BY_ID[interview.currentQuestionId]
     : undefined;
