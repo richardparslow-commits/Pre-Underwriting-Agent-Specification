@@ -98,7 +98,7 @@ export function ReviewScreen({
           </p>
         </div>
         <div className="sm:text-right">
-          <Button type="button" variant="outline" size="sm" onClick={onEditLead}>
+          <Button type="button" variant="outline" size="sm" onClick={onEditLead} disabled={submitting}>
             <Pencil aria-hidden />
             Edit contact details
           </Button>
@@ -164,6 +164,7 @@ export function ReviewScreen({
                 variant="outline"
                 size="sm"
                 onClick={() => onEditQuestion(question.id)}
+                disabled={submitting}
               >
                 {question.id}: {question.customerText.slice(0, 46)}
                 {question.customerText.length > 46 ? "…" : ""}
@@ -251,6 +252,7 @@ export function ReviewScreen({
                           variant={needsAttention ? "outline" : "ghost"}
                           size="sm"
                           onClick={() => onEditQuestion(question.id)}
+                disabled={submitting}
                         >
                           <Pencil aria-hidden />
                           {needsAttention ? "Answer" : "Change"}

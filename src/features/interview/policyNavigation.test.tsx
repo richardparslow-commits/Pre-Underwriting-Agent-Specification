@@ -58,7 +58,8 @@ async function fixture(send: IntakeSender, run: (f: Context) => Promise<void>) {
       read: () => session,
       location: () => location,
       navigate: async (path) => {
-        await navigate(path);
+        if (typeof path === "number") await navigate(path);
+        else await navigate(path);
       },
       resume: async () => {
         const link = view.root.findByType(ResumeInterview).findByType(Link);
@@ -100,7 +101,7 @@ function deferred<T>() {
 }
 interface Context {
   read: () => IntakeSession;
-  navigate: (path: string) => Promise<void>;
+  navigate: (path: string | number) => Promise<void>;
   resume: () => Promise<void>;
   location: () => { pathname: string; state: unknown };
 }
@@ -318,4 +319,52 @@ test("the memory scope excludes home, reviewers, opt-out and lookalike paths", (
     ])
       assert.equal(isIntakeSessionPath(base + suffix, base), false);
   }
+});
+
+
+test("Back during a pending submission never exposes a mutable earlier snapshot", async () => {
+ const pending=deferred<SubmissionReceipt>();const requests: {draft:unknown;key:string}[]=[];
+ await fixture(async(draft,key)=>{requests.push({draft:structuredClone(draft),key});return pending.promise;},async f=>{
+  await seed(f.read,true); const original=structuredClone(f.read().interview.draft);const key=f.read().interview.submissionKey;
+  const stale=f.read().interview;let request!:Promise<void>;
+  await act(async()=>{
+   request=f.read().submit();
+   // Handlers captured before React rerenders must also observe the live lock.
+   stale.setLeadField('firstName','Dropped edit'); stale.setAnswer('MED-01',{value:'no'});
+   stale.setAdultAttested(false);stale.setConsent('intakePermission',false);stale.confirmReview(false);stale.markSubmitted({...receipt,reference:'LPP-2026-STALE1'});stale.startOver();
+  });
+  await act(async()=>f.navigate(-1));
+  assert.equal(f.read().submitting,true);assert.equal(f.read().interview.step,'review');
+  assert.equal(f.read().interview.submissionKey,key);assert.deepEqual(f.read().interview.draft,original);
+  await act(async()=>{f.read().interview.backToLead();f.read().interview.goToQuestion('MED-01');f.read().interview.previousQuestion();f.read().interview.nextQuestion();f.read().interview.finishInterview();f.read().interview.begin();f.read().interview.givePermission();});
+  assert.equal(f.read().interview.step,'review');assert.deepEqual(f.read().interview.draft,original);
+  await act(async()=>{await f.read().submit();});assert.equal(requests.length,1);
+  await act(async()=>{pending.resolve(receipt);await request;});
+  assert.equal(f.read().interview.step,'submitted');assert.deepEqual(f.read().interview.receipt,receipt);
+  assert.deepEqual(requests[0],{draft:original,key});
+  await act(async()=>f.read().submit());assert.equal(requests.length,1,'a completed receipt cannot be resubmitted');
+  await act(async()=>f.read().interview.startOver());assert.equal(f.read().interview.step,'lead');assert.notEqual(f.read().interview.submissionKey,key);
+ });
+});
+
+test("a failed request after browser Back restores review with identical retry evidence and unlocks editing", async()=>{
+ const pending=deferred<SubmissionReceipt>();const requests:{draft:unknown;key:string}[]=[];
+ await fixture(async(draft,key)=>{requests.push({draft:structuredClone(draft),key});return requests.length===1?pending.promise:receipt;},async f=>{
+  await seed(f.read,true);let request!:Promise<void>;
+  await act(async()=>{request=f.read().submit();});await act(async()=>f.navigate(-1));
+  await act(async()=>{pending.reject(new Error('Synthetic uncertain response'));await request;});
+  assert.equal(f.read().submitting,false);assert.equal(f.read().interview.step,'review');assert.equal(f.read().error,'Synthetic uncertain response');
+  await act(async()=>f.read().submit());assert.deepEqual(requests[1],requests[0]);
+ });
+});
+
+test("failed submission releases the edit lock without changing its operation key", async()=>{
+ const pending=deferred<SubmissionReceipt>();
+ await fixture(async()=>pending.promise,async f=>{
+  await seed(f.read,true);const key=f.read().interview.submissionKey;let request!:Promise<void>;
+  await act(async()=>{request=f.read().submit();});
+  await act(async()=>{pending.reject(new Error('Synthetic uncertain response'));await request;});
+  await act(async()=>f.read().interview.setLeadField('firstName','Corrected after response'));
+  assert.equal(f.read().interview.lead.firstName,'Corrected after response');assert.equal(f.read().interview.acknowledgements.length,0);assert.equal(f.read().interview.submissionKey,key);
+ });
 });
