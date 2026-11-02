@@ -578,3 +578,10 @@ in migration `0018` prevent older vendor refusals from starving new opt-outs,
 reject stale lease results, and normalize legacy phone numbers for the vendor.
 This requires a separately authorized migration and matching worker deployment.
 Lovable preview sync leaves the hosted backend unchanged.
+
+[Provider evidence survives local timeouts](docs/HEAL-PROVIDER-EVIDENCE.md):
+migration `0019` retains signed bounces, repairs previously ignored correlated
+events and prevents automatic resend of provider-confirmed failures. The matching
+retry worker filters them before its batch limit. Display errors remain
+unconfirmed rather than claiming rejection or delivery. Hosted rollout is
+separate from Lovable preview sync; intake stays locked.

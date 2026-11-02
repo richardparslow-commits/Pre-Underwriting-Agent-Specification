@@ -22,7 +22,11 @@
  */
 
 import { jsonResponse, serviceClient } from "../_shared/case.ts";
-import { notificationBlocker, notificationDetailForStorage, sendCaseNotification } from "../_shared/email.ts";
+import {
+  notificationBlocker,
+  notificationDetailForStorage,
+  sendCaseNotification,
+} from "../_shared/email.ts";
 
 const MAX_ATTEMPTS = 5;
 const BATCH_SIZE = 20;
@@ -81,12 +85,32 @@ Deno.serve(async (req: Request) => {
 
   // Without a provider, claiming rows would burn attempts for no benefit.
   if (!Deno.env.get("RESEND_API_KEY")) {
-    return jsonResponse({ inspected: 0, sent: 0, failed: 0, skipped: 0, provider: "not_configured" }, 200, null);
+    return jsonResponse(
+      {
+        inspected: 0,
+        sent: 0,
+        failed: 0,
+        skipped: 0,
+        provider: "not_configured",
+      },
+      200,
+      null,
+    );
   }
 
   const origin = portalOrigin();
   if (notificationBlocker(origin)) {
-    return jsonResponse({ inspected: 0, sent: 0, failed: 0, skipped: 0, portal: "not_configured" }, 200, null);
+    return jsonResponse(
+      {
+        inspected: 0,
+        sent: 0,
+        failed: 0,
+        skipped: 0,
+        portal: "not_configured",
+      },
+      200,
+      null,
+    );
   }
 
   const requested = await requestedReference(req);
@@ -97,12 +121,15 @@ Deno.serve(async (req: Request) => {
   const single = requested.kind === "single" ? requested.reference : null;
   const now = Date.now();
   const olderThan = new Date(now - MIN_AGE_MS).toISOString();
-  const newerThan = new Date(now - MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const newerThan = new Date(now - MAX_AGE_DAYS * 24 * 60 * 60 * 1000)
+    .toISOString();
   const dueAt = new Date(now).toISOString();
   const leaseExpiredBefore = new Date(now - CLAIM_LEASE_MS).toISOString();
   // Second precision keeps the PostgREST filter unambiguous. The claim function
   // enforces the same bound, so this filter is a batch-starvation guard only.
-  const firstAttemptCutoff = new Date(now - FIRST_ATTEMPT_WINDOW_HOURS * 60 * 60 * 1000)
+  const firstAttemptCutoff = new Date(
+    now - FIRST_ATTEMPT_WINDOW_HOURS * 60 * 60 * 1000,
+  )
     .toISOString()
     .replace(/\.\d{3}Z$/, "Z");
 
@@ -113,6 +140,11 @@ Deno.serve(async (req: Request) => {
     .select("reference, submitted_at, notification_attempts")
     .in("notification_state", ["queued", "failed", "not_sent"])
     .lt("notification_attempts", MAX_ATTEMPTS)
+    // Provider-confirmed failures are terminal for automatic sending. Exclude
+    // them before LIMIT so old bounces cannot occupy the due-work batch.
+    .or(
+      "notification_provider_state.is.null,notification_provider_state.eq.accepted",
+    )
     .gt("submitted_at", newerThan)
     // Never re-send after the provider idempotency key has expired. Old rows are
     // reported through notification_retry_backlog for a human decision.
@@ -121,8 +153,12 @@ Deno.serve(async (req: Request) => {
     )
     // Apply backoff and lease eligibility before the batch limit; the claim
     // RPC still rechecks them atomically when each row is processed.
-    .or(`notification_next_attempt_at.is.null,notification_next_attempt_at.lte.${dueAt}`)
-    .or(`notification_claimed_at.is.null,notification_claimed_at.lt.${leaseExpiredBefore}`)
+    .or(
+      `notification_next_attempt_at.is.null,notification_next_attempt_at.lte.${dueAt}`,
+    )
+    .or(
+      `notification_claimed_at.is.null,notification_claimed_at.lt.${leaseExpiredBefore}`,
+    )
     .order("submitted_at", { ascending: true })
     .limit(BATCH_SIZE);
 
@@ -171,12 +207,15 @@ Deno.serve(async (req: Request) => {
       idempotencyKey: row.reference,
     });
 
-    const { error: completeError } = await supabase.rpc("complete_case_notification", {
-      p_reference: row.reference,
-      p_state: result.state,
-      p_detail: notificationDetailForStorage(result),
-      p_message_id: result.messageId ?? null,
-    });
+    const { error: completeError } = await supabase.rpc(
+      "complete_case_notification",
+      {
+        p_reference: row.reference,
+        p_state: result.state,
+        p_detail: notificationDetailForStorage(result),
+        p_message_id: result.messageId ?? null,
+      },
+    );
 
     if (completeError) {
       console.error("Retry completion failed", completeError.code);
