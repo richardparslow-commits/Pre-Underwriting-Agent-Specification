@@ -23,8 +23,8 @@ function buildSteps(notification: NotificationRecord): Step[] {
   const queued: StepState =
     state === "queued" ? "active" : state === "not_sent" ? "skipped" : "done";
   const accepted: StepState =
-    state === "accepted" ? "done" : state === "delivered" ? "done" : state === "failed" ? "failed" : "pending";
-  const delivered: StepState = state === "delivered" ? "done" : state === "failed" ? "failed" : "pending";
+    state === "accepted" ? "done" : state === "delivered" ? "done" : "pending";
+  const delivered: StepState = state === "delivered" ? "done" : "pending";
 
   return [
     {
@@ -52,7 +52,7 @@ function buildSteps(notification: NotificationRecord): Step[] {
         state === "accepted" || state === "delivered"
           ? "The provider accepted it for delivery. That is not the same as inbox delivery."
           : state === "failed"
-            ? "The provider rejected or could not accept the message."
+            ? "Provider acceptance is unconfirmed. A request error or timeout does not establish rejection."
             : "Waiting on the provider.",
     },
     {

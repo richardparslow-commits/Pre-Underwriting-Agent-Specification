@@ -45,7 +45,7 @@ export function ConfirmationScreen({
           {notificationSent
             ? "Your answers are saved and queued for review. This is a preliminary review request, not an application, an offer, or an approval — and no coverage exists until a policy is issued."
             : notificationFailed
-              ? `Your answers are saved, but the notification to ${SITE.owner} failed. He can still see the case in the secure review portal; no action is needed from you. This is a preliminary review request, not an application, an offer, or an approval.`
+              ? `Your answers are saved, but the notification to ${SITE.owner} could not be confirmed. He can still see the case in the secure review portal; no action is needed from you. This is a preliminary review request, not an application, an offer, or an approval.`
               : `Your answers are saved in the review portal, but no notification was sent to ${SITE.owner} because the email service is not configured. This is a preliminary review request, not an application, an offer, or an approval.`}
         </p>
       </header>
