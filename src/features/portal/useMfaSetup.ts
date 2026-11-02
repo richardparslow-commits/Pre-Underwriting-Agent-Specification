@@ -46,7 +46,7 @@ const EMPTY: SetupState = {
 const START_ERROR =
   "Multifactor authentication could not be started. Check setup again or sign out and try again.";
 const SETUP_ERROR =
-  "Authenticator setup could not be checked. Check setup again; if it was restarted, use the new setup key.";
+  "Authenticator setup could not be checked. Try a fresh code, or check setup again.";
 const errorCode = (error: unknown) =>
   error && typeof error === "object" && "code" in error ? error.code : null;
 const existingFactor = (factors: MfaFactor[]) =>
@@ -60,10 +60,14 @@ export function useMfaSetup(mfa: MfaSetupApi | null, onVerified: () => void) {
   const active = useRef(false);
   const inFlight = useRef(false);
   const showFactor = useCallback((factor: MfaFactor) => {
-    setState({
-      ...EMPTY,
-      factorId: factor.id,
-      phase: factor.status === "verified" ? "challenging" : "pending",
+    setState((current) => {
+      // Only this component's matching unverified enrollment owns its one-time
+      // QR/key. Another tab's factor never supplies or inherits those values.
+      if (factor.status === "unverified" && current.factorId === factor.id && current.qrCode && current.secret) {
+        return { ...current, phase: "enrolling", code: "", error: null, busy: false };
+      }
+      return { ...EMPTY, factorId: factor.id,
+        phase: factor.status === "verified" ? "challenging" : "pending" };
     });
   }, []);
   const begin = useCallback(async () => {
@@ -73,7 +77,8 @@ export function useMfaSetup(mfa: MfaSetupApi | null, onVerified: () => void) {
       return;
     }
     inFlight.current = true;
-    setState({ ...EMPTY, busy: true });
+    setState((current) => ({ ...current,
+      phase: current.factorId ? current.phase : "checking", code: "", error: null, busy: true }));
     try {
       const listed = await mfa.listFactors();
       if (!active.current) return;
@@ -84,6 +89,9 @@ export function useMfaSetup(mfa: MfaSetupApi | null, onVerified: () => void) {
         return;
       }
 
+      // A successful list confirmed the old factor is absent. Its old key must
+      // not survive into a new enrollment (including a lost/raced response).
+      setState({ ...EMPTY, busy: true });
       const enrolled = await mfa.enroll({
         factorType: "totp",
         friendlyName: "Reviewer authenticator",
@@ -114,7 +122,9 @@ export function useMfaSetup(mfa: MfaSetupApi | null, onVerified: () => void) {
         secret: enrolledFactor.totp.secret,
       });
     } catch {
-      if (active.current) setState({ ...EMPTY, phase: "error", error: START_ERROR });
+      if (active.current) setState((current) => current.factorId
+        ? { ...current, code: "", error: START_ERROR, busy: false }
+        : { ...EMPTY, phase: "error", error: START_ERROR });
     } finally {
       inFlight.current = false;
       if (active.current) setState((current) => ({ ...current, busy: false }));
@@ -147,7 +157,8 @@ export function useMfaSetup(mfa: MfaSetupApi | null, onVerified: () => void) {
     try {
       const challenge = await mfa.challenge({ factorId: state.factorId });
       if (!active.current) return;
-      if (challenge.error || !challenge.data?.id) throw new Error(SETUP_ERROR);
+      if (challenge.error) throw challenge.error;
+      if (!challenge.data?.id) throw new Error(SETUP_ERROR);
       const result = await mfa.verify({
         factorId: state.factorId,
         challengeId: challenge.data.id,
@@ -164,12 +175,15 @@ export function useMfaSetup(mfa: MfaSetupApi | null, onVerified: () => void) {
           }));
           return;
         }
-        throw new Error(SETUP_ERROR);
+        throw result.error;
       }
       setState({ ...EMPTY, phase: "done" });
       onVerified();
-    } catch {
-      if (active.current) setState({ ...EMPTY, phase: "error", error: SETUP_ERROR });
+    } catch (verificationError) {
+      if (active.current) setState((current) =>
+        errorCode(verificationError) === "mfa_factor_not_found"
+          ? { ...EMPTY, phase: "error", error: SETUP_ERROR }
+          : { ...current, phase: returnPhase, code: "", error: SETUP_ERROR });
     } finally {
       inFlight.current = false;
       if (active.current) setState((current) => ({ ...current, busy: false }));

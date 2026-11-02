@@ -131,6 +131,7 @@ function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
                 onChange={(event) => setCode(event.target.value.replace(/[^0-9]/g, ""))}
                 className="mt-1.5 tracking-[0.35em]"
                 required
+                disabled={busy}
               />
             </div>
             <Button type="submit" className="w-full" disabled={busy}>
@@ -158,9 +159,9 @@ function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
         ) : null}
 
         <div className="mt-6 flex flex-wrap gap-2 border-t border-border pt-4">
-          {phase === "error" ? (
+          {phase === "error" || (error && (phase === "enrolling" || phase === "challenging")) ? (
             <Button variant="outline" size="sm" onClick={() => void begin()} disabled={busy}>
-              Try again
+              {phase === "error" ? "Try again" : "Check setup again"}
             </Button>
           ) : null}
           <Button variant="quiet" size="sm" onClick={onLeave}>
