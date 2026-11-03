@@ -38,6 +38,8 @@ import {
 
 import { sameSubmissionContent } from "../_shared/submission-content.ts";
 
+import { RELAY_HEADER, verifyRelay } from "../_shared/intake-relay.ts";
+
 const MAX_BODY_BYTES = 512 * 1024;
 const REFERENCE_ATTEMPTS = 5;
 
@@ -182,7 +184,53 @@ Deno.serve(async (req: Request, info?: Deno.ServeHandlerInfo<Deno.NetAddr>) => {
   // A durable, salted counter is used when the project is configured. If it is
   // unavailable, production must fail closed: the in-memory limiter cannot
   // coordinate across instances and is reserved for the explicit test mode.
-  const rateKey = connectionRateKey(info);
+  let rateKey = connectionRateKey(info);
+  let verifiedBody: Awaited<ReturnType<typeof readBodyWithLimit>> | undefined;
+  if (Deno.env.get("INTAKE_RELAY_REQUIRED") === "true") {
+    const secret = Deno.env.get("INTAKE_RELAY_SECRET") ?? "";
+    if (secret.length < 32) {
+      return jsonResponse(
+        { error: "Submission relay unavailable" },
+        503,
+        origin,
+      );
+    }
+    if (!req.headers.has(RELAY_HEADER)) {
+      return jsonResponse({ error: "Verified relay required" }, 403, origin);
+    }
+    verifiedBody = await readBodyWithLimit(req, MAX_BODY_BYTES);
+    if (!verifiedBody.ok) {
+      return jsonResponse(
+        { error: "Could not read submission" },
+        verifiedBody.reason === "too_large" ? 413 : 400,
+        origin,
+      );
+    }
+    const identity = await verifyRelay(
+      req,
+      verifiedBody.text,
+      secret,
+      Date.now(),
+      `${
+        Deno.env.get("SUPABASE_URL")?.replace(/\/$/, "")
+      }/functions/v1/submit-case`,
+    );
+    if (!identity) {
+      return jsonResponse(
+        { error: "Invalid submission relay proof" },
+        403,
+        origin,
+      );
+    }
+    rateKey = identity;
+  } else if (req.headers.has(RELAY_HEADER)) {
+    // A partial rollout or bad configuration cannot silently downgrade trust.
+    return jsonResponse(
+      { error: "Submission relay is not enabled" },
+      503,
+      origin,
+    );
+  }
   const durableLimited = await durableRateLimited(rateKey);
   if (durableLimited === true) {
     return jsonResponse(
@@ -215,7 +263,7 @@ Deno.serve(async (req: Request, info?: Deno.ServeHandlerInfo<Deno.NetAddr>) => {
 
   // Content-Length can be absent or lie, so the byte budget is enforced while
   // streaming the body, before any JSON parsing or validation.
-  const bodyResult = await readBodyWithLimit(req, MAX_BODY_BYTES);
+  const bodyResult = verifiedBody ?? await readBodyWithLimit(req, MAX_BODY_BYTES);
   if (!bodyResult.ok) {
     if (bodyResult.reason === "too_large") {
       return jsonResponse({ error: "Submission too large" }, 413, origin);

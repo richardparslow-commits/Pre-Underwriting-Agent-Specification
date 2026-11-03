@@ -7,6 +7,7 @@
  */
 
 import { resolveLegalEntity } from "./legalEntity";
+import { submissionEndpoint } from "./submissionEndpoint";
 
 /**
  * Vite replaces `import.meta.env` at build time. The fallback keeps this
@@ -91,9 +92,7 @@ export const SUPABASE_ANON_KEY =
 export const PREVIEW_MODE =
   ENV.VITE_APP_MODE !== "live" || !SUPABASE_URL || !SUPABASE_ANON_KEY;
 
-export const SUBMIT_CASE_URL =
-  ENV.VITE_SUBMIT_CASE_URL?.replace(/\/$/, "") ||
-  (SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/submit-case` : "");
+export const SUBMIT_CASE_URL = submissionEndpoint(ENV.VITE_SUBMIT_CASE_URL, SUPABASE_URL);
 
 /** Public marketing opt-out function; separate from case submission. */
 export const REVOKE_MARKETING_URL =
