@@ -603,3 +603,5 @@ Queue changes while paging: [Heal queue-change repair](docs/HEAL-QUEUE-CHANGES.m
 Contact validation after browser history navigation: [Heal history validation repair](docs/HEAL-HISTORY-LEAD-VALIDATION.md).
 
 Bounded payload selection and queue summaries: [Heal queue scaling repair](docs/HEAL-QUEUE-SCALING.md). Migration `0021` is required for the optimized hosted path; exact totals still count queue-wide metadata.
+
+Explicit recovery of this tab's lost MFA enrollment response: [Heal owned MFA recovery](docs/HEAL-OWNED-MFA-RECOVERY.md). Unknown or closed-tab setups remain operator recovery cases.
