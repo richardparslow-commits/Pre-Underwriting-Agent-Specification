@@ -42,7 +42,9 @@ export interface CasePage {
   items: CaseListItem[];
   /** Total rows visible to this reviewer, not just this page. */
   total: number;
-  /** Pass back to listCases() for the next page; null means the queue is complete. */
+  /** Newest visible case identity at the metadata read; undefined for legacy loaders. */
+  headCursor?: string | null;
+  /** Null means no older page remains; concurrent new cases may still require refresh. */
   nextCursor: string | null;
 }
 
@@ -424,7 +426,7 @@ export async function listCases(cursor?: string): Promise<CasePage> {
         unanswered: record.answers.filter((answer) => answer.disposition === "unresolved").length,
         sample: record.sample,
       }));
-    return { items, total: items.length, nextCursor: null };
+    return { items, total: items.length, nextCursor: null, headCursor: items[0] ? `${items[0].submittedAt}|${items[0].reference}` : null };
   }
 
   if (!supabase) throw new Error("Sign-in is not configured.");

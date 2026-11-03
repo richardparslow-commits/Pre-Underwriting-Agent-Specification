@@ -54,16 +54,22 @@ export async function readCaseQueue(client: SupabaseClient, cursor?: string): Pr
     );
   }
 
-  // Count the entire reviewer-visible queue, independently of the page cursor.
-  // HEAD returns no rows, and the same authenticated client enforces the view's
-  // reviewer/MFA permissions for both requests. Refresh on every page so newly
-  // submitted or removed cases change the total instead of freezing it.
+  // One minimal row identifies the current queue head alongside the queue-wide
+  // exact count. A count alone misses an insertion balanced by a deletion.
+  // Both requests use the same authenticated projection; no payload is read.
   const [{ data, error }, totalResult] = await Promise.all([
     query,
-    client.from("case_summaries").select("reference", { count: "exact", head: true }),
+    client.from("case_summaries").select("reference, submitted_at", { count: "exact" })
+      .order("submitted_at", { ascending: false }).order("reference", { ascending: false }).limit(1),
   ]);
   const count = totalResult.count;
-  if (error || totalResult.error || count === null || !Number.isSafeInteger(count) || count < 0) {
+  const metadata = totalResult.data;
+  if (error || totalResult.error || count === null || !Number.isSafeInteger(count) || count < 0
+      || !Array.isArray(metadata) || metadata.length !== (count > 0 ? 1 : 0)) {
+    throw new Error("Cases could not be loaded.");
+  }
+  const head = metadata[0];
+  if (count > 0 && (!head || typeof head.reference !== "string" || !head.reference || typeof head.submitted_at !== "string" || !head.submitted_at)) {
     throw new Error("Cases could not be loaded.");
   }
 
@@ -75,6 +81,7 @@ export async function readCaseQueue(client: SupabaseClient, cursor?: string): Pr
   return {
     items: page.map(summaryToItem),
     total: count,
+    headCursor: head ? `${head.submitted_at}|${head.reference}` : null,
     nextCursor: hasMore && last ? `${last.submitted_at}|${last.reference}` : null,
   };
 }
