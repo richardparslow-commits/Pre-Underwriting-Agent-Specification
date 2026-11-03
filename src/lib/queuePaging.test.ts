@@ -20,6 +20,7 @@ function fixture(size = 282) {
   const state = {
     rows: Array.from({ length: size }, (_, i) => row(size - i)),
     calls: [] as { url: URL; method: string }[],
+    rpcCalls: 0,
     countFails: false,
     pageFails: false,
     missingCount: false,
@@ -32,6 +33,10 @@ function fixture(size = 282) {
       fetch: async (input, init) => {
         const url = new URL(String(input));
         const method = init?.method ?? "GET";
+        if (url.pathname === "/rest/v1/rpc/get_case_queue_page") {
+          state.rpcCalls++;
+          return new Response(JSON.stringify({code:"PGRST202",message:"Could not find the function public.get_case_queue_page in the schema cache"}), {status:404,headers:{"Content-Type":"application/json"}});
+        }
         state.calls.push({ url, method });
         assert.equal(url.pathname, "/rest/v1/case_summaries");
         assert.ok(!url.searchParams.get("select")?.match(/payload|answers/));
@@ -62,7 +67,7 @@ function fixture(size = 282) {
   return { state, client, row };
 }
 
-test("282-case queue keeps its total across every page, including the final partial page", async () => {
+test("legacy 282-case queue keeps its total across every page, including the final partial page", async () => {
   const { state, client } = fixture();
   const references: string[] = [];
   let cursor: string | undefined;
@@ -73,6 +78,7 @@ test("282-case queue keeps its total across every page, including the final part
     references.push(...page.items.map((item) => item.reference));
     cursor = page.nextCursor ?? undefined;
   } while (cursor);
+  assert.equal(state.rpcCalls,12,"only an explicitly missing queue RPC permits the legacy projection");
   assert.equal(references.length, 282);
   assert.equal(new Set(references).size, 282);
   assert.deepEqual(

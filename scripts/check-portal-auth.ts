@@ -122,6 +122,11 @@ requireMarker(
   ".limit(1)",
   "the independent metadata request must be bounded to one row",
 );
+requireMarker("src/lib/queuePaging.ts", queuePaging, '.rpc("get_case_queue_page"', "the live queue must try its bounded backend read first");
+const queueMigration = read("supabase/migrations/0021_bounded_case_queue.sql");
+for (const marker of ["selected as materialized", "limit 26", "public.is_reviewer()", "security definer", "from public, anon, authenticated"]) {
+  requireMarker("supabase/migrations/0021_bounded_case_queue.sql", queueMigration, marker, "bounded selection and explicit reviewer/helper restrictions must remain");
+}
 requireMarker(
   "src/lib/api.ts",
   api,
