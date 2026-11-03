@@ -34,9 +34,16 @@ function requireMarker(
 }
 
 const gate = read("src/features/portal/MfaGate.tsx");
-requireMarker("src/features/portal/MfaGate.tsx", gate, "src={qrCode}", "the QR image must use the data URL auth-js already returns");
+requireMarker(
+  "src/features/portal/MfaGate.tsx",
+  gate,
+  "src={qrCode}",
+  "the QR image must use the data URL auth-js already returns",
+);
 if (gate.includes("encodeURIComponent(qrCode)")) {
-  failures.push("The MFA gate must not re-encode the QR data URL returned by auth-js.");
+  failures.push(
+    "The MFA gate must not re-encode the QR data URL returned by auth-js.",
+  );
 }
 requireMarker(
   "src/features/portal/MfaGate.tsx",
@@ -64,10 +71,24 @@ requireMarker(
   "setup is already in progress",
   "a second tab must preserve pending setup",
 );
-if (/\.unenroll\s*\(/.test(gate + mfa))
-  failures.push(
-    "The MFA gate must not automatically remove another tab's pending factor.",
+// Removal is restricted to the explicit owned-orphan recovery callback.
+if (/\.unenroll\s*\(/.test(gate))
+  failures.push("The rendered gate must not remove factors directly.");
+for (const marker of [
+  "!state.canRestart",
+  "ownedAttempt.current",
+  'target.status !== "unverified"',
+  "target.friendly_name !== name",
+  "const listed = await mfa.listFactors()",
+  "const restart = useCallback",
+]) {
+  requireMarker(
+    "src/features/portal/useMfaSetup.ts",
+    mfa,
+    marker,
+    "pending recovery must require fresh ownership and verification checks",
   );
+}
 
 const portal = read("src/pages/PortalPage.tsx");
 requireMarker(
@@ -122,10 +143,26 @@ requireMarker(
   ".limit(1)",
   "the independent metadata request must be bounded to one row",
 );
-requireMarker("src/lib/queuePaging.ts", queuePaging, '.rpc("get_case_queue_page"', "the live queue must try its bounded backend read first");
+requireMarker(
+  "src/lib/queuePaging.ts",
+  queuePaging,
+  '.rpc("get_case_queue_page"',
+  "the live queue must try its bounded backend read first",
+);
 const queueMigration = read("supabase/migrations/0021_bounded_case_queue.sql");
-for (const marker of ["selected as materialized", "limit 26", "public.is_reviewer()", "security definer", "from public, anon, authenticated"]) {
-  requireMarker("supabase/migrations/0021_bounded_case_queue.sql", queueMigration, marker, "bounded selection and explicit reviewer/helper restrictions must remain");
+for (const marker of [
+  "selected as materialized",
+  "limit 26",
+  "public.is_reviewer()",
+  "security definer",
+  "from public, anon, authenticated",
+]) {
+  requireMarker(
+    "supabase/migrations/0021_bounded_case_queue.sql",
+    queueMigration,
+    marker,
+    "bounded selection and explicit reviewer/helper restrictions must remain",
+  );
 }
 requireMarker(
   "src/lib/api.ts",

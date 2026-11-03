@@ -1,10 +1,13 @@
-import { useId } from "react";
+import { useId, useMemo, useState } from "react";
 import { useMfaSetup } from "./useMfaSetup";
 import { KeyRound, Loader2, LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/form";
 import { Alert, Badge } from "@/components/ui/surface";
 import { supabase } from "@/integrations/supabase/client";
+
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/config/site";
+import { unenrollPendingFactor } from "./pendingFactorRecovery";
 
 interface MfaGateProps {
   email: string | null;
@@ -25,12 +28,37 @@ export function MfaGate(props: MfaGateProps) {
 }
 
 function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
+  const [confirmRestart, setConfirmRestart] = useState<string | null>(null);
+  const mfa = useMemo(() => {
+    const client = supabase;
+    if (!client) return null;
+    return {
+      ...client.auth.mfa,
+      unenroll: ({ factorId }: { factorId: string }) =>
+        unenrollPendingFactor({
+          url: SUPABASE_URL,
+          key: SUPABASE_ANON_KEY,
+          factorId,
+          getSession: () => client.auth.getSession(),
+        }),
+    };
+  }, []);
   const codeInputId = useId();
   const secretInputId = useId();
-  const { phase, qrCode, secret, code, error, busy, setCode, begin, verify } = useMfaSetup(
-    supabase?.auth.mfa ?? null,
-    onVerified,
-  );
+  const {
+    phase,
+    factorId,
+    qrCode,
+    secret,
+    code,
+    error,
+    busy,
+    canRestart,
+    restart,
+    setCode,
+    begin,
+    verify,
+  } = useMfaSetup(mfa, onVerified);
 
   return (
     <div className="container max-w-md py-16">
@@ -44,8 +72,9 @@ function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
               : "Step up your session"}
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          You are signed in as {email ?? "a reviewer"}, but this session has not completed
-          multifactor authentication. Case data is not available until you verify a second factor.
+          You are signed in as {email ?? "a reviewer"}, but this session has not
+          completed multifactor authentication. Case data is not available until
+          you verify a second factor.
         </p>
 
         {phase === "checking" ? (
@@ -58,20 +87,70 @@ function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
         {phase === "pending" ? (
           <div role="status">
             <Alert tone="warn" className="mt-5">
-              <p>An authenticator setup is already in progress. It has not been changed.</p>
-              <p className="mt-2">
-                Finish in the original tab, or enter a code here if you already scanned that setup
-                key.
+              <p>
+                An authenticator setup is already in progress. It has not been
+                changed.
               </p>
               <p className="mt-2">
-                If the original tab was closed before you added the key, sign out and ask the
-                operator to clear the pending setup. Opening another tab will not replace it.
+                Finish in the original tab, or enter a code here if you already
+                scanned that setup key.
               </p>
+              {canRestart ? (
+                <div className="mt-3">
+                  <p>
+                    This tab started the unfinished setup, but did not receive
+                    its key. You can replace it with a new setup.
+                  </p>
+                  {confirmRestart === factorId ? (
+                    <div className="mt-2">
+                      <p>
+                        The unfinished key will stop working. Add the new key to
+                        your authenticator after replacement.
+                      </p>
+                      <Button
+                        className="mt-2"
+                        disabled={busy}
+                        onClick={() => {
+                          setConfirmRestart(null);
+                          void restart();
+                        }}
+                      >
+                        Replace unfinished setup
+                      </Button>
+                      <Button
+                        variant="quiet"
+                        disabled={busy}
+                        onClick={() => setConfirmRestart(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      className="mt-2"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => setConfirmRestart(factorId)}
+                    >
+                      Restart this tab’s setup
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-2">
+                  If the original tab was closed before you added the key, sign
+                  out and ask the operator to clear the pending setup. Opening
+                  another tab will not replace it.
+                </p>
+              )}
               <Button
                 variant="outline"
                 size="sm"
                 className="mt-3"
-                onClick={() => void begin()}
+                onClick={() => {
+                  setConfirmRestart(null);
+                  void begin();
+                }}
                 disabled={busy}
               >
                 Check setup again
@@ -83,8 +162,8 @@ function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
         {phase === "enrolling" && qrCode ? (
           <div className="mt-5 space-y-4">
             <p className="text-sm leading-relaxed text-muted-foreground">
-              Scan this code with an authenticator app, or enter the setup key manually. The key is
-              shown once and is never stored by this site.
+              Scan this code with an authenticator app, or enter the setup key
+              manually. The key is shown once and is never stored by this site.
             </p>
             {/* `totp.qr_code` is already a `data:image/svg+xml;utf-8,…` URL:
                 @supabase/auth-js prefixes it before returning. Prefixing again
@@ -116,6 +195,7 @@ function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
             className="mt-5 space-y-3"
             onSubmit={(event) => {
               event.preventDefault();
+              setConfirmRestart(null);
               void verify();
             }}
           >
@@ -128,14 +208,20 @@ function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
                 pattern="[0-9]*"
                 maxLength={6}
                 value={code}
-                onChange={(event) => setCode(event.target.value.replace(/[^0-9]/g, ""))}
+                onChange={(event) =>
+                  setCode(event.target.value.replace(/[^0-9]/g, ""))
+                }
                 className="mt-1.5 tracking-[0.35em]"
                 required
                 disabled={busy}
               />
             </div>
             <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? <Loader2 className="animate-spin" aria-hidden /> : <KeyRound aria-hidden />}
+              {busy ? (
+                <Loader2 className="animate-spin" aria-hidden />
+              ) : (
+                <KeyRound aria-hidden />
+              )}
               Verify and open the queue
             </Button>
           </form>
@@ -159,8 +245,17 @@ function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
         ) : null}
 
         <div className="mt-6 flex flex-wrap gap-2 border-t border-border pt-4">
-          {phase === "error" || (error && (phase === "enrolling" || phase === "challenging")) ? (
-            <Button variant="outline" size="sm" onClick={() => void begin()} disabled={busy}>
+          {phase === "error" ||
+          (error && (phase === "enrolling" || phase === "challenging")) ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setConfirmRestart(null);
+                void begin();
+              }}
+              disabled={busy}
+            >
               {phase === "error" ? "Try again" : "Check setup again"}
             </Button>
           ) : null}
@@ -171,8 +266,9 @@ function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
         </div>
 
         <p className="mt-5 text-[0.7rem] leading-relaxed text-muted-foreground">
-          If you lose access to your authenticator, an operator must remove the factor from your
-          account before you can enrol a replacement. Do not share a code with anyone.
+          If you lose access to your authenticator, an operator must remove the
+          factor from your account before you can enrol a replacement. Do not
+          share a code with anyone.
         </p>
       </div>
     </div>
