@@ -605,3 +605,5 @@ Contact validation after browser history navigation: [Heal history validation re
 Bounded payload selection and queue summaries: [Heal queue scaling repair](docs/HEAL-QUEUE-SCALING.md). Migration `0021` is required for the optimized hosted path; exact totals still count queue-wide metadata.
 
 Explicit recovery of this tab's lost MFA enrollment response: [Heal owned MFA recovery](docs/HEAL-OWNED-MFA-RECOVERY.md). Unknown or closed-tab setups remain operator recovery cases.
+
+Policy-page header/footer returns preserve the active interview position: [Heal policy return repair](docs/HEAL-POLICY-RETURN.md). Browser history, reset and private-test boundaries remain intact.

@@ -43,11 +43,13 @@ async function fixture(send: IntakeSender, run: (f: Context) => Promise<void>) {
       <MemoryRouter initialEntries={["/start"]}>
         <Observer />
         <Routes>
-          <Route path="/" element={<p>Outside questionnaire</p>} />
-          <Route element={<Scope />}>
-            <Route path="start" element={<p>Intake</p>} />
-            <Route path="privacy" element={<ResumeInterview />} />
-            <Route path="messaging-terms" element={<ResumeInterview />} />
+          <Route element={<SiteLayout />}>
+            <Route path="/" element={<p>Outside questionnaire</p>} />
+            <Route element={<Scope />}>
+              <Route path="start" element={<p>Intake</p>} />
+              <Route path="privacy" element={<ResumeInterview />} />
+              <Route path="messaging-terms" element={<ResumeInterview />} />
+            </Route>
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -60,6 +62,16 @@ async function fixture(send: IntakeSender, run: (f: Context) => Promise<void>) {
       navigate: async (path) => {
         if (typeof path === "number") await navigate(path);
         else await navigate(path);
+      },
+      chromeStart: async (kind) => {
+        const label =
+          kind === "header" ? "Start the interview" : "Start a review request";
+        const link = view.root
+          .findAllByType(Link)
+          .find((x) => x.props.children === label)!;
+        await act(async () =>
+          navigate(link.props.to, { state: link.props.state }),
+        );
       },
       resume: async () => {
         const link = view.root.findByType(ResumeInterview).findByType(Link);
@@ -77,6 +89,7 @@ import assert from "node:assert/strict";
 import { IntakeSessionProvider, type IntakeSender } from "./IntakeSession";
 import { useIntakeSession, type IntakeSession } from "./intakeSessionContext";
 import { ResumeInterview } from "../../components/site/ResumeInterview";
+import { SiteLayout } from "../../components/site/SiteChrome";
 import { isIntakeSessionPath } from "./intakeSessionScope";
 import type { SubmissionReceipt } from "./types";
 
@@ -103,6 +116,7 @@ interface Context {
   read: () => IntakeSession;
   navigate: (path: string | number) => Promise<void>;
   resume: () => Promise<void>;
+  chromeStart: (kind: "header" | "footer") => Promise<void>;
   location: () => { pathname: string; state: unknown };
 }
 async function seed(read: () => IntakeSession, reviewed = false) {
@@ -321,50 +335,259 @@ test("the memory scope excludes home, reviewers, opt-out and lookalike paths", (
   }
 });
 
-
 test("Back during a pending submission never exposes a mutable earlier snapshot", async () => {
- const pending=deferred<SubmissionReceipt>();const requests: {draft:unknown;key:string}[]=[];
- await fixture(async(draft,key)=>{requests.push({draft:structuredClone(draft),key});return pending.promise;},async f=>{
-  await seed(f.read,true); const original=structuredClone(f.read().interview.draft);const key=f.read().interview.submissionKey;
-  const stale=f.read().interview;let request!:Promise<void>;
-  await act(async()=>{
-   request=f.read().submit();
-   // Handlers captured before React rerenders must also observe the live lock.
-   stale.setLeadField('firstName','Dropped edit'); stale.setAnswer('MED-01',{value:'no'});
-   stale.setAdultAttested(false);stale.setConsent('intakePermission',false);stale.confirmReview(false);stale.markSubmitted({...receipt,reference:'LPP-2026-STALE1'});stale.startOver();
-  });
-  await act(async()=>f.navigate(-1));
-  assert.equal(f.read().submitting,true);assert.equal(f.read().interview.step,'review');
-  assert.equal(f.read().interview.submissionKey,key);assert.deepEqual(f.read().interview.draft,original);
-  await act(async()=>{f.read().interview.backToLead();f.read().interview.goToQuestion('MED-01');f.read().interview.previousQuestion();f.read().interview.nextQuestion();f.read().interview.finishInterview();f.read().interview.begin();f.read().interview.givePermission();});
-  assert.equal(f.read().interview.step,'review');assert.deepEqual(f.read().interview.draft,original);
-  await act(async()=>{await f.read().submit();});assert.equal(requests.length,1);
-  await act(async()=>{pending.resolve(receipt);await request;});
-  assert.equal(f.read().interview.step,'submitted');assert.deepEqual(f.read().interview.receipt,receipt);
-  assert.deepEqual(requests[0],{draft:original,key});
-  await act(async()=>f.read().submit());assert.equal(requests.length,1,'a completed receipt cannot be resubmitted');
-  await act(async()=>f.read().interview.startOver());assert.equal(f.read().interview.step,'lead');assert.notEqual(f.read().interview.submissionKey,key);
- });
+  const pending = deferred<SubmissionReceipt>();
+  const requests: { draft: unknown; key: string }[] = [];
+  await fixture(
+    async (draft, key) => {
+      requests.push({ draft: structuredClone(draft), key });
+      return pending.promise;
+    },
+    async (f) => {
+      await seed(f.read, true);
+      const original = structuredClone(f.read().interview.draft);
+      const key = f.read().interview.submissionKey;
+      const stale = f.read().interview;
+      let request!: Promise<void>;
+      await act(async () => {
+        request = f.read().submit();
+        // Handlers captured before React rerenders must also observe the live lock.
+        stale.setLeadField("firstName", "Dropped edit");
+        stale.setAnswer("MED-01", { value: "no" });
+        stale.setAdultAttested(false);
+        stale.setConsent("intakePermission", false);
+        stale.confirmReview(false);
+        stale.markSubmitted({ ...receipt, reference: "LPP-2026-STALE1" });
+        stale.startOver();
+      });
+      await act(async () => f.navigate(-1));
+      assert.equal(f.read().submitting, true);
+      assert.equal(f.read().interview.step, "review");
+      assert.equal(f.read().interview.submissionKey, key);
+      assert.deepEqual(f.read().interview.draft, original);
+      await act(async () => {
+        f.read().interview.backToLead();
+        f.read().interview.goToQuestion("MED-01");
+        f.read().interview.previousQuestion();
+        f.read().interview.nextQuestion();
+        f.read().interview.finishInterview();
+        f.read().interview.begin();
+        f.read().interview.givePermission();
+      });
+      assert.equal(f.read().interview.step, "review");
+      assert.deepEqual(f.read().interview.draft, original);
+      await act(async () => {
+        await f.read().submit();
+      });
+      assert.equal(requests.length, 1);
+      await act(async () => {
+        pending.resolve(receipt);
+        await request;
+      });
+      assert.equal(f.read().interview.step, "submitted");
+      assert.deepEqual(f.read().interview.receipt, receipt);
+      assert.deepEqual(requests[0], { draft: original, key });
+      await act(async () => f.read().submit());
+      assert.equal(
+        requests.length,
+        1,
+        "a completed receipt cannot be resubmitted",
+      );
+      await act(async () => f.read().interview.startOver());
+      assert.equal(f.read().interview.step, "lead");
+      assert.notEqual(f.read().interview.submissionKey, key);
+    },
+  );
 });
 
-test("a failed request after browser Back restores review with identical retry evidence and unlocks editing", async()=>{
- const pending=deferred<SubmissionReceipt>();const requests:{draft:unknown;key:string}[]=[];
- await fixture(async(draft,key)=>{requests.push({draft:structuredClone(draft),key});return requests.length===1?pending.promise:receipt;},async f=>{
-  await seed(f.read,true);let request!:Promise<void>;
-  await act(async()=>{request=f.read().submit();});await act(async()=>f.navigate(-1));
-  await act(async()=>{pending.reject(new Error('Synthetic uncertain response'));await request;});
-  assert.equal(f.read().submitting,false);assert.equal(f.read().interview.step,'review');assert.equal(f.read().error,'Synthetic uncertain response');
-  await act(async()=>f.read().submit());assert.deepEqual(requests[1],requests[0]);
- });
+test("a failed request after browser Back restores review with identical retry evidence and unlocks editing", async () => {
+  const pending = deferred<SubmissionReceipt>();
+  const requests: { draft: unknown; key: string }[] = [];
+  await fixture(
+    async (draft, key) => {
+      requests.push({ draft: structuredClone(draft), key });
+      return requests.length === 1 ? pending.promise : receipt;
+    },
+    async (f) => {
+      await seed(f.read, true);
+      let request!: Promise<void>;
+      await act(async () => {
+        request = f.read().submit();
+      });
+      await act(async () => f.navigate(-1));
+      await act(async () => {
+        pending.reject(new Error("Synthetic uncertain response"));
+        await request;
+      });
+      assert.equal(f.read().submitting, false);
+      assert.equal(f.read().interview.step, "review");
+      assert.equal(f.read().error, "Synthetic uncertain response");
+      await act(async () => f.read().submit());
+      assert.deepEqual(requests[1], requests[0]);
+    },
+  );
 });
 
-test("failed submission releases the edit lock without changing its operation key", async()=>{
- const pending=deferred<SubmissionReceipt>();
- await fixture(async()=>pending.promise,async f=>{
-  await seed(f.read,true);const key=f.read().interview.submissionKey;let request!:Promise<void>;
-  await act(async()=>{request=f.read().submit();});
-  await act(async()=>{pending.reject(new Error('Synthetic uncertain response'));await request;});
-  await act(async()=>f.read().interview.setLeadField('firstName','Corrected after response'));
-  assert.equal(f.read().interview.lead.firstName,'Corrected after response');assert.equal(f.read().interview.acknowledgements.length,0);assert.equal(f.read().interview.submissionKey,key);
- });
+test("failed submission releases the edit lock without changing its operation key", async () => {
+  const pending = deferred<SubmissionReceipt>();
+  await fixture(
+    async () => pending.promise,
+    async (f) => {
+      await seed(f.read, true);
+      const key = f.read().interview.submissionKey;
+      let request!: Promise<void>;
+      await act(async () => {
+        request = f.read().submit();
+      });
+      await act(async () => {
+        pending.reject(new Error("Synthetic uncertain response"));
+        await request;
+      });
+      await act(async () =>
+        f
+          .read()
+          .interview.setLeadField("firstName", "Corrected after response"),
+      );
+      assert.equal(
+        f.read().interview.lead.firstName,
+        "Corrected after response",
+      );
+      assert.equal(f.read().interview.acknowledgements.length, 0);
+      assert.equal(f.read().interview.submissionKey, key);
+    },
+  );
+});
+
+for (const policy of ["/privacy", "/messaging-terms"]) {
+  for (const kind of ["header", "footer"] as const) {
+    test(`${kind} start from ${policy} resumes the same question and replaces only screen metadata`, async () => {
+      await fixture(
+        async () => receipt,
+        async (f) => {
+          await seed(f.read);
+          const before = f.read().interview;
+          const answers = structuredClone(before.answers),
+            lead = structuredClone(before.lead),
+            consent = structuredClone(before.consent),
+            key = before.submissionKey;
+          await act(async () => f.navigate(policy));
+          await f.chromeStart(kind);
+          assert.equal(f.read().interview.step, "interview");
+          assert.equal(f.read().interview.currentQuestionId, "MED-01");
+          assert.deepEqual(f.read().interview.answers, answers);
+          assert.deepEqual(f.read().interview.lead, lead);
+          assert.deepEqual(f.read().interview.consent, consent);
+          assert.equal(f.read().interview.submissionKey, key);
+          const state = f.location().state as {
+            lppIntake: { session: string; step: string };
+          };
+          assert.deepEqual(Object.keys(state.lppIntake).sort(), [
+            "session",
+            "step",
+          ]);
+          assert.equal(state.lppIntake.step, "interview");
+          assert.ok(
+            !JSON.stringify(state).match(
+              /Synthetic|1980|example.invalid|answers|submissionKey/,
+            ),
+          );
+        },
+      );
+    });
+  }
+}
+test("header return retains reviewed payload and retry acknowledgement", async () => {
+  await fixture(
+    async () => receipt,
+    async (f) => {
+      await seed(f.read, true);
+      const draft = structuredClone(f.read().interview.draft),
+        key = f.read().interview.submissionKey;
+      await act(async () => f.navigate("/privacy"));
+      await f.chromeStart("header");
+      assert.equal(f.read().interview.step, "review");
+      assert.deepEqual(f.read().interview.draft, draft);
+      assert.equal(f.read().interview.submissionKey, key);
+    },
+  );
+});
+test("unmarked form navigation without a policy visit still returns to lead", async () => {
+  await fixture(
+    async () => receipt,
+    async (f) => {
+      await seed(f.read);
+      await act(async () => f.navigate("/start"));
+      assert.equal(f.read().interview.step, "lead");
+    },
+  );
+});
+test("header return after policy Start over cannot revive the previous interview", async () => {
+  await fixture(
+    async () => receipt,
+    async (f) => {
+      await seed(f.read, true);
+      await act(async () => f.navigate("/privacy"));
+      await act(async () => f.read().interview.startOver());
+      await f.chromeStart("header");
+      assert.equal(f.read().interview.step, "lead");
+      assert.deepEqual(f.read().interview.answers, {});
+      assert.equal(f.read().interview.draft, null);
+    },
+  );
+});
+test("header policy return retains lead validation and permission gates", async () => {
+  await fixture(
+    async () => receipt,
+    async (f) => {
+      await seed(f.read, true);
+      await act(async () => f.navigate("/privacy"));
+      await act(async () =>
+        f.read().interview.setLeadField("email", "invalid"),
+      );
+      await f.chromeStart("header");
+      assert.equal(f.read().interview.step, "lead");
+      assert.equal(f.read().interview.draft, null);
+    },
+  );
+});
+test("header return after a pending policy-page receipt cannot submit twice", async () => {
+  const pending = deferred<SubmissionReceipt>();
+  let calls = 0;
+  await fixture(
+    async () => {
+      calls++;
+      return pending.promise;
+    },
+    async (f) => {
+      await seed(f.read, true);
+      let op!: Promise<void>;
+      await act(async () => {
+        op = f.read().submit();
+      });
+      await act(async () => f.navigate("/privacy"));
+      await act(async () => {
+        pending.resolve(receipt);
+        await op;
+      });
+      await f.chromeStart("header");
+      assert.equal(f.read().interview.step, "submitted");
+      assert.deepEqual(f.read().interview.receipt, receipt);
+      await act(async () => f.read().submit());
+      assert.equal(calls, 1);
+    },
+  );
+});
+
+test("browser Back to the original unmarked lead entry keeps its original meaning", async () => {
+  await fixture(
+    async () => receipt,
+    async (f) => {
+      await seed(f.read);
+      await act(async () => f.navigate("/privacy"));
+      await act(async () => f.navigate(-2));
+      assert.equal(f.location().pathname, "/start");
+      assert.equal(f.read().interview.step, "lead");
+      assert.equal(f.read().interview.lead.firstName, "Synthetic");
+    },
+  );
 });
