@@ -118,11 +118,16 @@ function SignInCard({ auth }: { auth: ReturnType<typeof useReviewerAuth> }) {
 export default function PortalPage() {
   const auth = useReviewerAuth();
   const [safetyRefresh, setSafetyRefresh] = useState(0);
-  const { cases, total, nextCursor, error, loading, loadingMore, load } = useCaseQueue(
+  const { cases, total, nextCursor, queueChanged, error, loading, loadingMore, load } = useCaseQueue(
     auth.signedIn && !auth.loading,
     listCases,
     auth.email,
   );
+
+  function refreshQueue() {
+    void load();
+    setSafetyRefresh(value => value + 1);
+  }
 
   if (auth.loading) {
     return (
@@ -186,7 +191,7 @@ export default function PortalPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => { void load(); setSafetyRefresh((value) => value + 1); }}
+            onClick={refreshQueue}
             disabled={loading || loadingMore}
           >
             {loading ? <Loader2 className="animate-spin" aria-hidden /> : <RefreshCw aria-hidden />}
@@ -208,6 +213,13 @@ export default function PortalPage() {
 
       <SafetyDisclosures refreshKey={safetyRefresh} />
 
+      {queueChanged ? <Alert tone="warn" className="mt-6">
+        <p role="status">Case queue changed while you were paging. New or removed cases may not be reflected below.</p>
+        <Button className="mt-3" variant="outline" size="sm" onClick={refreshQueue} disabled={loading || loadingMore}>
+          Refresh latest cases
+        </Button>
+      </Alert> : null}
+
       {error ? (
         <Alert tone="danger" className="mt-6">
           {error}
@@ -222,7 +234,7 @@ export default function PortalPage() {
           </div>
         ) : null}
 
-        {cases && cases.length === 0 ? (
+        {cases && cases.length === 0 && !queueChanged && total === 0 ? (
           <div className="panel p-8 text-center">
             <ShieldCheck className="mx-auto h-6 w-6 text-muted-foreground" aria-hidden />
             <p className="mt-3 text-sm font-medium">No cases yet</p>
@@ -279,7 +291,7 @@ export default function PortalPage() {
           </div>
         ) : cases && cases.length > 0 ? (
           <p className="pt-2 text-center text-xs text-muted-foreground">
-            Showing all {cases.length} case{cases.length === 1 ? "" : "s"} visible to you.
+            Showing {cases.length} of {total} case{total === 1 ? "" : "s"} from this load. {queueChanged ? "Refresh for the latest cases." : "No older cases remain in this load."}
           </p>
         ) : null}
       </div>

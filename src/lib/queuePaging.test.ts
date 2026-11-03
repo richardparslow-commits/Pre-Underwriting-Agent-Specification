@@ -23,6 +23,8 @@ function fixture(size = 282) {
     countFails: false,
     pageFails: false,
     missingCount: false,
+    missingHead: false,
+    malformedHead: false,
   };
   const client = createClient("https://queue.example.invalid", "synthetic-public-key", {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -33,7 +35,7 @@ function fixture(size = 282) {
         state.calls.push({ url, method });
         assert.equal(url.pathname, "/rest/v1/case_summaries");
         assert.ok(!url.searchParams.get("select")?.match(/payload|answers/));
-        const isCount = method === "HEAD";
+        const isCount = new Headers(init?.headers).get("prefer")?.includes("count=exact");
         if ((isCount && state.countFails) || (!isCount && state.pageFails)) {
           return new Response(JSON.stringify({ message: "Synthetic request failure" }), {
             status: 500,
@@ -45,7 +47,7 @@ function fixture(size = 282) {
         const items = matching.slice(0, limit);
         const wantsCount = new Headers(init?.headers).get("prefer")?.includes("count=exact");
         const count = state.missingCount ? "*" : String(matching.length);
-        return new Response(isCount ? null : JSON.stringify(items), {
+        return new Response(JSON.stringify(isCount && state.missingHead ? [] : isCount && state.malformedHead ? [{}] : items), {
           status: 200,
           headers: {
             "Content-Type": "application/json",
@@ -77,14 +79,15 @@ test("282-case queue keeps its total across every page, including the final part
     references,
     state.rows.map((item) => item.reference),
   );
-  const counts = state.calls.filter((call) => call.method === "HEAD");
+  const counts = state.calls.filter((call) => call.url.searchParams.get("select") === "reference,submitted_at");
   assert.equal(counts.length, 12);
   for (const { url } of counts) {
-    assert.equal(url.searchParams.get("select"), "reference");
+    assert.equal(url.searchParams.get("select"), "reference,submitted_at");
+    assert.equal(url.searchParams.get("order"), "submitted_at.desc,reference.desc");
     assert.equal(url.searchParams.has("or"), false);
-    assert.equal(url.searchParams.has("limit"), false);
+    assert.equal(url.searchParams.get("limit"), "1");
   }
-  for (const { url } of state.calls.filter((call) => call.method === "GET")) {
+  for (const { url } of state.calls.filter((call) => call.url.searchParams.get("select") !== "reference,submitted_at")) {
     assert.equal(url.searchParams.get("limit"), "26");
     assert.equal(url.searchParams.get("order"), "submitted_at.desc,reference.desc");
   }
@@ -96,6 +99,7 @@ test("later pages refresh the total after insertions and deletions without repea
   state.rows.unshift(row(283));
   const second = await readCaseQueue(client, first.nextCursor!);
   assert.equal(second.total, 283);
+  assert.equal(second.headCursor, `${row(283).submitted_at}|${row(283).reference}`);
   assert.equal(second.items[0]?.reference, row(257).reference);
   state.rows.pop();
   const third = await readCaseQueue(client, second.nextCursor!);
@@ -105,10 +109,10 @@ test("later pages refresh the total after insertions and deletions without repea
 
 test("empty queues have a real zero total and no continuation", async () => {
   const { client } = fixture(0);
-  assert.deepEqual(await readCaseQueue(client), { items: [], total: 0, nextCursor: null });
+  assert.deepEqual(await readCaseQueue(client), { items: [], total: 0, nextCursor: null, headCursor: null });
 });
 
-for (const failure of ["countFails", "pageFails", "missingCount"] as const) {
+for (const failure of ["countFails", "pageFails", "missingCount", "missingHead", "malformedHead"] as const) {
   test(`${failure} rejects the page instead of displaying a fabricated total`, async () => {
     const { state, client } = fixture();
     state[failure] = true;
@@ -120,4 +124,16 @@ test("malformed continuation fails before issuing any query", async () => {
   const { state, client } = fixture();
   await assert.rejects(readCaseQueue(client, "invalid"), /cursor is not valid/);
   assert.equal(state.calls.length, 0);
+});
+
+
+test("same-total replacement still changes metadata head without fetching the head page",async()=>{
+  const {state,client,row}=fixture(50);
+  const first=await readCaseQueue(client);
+  state.rows.pop();state.rows.unshift(row(51));
+  const older=await readCaseQueue(client,first.nextCursor!);
+  assert.equal(older.total,50);
+  assert.notEqual(older.headCursor,first.headCursor);
+  assert.ok(!older.items.some(x=>x.reference===row(51).reference));
+  assert.equal(state.calls.length,4,'still only one page and one minimal metadata request per load');
 });

@@ -117,3 +117,52 @@ test("inactive sessions load nothing and late responses cannot restore their row
     assert.equal(read().loading, false);
   }, false);
 });
+
+const headOf = (start: number) => `${page(start,1).items[0]!.submittedAt}|${page(start,1).items[0]!.reference}`;
+const snapshot = (start: number, total: number, next: string | null, head = headOf(1)) => ({...page(start,25,next),total,headCursor:head});
+test('a new head case during paging signals change and refresh replaces the old walk',()=>{
+  let heads=0;
+  return queue(async cursor=>cursor ? snapshot(26,51,null,headOf(100)) : ++heads===1 ? snapshot(1,50,'c25') : snapshot(100,51,'c124',headOf(100)),async read=>{
+    assert.equal(read().queueChanged,false);
+    await act(async()=>read().load('c25'));
+    assert.equal(read().queueChanged,true);
+    assert.equal(read().total,51);
+    assert.equal(read().nextCursor,null);
+    assert.deepEqual(refs(read()),expected(1,50));
+    await act(async()=>read().load());
+    assert.equal(read().queueChanged,false);
+    assert.deepEqual(refs(read()),expected(100));
+  });
+});
+test('an insertion balanced by deletion still signals a changed head and warning stays through paging/failure',()=>{
+  let heads=0;
+  return queue(async cursor=>{
+    if(!cursor) {if(++heads===2) throw new Error('Synthetic offline');return snapshot(1,75,'c25');}
+    return snapshot(cursor==='c25'?26:51,75,cursor==='c25'?'c50':null,cursor==='c25'?headOf(100):headOf(1));
+  },async read=>{
+    await act(async()=>read().load('c25'));
+    assert.equal(read().queueChanged,true);
+    await act(async()=>read().load('c50'));
+    assert.equal(read().queueChanged,true,'same total and full row count do not erase a known changed head');
+    await act(async()=>read().load());
+    assert.equal(read().queueChanged,true,'failed refresh cannot claim reconciliation');
+    assert.deepEqual(refs(read()),expected(1,75));
+  });
+});
+test('a final count/list disagreement also warns when head metadata is unavailable',()=>queue(async cursor=>cursor?{...page(26,25,null),total:51}:{...page(1),total:50},async read=>{
+  await act(async()=>read().load('c25'));
+  assert.equal(read().queueChanged,true);
+}));
+test('a head changing between the first page and its metadata response warns immediately',()=>queue(async()=>snapshot(1,50,'c25',headOf(100)),async read=>{
+  assert.equal(read().queueChanged,true);
+}));
+test('session changes reset the queue-change warning with the rows',()=>{
+  let heads=0;
+  return queue(async cursor=>cursor?snapshot(26,51,null,headOf(100)):++heads===1?snapshot(1,50,'c25'):snapshot(100,25,null,headOf(100)),async(read,update)=>{
+    await act(async()=>read().load('c25'));
+    assert.equal(read().queueChanged,true);
+    await update(true,'reviewer-b');
+    assert.equal(read().queueChanged,false);
+    assert.deepEqual(refs(read()),expected(100));
+  });
+});
