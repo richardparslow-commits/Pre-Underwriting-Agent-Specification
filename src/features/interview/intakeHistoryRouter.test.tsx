@@ -26,6 +26,18 @@ async function fixture(run: (context: {
   finally { await act(async () => view.unmount()); }
 }
 
+async function validLead(read: () => InterviewHook) {
+  await act(async () => {
+    read().setLeadField("firstName", "Synthetic");
+    read().setLeadField("lastName", "Router");
+    read().setLeadField("email", "history@example.invalid");
+    read().setLeadField("state", "TX");
+    read().setLeadField("dateOfBirth", "1980-01-01");
+    read().setAdultAttested(true);
+    read().setConsent("privacyAcknowledged", true);
+  });
+}
+
 test("React Router Back/Forward remains on intake and retains entered contact fields", async () => {
   await fixture(async ({ read, location, navigate }) => {
     await act(async () => {
@@ -33,6 +45,7 @@ test("React Router Back/Forward remains on intake and retains entered contact fi
       read().setLeadField("email", "history@example.invalid");
       read().setConsent("privacyAcknowledged", true);
     });
+    await validLead(read);
     const key = read().submissionKey;
     await act(async () => read().begin());
     assert.equal(read().step, "permission");
@@ -55,6 +68,7 @@ test("React Router Back/Forward remains on intake and retains entered contact fi
 
 test("React Router steps preserve private answers across review Back/Forward", async () => {
   await fixture(async ({ read, navigate, location }) => {
+    await validLead(read);
     await act(async () => read().begin());
     await act(async () => read().setConsent("intakePermission", true));
     await act(async () => read().givePermission());
@@ -69,5 +83,35 @@ test("React Router steps preserve private answers across review Back/Forward", a
     await act(async () => navigate(1));
     assert.equal(read().step, "review");
     assert.deepEqual(read().answers, answers);
+  });
+});
+
+test('React Router Forward replaces a rejected permission entry with contact details and preserves private state',async()=>{
+  await fixture(async({read,navigate,location})=>{
+    await validLead(read);
+    await act(async()=>read().begin());
+    await act(async()=>read().setConsent('intakePermission',true));
+    await act(async()=>read().givePermission());
+    await act(async()=>read().setAnswer('ID-02',{value:'Synthetic retained answer'}));
+    await act(async()=>read().finishInterview());
+    const answers=structuredClone(read().answers), key=read().submissionKey, consent=structuredClone(read().consent);
+    await act(async()=>navigate(-3));
+    assert.equal(read().step,'lead');
+    await act(async()=>read().setLeadField('email',''));
+    await act(async()=>navigate(1));
+    assert.equal(read().step,'lead');
+    assert.equal(read().showLeadValidation,true);
+    assert.equal(location().state.lppIntake.step,'lead');
+    assert.equal(location().pathname,'/start');
+    assert.equal(location().search,'?from=tool');
+    assert.equal(location().hash,'#intake');
+    assert.deepEqual(Object.keys(location().state.lppIntake).sort(),['session','step']);
+    assert.deepEqual(read().answers,answers);
+    assert.deepEqual(read().consent,consent);
+    assert.equal(read().submissionKey,key);
+    await act(async()=>read().setLeadField('email','history@example.invalid'));
+    assert.equal(read().step,'lead');
+    await act(async()=>read().begin());
+    assert.equal(read().step,'interview');
   });
 });

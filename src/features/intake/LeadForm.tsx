@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, LockKeyhole } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ interface LeadFormProps {
   onAdultAttested: (value: boolean) => void;
   onConsent: (key: keyof ConsentSelection, value: boolean) => void;
   onContinue: () => void;
+  showValidation?: boolean;
 }
 
 const ASSISTANCE_OPTIONS = [
@@ -42,10 +43,18 @@ export function LeadForm({
   onAdultAttested,
   onConsent,
   onContinue,
+  showValidation = false,
 }: LeadFormProps) {
-  const [errors, setErrors] = useState<LeadErrors>({});
-  const [consentError, setConsentError] = useState<string | null>(null);
+  const [submittedErrors, setErrors] = useState<LeadErrors>({});
+  const [submittedConsentError, setConsentError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const errors = showValidation ? validateLead(lead) : submittedErrors;
+  const consentError = showValidation
+    ? consent.privacyAcknowledged ? null : "Acknowledge the privacy practices before continuing."
+    : submittedConsentError;
+  useEffect(() => {
+    if (showValidation) formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [showValidation]);
 
   const latestAdultBirthDate = (() => {
     const date = new Date();
