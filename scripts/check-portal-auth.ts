@@ -113,8 +113,14 @@ requireMarker(
 requireMarker(
   "src/lib/queuePaging.ts",
   queuePaging,
-  'count: "exact", head: true',
-  "the queue needs an independent exact count without transferring rows",
+  '.select("reference, submitted_at", { count: "exact" })',
+  "the queue needs an independent exact count and metadata-only head identity",
+);
+requireMarker(
+  "src/lib/queuePaging.ts",
+  queuePaging,
+  ".limit(1)",
+  "the independent metadata request must be bounded to one row",
 );
 requireMarker(
   "src/lib/api.ts",
