@@ -31,7 +31,7 @@ function summaryToItem(row: CaseSummaryRow): CaseListItem {
 }
 
 /** Read summaries through the caller’s authenticated, RLS-protected client. */
-export async function readCaseQueue(client: SupabaseClient, cursor?: string): Promise<CasePage> {
+async function readLegacyCaseQueue(client: SupabaseClient, cursor?: string): Promise<CasePage> {
   // The queue is a metadata projection. Never select `payload` here: that
   // would transfer every health answer for a whole page before the reviewer
   // opens any of them and would bypass the per-case `opened` audit.
@@ -84,4 +84,54 @@ export async function readCaseQueue(client: SupabaseClient, cursor?: string): Pr
     headCursor: head ? `${head.submitted_at}|${head.reference}` : null,
     nextCursor: hasMore && last ? `${last.submitted_at}|${last.reference}` : null,
   };
+}
+
+function object(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function validIdentity(value: unknown): value is Record<string, unknown> & { submitted_at: string; reference: string } {
+  return object(value) && typeof value.reference === "string" && value.reference.trim().length > 0
+    && typeof value.submitted_at === "string" && Number.isFinite(Date.parse(value.submitted_at));
+}
+function decodeQueue(value: unknown): CasePage {
+  const fail = () => { throw new Error("Cases could not be loaded."); };
+  if (!object(value) || !Array.isArray(value.entries) || value.entries.length > QUEUE_PAGE_SIZE
+    || !Number.isSafeInteger(value.total) || Number(value.total) < value.entries.length) return fail();
+  const total = Number(value.total);
+  if (total === 0 ? value.head !== null : !validIdentity(value.head)) return fail();
+  const items = value.entries.map((entry: unknown) => {
+    if (!validIdentity(entry) || !object(entry)
+      || !["saved", "submitted", "reviewed", "needs_clarification"].includes(String(entry.status))
+      || !["not_sent", "queued", "accepted", "delivered", "failed"].includes(String(entry.notification_state))
+      || typeof entry.crisis_disclosure !== "boolean"
+      || !Number.isSafeInteger(entry.unanswered) || Number(entry.unanswered) < 0
+      || ![entry.first_name, entry.last_name, entry.residence_state].every(x => x === null || typeof x === "string")) return fail();
+    return summaryToItem(entry as unknown as CaseSummaryRow);
+  });
+  let nextCursor: string | null = null;
+  if (value.next_cursor !== null) {
+    const last = items.at(-1);
+    if (!validIdentity(value.next_cursor) || items.length !== QUEUE_PAGE_SIZE || !last
+      || value.next_cursor.reference !== last.reference || value.next_cursor.submitted_at !== last.submittedAt) return fail();
+    nextCursor = `${value.next_cursor.submitted_at}|${value.next_cursor.reference}`;
+  }
+  return { items, total, nextCursor, headCursor: validIdentity(value.head) ? `${value.head.submitted_at}|${value.head.reference}` : null };
+}
+
+/** The optimized RPC selects a bounded page before projecting any answer counts.
+ * Only an explicitly missing RPC permits the old metadata-only view during rollout. */
+export async function readCaseQueue(client: SupabaseClient, cursor?: string): Promise<CasePage> {
+  let at: string | null = null, reference: string | null = null;
+  if (cursor) {
+    const parts = cursor.split("|");
+    if (parts.length !== 2 || !parts[0] || !Number.isFinite(Date.parse(parts[0])) || !parts[1]?.trim())
+      throw new Error("The case cursor is not valid.");
+    [at, reference] = parts as [string, string];
+  }
+  const { data, error } = await client.rpc("get_case_queue_page", { p_before_at: at, p_before_reference: reference });
+  if (error) {
+    if (error.code === "PGRST202" && /public\.get_case_queue_page\b/.test(error.message)) return readLegacyCaseQueue(client, cursor);
+    throw new Error("Cases could not be loaded.");
+  }
+  return decodeQueue(data);
 }
