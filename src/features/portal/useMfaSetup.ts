@@ -237,8 +237,8 @@ export function useMfaSetup(mfa: MfaSetupApi | null, onVerified: () => void) {
         return;
       }
       if (target) {
-        // Supabase additionally requires AAL2 to remove a verified factor,
-        // guarding a server-side verification race after this fresh read.
+        // The production adapter pins an AAL1 token for removal. Supabase
+        // rejects that token if the factor becomes verified after our read.
         const removed = await mfa.unenroll({ factorId: id });
         if (!active.current) return;
         if (removed.error) throw new Error(START_ERROR);

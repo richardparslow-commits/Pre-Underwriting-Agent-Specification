@@ -1,10 +1,13 @@
-import { useEffect, useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useMfaSetup } from "./useMfaSetup";
 import { KeyRound, Loader2, LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/form";
 import { Alert, Badge } from "@/components/ui/surface";
 import { supabase } from "@/integrations/supabase/client";
+
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/config/site";
+import { unenrollPendingFactor } from "./pendingFactorRecovery";
 
 interface MfaGateProps {
   email: string | null;
@@ -25,7 +28,21 @@ export function MfaGate(props: MfaGateProps) {
 }
 
 function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
-  const [confirmRestart, setConfirmRestart] = useState(false);
+  const [confirmRestart, setConfirmRestart] = useState<string | null>(null);
+  const mfa = useMemo(() => {
+    const client = supabase;
+    if (!client) return null;
+    return {
+      ...client.auth.mfa,
+      unenroll: ({ factorId }: { factorId: string }) =>
+        unenrollPendingFactor({
+          url: SUPABASE_URL,
+          key: SUPABASE_ANON_KEY,
+          factorId,
+          getSession: () => client.auth.getSession(),
+        }),
+    };
+  }, []);
   const codeInputId = useId();
   const secretInputId = useId();
   const {
@@ -41,10 +58,7 @@ function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
     setCode,
     begin,
     verify,
-  } = useMfaSetup(supabase?.auth.mfa ?? null, onVerified);
-  useEffect(() => {
-    setConfirmRestart(false);
-  }, [factorId, canRestart, phase]);
+  } = useMfaSetup(mfa, onVerified);
 
   return (
     <div className="container max-w-md py-16">
@@ -87,7 +101,7 @@ function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
                     This tab started the unfinished setup, but did not receive
                     its key. You can replace it with a new setup.
                   </p>
-                  {confirmRestart ? (
+                  {confirmRestart === factorId ? (
                     <div className="mt-2">
                       <p>
                         The unfinished key will stop working. Add the new key to
@@ -97,7 +111,7 @@ function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
                         className="mt-2"
                         disabled={busy}
                         onClick={() => {
-                          setConfirmRestart(false);
+                          setConfirmRestart(null);
                           void restart();
                         }}
                       >
@@ -106,7 +120,7 @@ function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
                       <Button
                         variant="quiet"
                         disabled={busy}
-                        onClick={() => setConfirmRestart(false)}
+                        onClick={() => setConfirmRestart(null)}
                       >
                         Cancel
                       </Button>
@@ -116,7 +130,7 @@ function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
                       className="mt-2"
                       variant="outline"
                       disabled={busy}
-                      onClick={() => setConfirmRestart(true)}
+                      onClick={() => setConfirmRestart(factorId)}
                     >
                       Restart this tab’s setup
                     </Button>
@@ -133,7 +147,10 @@ function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
                 variant="outline"
                 size="sm"
                 className="mt-3"
-                onClick={() => void begin()}
+                onClick={() => {
+                  setConfirmRestart(null);
+                  void begin();
+                }}
                 disabled={busy}
               >
                 Check setup again
@@ -178,6 +195,7 @@ function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
             className="mt-5 space-y-3"
             onSubmit={(event) => {
               event.preventDefault();
+              setConfirmRestart(null);
               void verify();
             }}
           >
@@ -232,7 +250,10 @@ function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => void begin()}
+              onClick={() => {
+                setConfirmRestart(null);
+                void begin();
+              }}
               disabled={busy}
             >
               {phase === "error" ? "Try again" : "Check setup again"}
