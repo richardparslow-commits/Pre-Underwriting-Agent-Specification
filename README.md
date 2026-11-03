@@ -599,3 +599,5 @@ frontend repair does not change MFA settings, factors or the public intake lock.
 Phone withdrawal evidence and audited history paging: [Heal withdrawal-history repair](docs/HEAL-WITHDRAWAL-HISTORY.md).
 
 Queue changes while paging: [Heal queue-change repair](docs/HEAL-QUEUE-CHANGES.md).
+
+Contact validation after browser history navigation: [Heal history validation repair](docs/HEAL-HISTORY-LEAD-VALIDATION.md).

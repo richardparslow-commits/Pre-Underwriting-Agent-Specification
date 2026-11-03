@@ -45,6 +45,7 @@ export default function IntakePage() {
         {interview.step === "lead" ? (
           <LeadForm
             lead={interview.lead}
+            showValidation={interview.showLeadValidation}
             consent={interview.consent}
             onField={interview.setLeadField}
             onAdultAttested={interview.setAdultAttested}

@@ -183,3 +183,52 @@ test("two Continue activations before rendering add only one permission history 
     assert.equal(read().step, "permission");
   });
 });
+
+for (const [field, value] of [['email',''],['email','not-an-email'],['firstName','  '],['dateOfBirth','2020-01-01'],['phone','123']] as const) {
+  test(`history cannot reopen downstream screens with invalid ${field}: ${value}`,async()=>{
+    await fixture(async({read,writes,restore})=>{
+      await review(read);
+      const downstream=writes.filter(x=>['permission','interview','review'].includes(x.entry.step)).map(x=>x.entry);
+      const answers=structuredClone(read().answers), consent=structuredClone(read().consent), key=read().submissionKey, question=read().currentQuestionId;
+      await restore(null);
+      await act(async()=>read().setLeadField(field,value));
+      for(const oldEntry of downstream) {
+        await restore(oldEntry);
+        assert.equal(read().step,'lead');
+        assert.equal(read().showLeadValidation,true);
+        assert.equal(read().draft,null);
+        assert.equal(writes.at(-1)!.replace,true,'replace the invalid navigation entry instead of creating a loop');
+      }
+      assert.deepEqual(read().answers,answers);
+      assert.deepEqual(read().consent,consent);
+      assert.equal(read().submissionKey,key);
+      assert.equal(read().currentQuestionId,question);
+      await act(async()=>read().setLeadField(field,field==='email'?'history@example.invalid':field==='firstName'?'Synthetic':field==='dateOfBirth'?'1980-01-01':''));
+      assert.equal(read().step,'lead','fixing a field must not jump forward before Continue');
+      await act(async()=>read().begin());
+      assert.equal(read().step,'interview');
+    });
+  });
+}
+test('revoked privacy acknowledgement returns old history to contact details without changing health consent evidence',async()=>{
+  await fixture(async({read,writes,restore})=>{
+    await review(read);const old=writes.at(-1)!.entry;
+    const at=read().consent.timestamps.intake_permission;
+    await restore(null);
+    await act(async()=>read().setConsent('privacyAcknowledged',false));
+    await restore(old);
+    assert.equal(read().step,'lead');
+    assert.equal(read().consent.timestamps.intake_permission,at);
+    assert.equal(read().draft,null);
+  });
+});
+test('direct Continue and review confirmation cannot create a draft from a malformed nonempty email',async()=>{
+  await fixture(async({read,restore})=>{
+    await review(read);await restore(null);
+    await act(async()=>read().setLeadField('email','bad-email'));
+    await act(async()=>read().begin());
+    assert.equal(read().step,'lead');
+    await act(async()=>read().confirmReview(true));
+    assert.equal(read().draft,null);
+  });
+});

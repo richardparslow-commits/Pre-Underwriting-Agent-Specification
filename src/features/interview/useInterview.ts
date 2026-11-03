@@ -1,5 +1,6 @@
+import { validateLead } from "@/features/intake/validation";
 import type { IntakeNavigation } from "./useIntakeHistory";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildCaseDraft,
   crisisDisclosed,
@@ -57,6 +58,7 @@ const EMPTY_CONSENT: ConsentState = {
 
 export interface InterviewHook {
   step: IntakeStep;
+  showLeadValidation: boolean;
   lead: Partial<LeadDetails>;
   consent: ConsentState;
   answers: Answers;
@@ -107,12 +109,25 @@ export function useInterview(navigation?: IntakeNavigation): InterviewHook {
   const reviewConfirmation = useRef<SubmissionAcknowledgement | null>(null);
   const [prefilledIds, setPrefilledIds] = useState<string[]>([]);
   const [receipt, setReceipt] = useState<SubmissionReceipt | null>(null);
+  const [showLeadValidation, setShowLeadValidation] = useState(false);
+  const leadReady = Object.keys(validateLead(lead)).length === 0 && consent.privacyAcknowledged;
   const requestedStep = navigation?.step ?? localStep;
+  const requiresLead = !receipt && !leadReady &&
+    (requestedStep === "permission" || requestedStep === "interview" || requestedStep === "review");
+  const navigationGo = navigation?.go;
+  const returnToLead = useCallback(() => {
+    setShowLeadValidation(true);
+    if (navigationGo) navigationGo("lead", true);
+    else setLocalStep("lead");
+  }, [navigationGo]);
+  useEffect(() => {
+    if (requiresLead) returnToLead();
+  }, [requiresLead, returnToLead]);
   // Browser history cannot reopen a completed submission or bypass a withdrawn
   // permission. History is navigation metadata, never evidence of consent.
   const requiresPermission = navigation &&
     (requestedStep === "interview" || requestedStep === "review") && !consent.intakePermission;
-  const step = receipt ? "submitted" : requiresPermission ? "permission" : requestedStep;
+  const step = receipt ? "submitted" : requiresLead ? "lead" : requiresPermission ? "permission" : requestedStep;
   const setStep = navigation?.go ?? setLocalStep;
   const [submissionKey, setSubmissionKey] = useState(() => crypto.randomUUID());
   const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(
@@ -161,11 +176,16 @@ export function useInterview(navigation?: IntakeNavigation): InterviewHook {
 
   // Returning from the review screen should not ask for permission twice.
   const begin = useCallback(
-    () => setStep(consent.intakePermission ? "interview" : "permission"),
-    [consent.intakePermission, setStep],
+    () => {
+      if (!leadReady) { returnToLead(); return; }
+      setShowLeadValidation(false);
+      setStep(consent.intakePermission ? "interview" : "permission");
+    },
+    [leadReady, returnToLead, consent.intakePermission, setStep],
   );
 
   const givePermission = useCallback(() => {
+    if (!leadReady) { returnToLead(); return; }
     if (!consent.intakePermission) return;
 
     // Reuse a fact the customer already gave, visibly and only where the scope
@@ -197,6 +217,8 @@ export function useInterview(navigation?: IntakeNavigation): InterviewHook {
     setCurrentQuestionId((current) => current ?? visible[0]?.id ?? null);
   }, [
     answers,
+    leadReady,
+    returnToLead,
     consent.intakePermission,
     lead.state,
     lead.dateOfBirth,
@@ -282,17 +304,7 @@ export function useInterview(navigation?: IntakeNavigation): InterviewHook {
   }, []);
 
   const draft = useMemo<CaseDraft | null>(() => {
-    if (
-      !lead.firstName ||
-      !lead.lastName ||
-      !lead.state ||
-      !lead.dateOfBirth ||
-      !lead.email ||
-      !lead.preferredContact ||
-      lead.adultAttested !== true
-    ) {
-      return null;
-    }
+    if (!leadReady || !consent.intakePermission) return null;
     if (acknowledgements.length === 0) return null;
 
     const consents: ConsentRecord[] = buildConsentRecords(
@@ -309,7 +321,7 @@ export function useInterview(navigation?: IntakeNavigation): InterviewHook {
       startedAt,
       adultAttested: true,
     });
-  }, [acknowledgements, answers, consent, lead, startedAt]);
+  }, [acknowledgements, answers, consent, lead, leadReady, startedAt]);
 
   const markSubmitted = useCallback((next: SubmissionReceipt) => {
     setReceipt(next);
@@ -326,6 +338,7 @@ export function useInterview(navigation?: IntakeNavigation): InterviewHook {
       dateOfBirth: "",
       adultAttested: false,
     });
+    setShowLeadValidation(false);
     setConsentState(EMPTY_CONSENT);
     setAnswers({});
     invalidateReview();
@@ -348,6 +361,7 @@ export function useInterview(navigation?: IntakeNavigation): InterviewHook {
 
   return {
     step,
+    showLeadValidation: showLeadValidation || requiresLead,
     lead,
     consent,
     answers,

@@ -7,7 +7,7 @@ export interface IntakeHistoryEntry {
 }
 export interface IntakeNavigation {
   step: IntakeStep;
-  go: (step: IntakeStep) => void;
+  go: (step: IntakeStep, replace?: boolean) => void;
   reset: () => void;
   historyEntry: IntakeHistoryEntry;
 }
@@ -34,12 +34,12 @@ export function useIntakeHistory(
     if (onForm || valid) rememberedStep.current = step;
   }, [onForm, valid, step]);
   const go = useCallback(
-    (next: IntakeStep) => {
+    (next: IntakeStep, replace = false) => {
       if (next === step || (pending.current?.session === session && pending.current.step === next))
         return;
       pending.current = { session, step: next };
       // The receipt replaces review rather than adding another submit screen.
-      write({ session, step: next }, next === "submitted");
+      write({ session, step: next }, replace || next === "submitted");
     },
     [session, step, write],
   );
