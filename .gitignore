@@ -33,3 +33,6 @@ supabase/.temp
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Generated synthetic Tiger evaluation batch
+tiger/generated.sql
