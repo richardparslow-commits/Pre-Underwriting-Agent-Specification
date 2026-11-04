@@ -30,7 +30,9 @@
     "check:reviewer-visibility": "node --test scripts/check-reviewer-visibility.mjs scripts/check-queue-page.mjs",
     "check:db": "node scripts/check-db.mjs && node --test scripts/check-suppression-worker.mjs && node --test scripts/check-provider-evidence.mjs && node --test scripts/check-correction-replay.mjs",
     "report:reconciliation": "tsx scripts/report-reconciliation.ts",
-    "test:regressions": "node --test scripts/run-ui-regressions.test.mjs && node scripts/run-ui-regressions.mjs"
+    "test:regressions": "node --test scripts/run-ui-regressions.test.mjs && node scripts/run-ui-regressions.mjs",
+    "test:tiger": "tsx tiger/verify.ts",
+    "test:tiger:live": "tsx tiger/verify.ts --live"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.1.1",
