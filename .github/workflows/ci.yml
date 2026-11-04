@@ -13,7 +13,10 @@ concurrency:
 
 jobs:
   verify:
+    needs: regression
+    if: always()
     name: Bank check, typecheck and build
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
@@ -34,45 +37,6 @@ jobs:
 
       - name: Dependency audit
         run: npm audit --audit-level=high
-
-      - name: Set up Deno
-        # v2.0.5 — pinned to a commit, not a movable tag.
-        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
-        with:
-          deno-version: v2.9.6
-
-      # The public intake is the security boundary: a draft that omits either
-      # required consent must be rejected before a case is written, even when
-      # the browser form is bypassed. This drives the real submit-case handler.
-      - name: Server regression tests
-        run: deno test --allow-env --lock=deno.lock supabase/functions/tests/
-
-      # Consent evidence is generated from build-time channel flags. A
-      # placeholder seller or a disabled channel must never produce a
-      # marketing record the customer could not have seen.
-      - name: Marketing consent regression test
-        run: npm run test:consent
-
-      - name: Interview engine regression test
-        run: npm run test:engine
-
-      - name: Reviewer visibility database and UI regressions
-        run: |
-          npm run check:reviewer-visibility
-          npm run test:reviewer-visibility
-
-      # The lead form repeats the server's contact rules. A phone preference
-      # without a usable number must fail before the interview starts.
-      - name: Lead validation regression test
-        run: npm run test:validation
-
-      - name: Submission UI regression test
-        run: npm run test:submission-ui
-
-      # Isolated PostgreSQL replay: reviewer writes must stay RPC-only and a
-      # delivery event that arrives before its case must remain retryable.
-      - name: Database regression test
-        run: npm run check:db
 
       # Fails if a bank row loses its reconciliation record, a source question
       # stops being acknowledged, or the crisis question is gated again.
@@ -149,3 +113,39 @@ jobs:
       # the registers, never by deleting the step.
       - name: SC-01 closure gate is closed and consistent
         run: npm run check:sc01
+
+      - name: Independent regression suites must all pass
+        env:
+          REGRESSION_RESULT: ${{ needs.regression.result }}
+        run: test "$REGRESSION_RESULT" = success
+
+  regression:
+    name: Regression (${{ matrix.suite }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [ui, server, database]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - if: matrix.suite == 'server'
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
+        with:
+          deno-version: v2.9.6
+      - name: Every UI regression, including future test files
+        if: matrix.suite == 'ui'
+        run: npm run test:regressions
+      - name: Real server handlers with isolated transports
+        if: matrix.suite == 'server'
+        run: deno test --allow-env --lock=deno.lock supabase/functions/tests/
+      - name: Isolated database permissions, paging and worker regressions
+        if: matrix.suite == 'database'
+        run: |
+          npm run check:db
+          npm run check:reviewer-visibility
