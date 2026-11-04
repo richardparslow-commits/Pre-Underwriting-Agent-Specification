@@ -1,3 +1,4 @@
+import { correctionInput, writeCorrection } from "./correctionSubmission";
 import { initialWithdrawals, readWithdrawals, type WithdrawalPage } from "./withdrawalHistory";
 import { readCaseQueue } from "./queuePaging";
 import { initialCorrections, readCorrections, type CorrectionPage } from "./correctionHistory";
@@ -509,14 +510,21 @@ export async function getCase(reference: string): Promise<CaseRecord | null> {
   };
 }
 
-export async function recordCorrection(reference: string, detail: string): Promise<void> {
-  const trimmed = detail.trim();
-  if (!trimmed) throw new Error("Enter the correction before saving it.");
+const previewCorrectionRequests = new Map<string, string>();
+export async function recordCorrection(reference: string, detail: string, requestId: string): Promise<void> {
+  const trimmed = correctionInput(detail, requestId);
 
   if (PREVIEW_MODE) {
     ensurePreviewSeed();
     const record = previewCases.get(reference);
     if (!record) throw new Error("This case could not be found.");
+    const requestKey = `${reference}:${requestId}`;
+    const prior = previewCorrectionRequests.get(requestKey);
+    if (prior !== undefined) {
+      if (prior !== trimmed) throw new Error("Correction request already used for different content");
+      return;
+    }
+    previewCorrectionRequests.set(requestKey, trimmed);
     record.corrections = [
       {
         id: record.corrections.length + 1,
@@ -531,12 +539,7 @@ export async function recordCorrection(reference: string, detail: string): Promi
 
   if (!supabase) throw new Error("Sign-in is not configured.");
 
-  const { error } = await supabase.rpc("record_case_correction", {
-    p_reference: reference,
-    p_detail: trimmed,
-  });
-
-  if (error) throw new Error("The correction could not be recorded.");
+  await writeCorrection(supabase, reference, trimmed, requestId);
 }
 
 export async function recordReview(

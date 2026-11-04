@@ -195,7 +195,7 @@ Rows stay `pending` or `failed` until the worker records success. Do not enable 
 
 The detailed, window-by-window procedure for migrations `0006`–`0010`, including the audited case read and marketing withdrawal exercises, is in the [staging deployment runbook](STAGING-RUNBOOK.md). The list below is the summary version.
 
-- [ ] Apply migrations 0001–0021 in order and record the applied versions. **Staging:** 0001–0005 were verified on 28 Oct 2026; verify the current status and evidence for 0006–0021 before proceeding. **Production:** not verified. Deploy the matching portal code and migrations together; verify AAL1/AAL2, non-reviewer and direct REST denial, and logging failure with labelled data.
+- [ ] Apply migrations 0001–0022 in order and record the applied versions. **Staging:** 0001–0005 were verified on 28 Oct 2026; verify the current status and evidence for 0006–0022 before proceeding. **Production:** not verified. Deploy the matching portal code and migrations together; verify AAL1/AAL2, non-reviewer and direct REST denial, and logging failure with labelled data.
 - [ ] Keep `QUESTIONNAIRE_APPROVED=false` until 0/92 rows become 92/92 signed off.
 - [ ] Set `RATE_LIMIT_SALT` to a random value and confirm the durable limiter is active; without it production returns 503 (fail closed). Only `ENVIRONMENT=test` uses the in-memory guard.
 - [ ] Store `project_url` and `cron_secret` in Vault, apply `supabase/ops/retry-schedule.sql`, and verify one scheduler tick.
@@ -210,3 +210,14 @@ The detailed, window-by-window procedure for migrations `0006`–`0010`, includi
 Migration `0020` adds independent phone withdrawal status and audited withdrawal-history paging. Preview sync does not apply it. For authorized rollout, run `supabase/ops/withdrawal-history-checks.sql` and isolated regressions described in [withdrawal history](HEAL-WITHDRAWAL-HISTORY.md). Keep intake and marketing locked.
 
 Migration `0021` adds the bounded `get_case_queue_page` read. Run `supabase/ops/queue-page-checks.sql` during authorized rollout. It limits payload projection before answer counts; exact totals still count all queue metadata. Preview sync does not apply migrations.
+
+
+### Correction replay deployment (0022)
+
+Apply `0022_correction_request_idempotency.sql` before deploying the matching correction editor. It replaces the two-argument correction RPC with a request-ID-bearing three-argument RPC. Old clients fail closed instead of making unsafe unconditional inserts; deploy the frontend and migration together. The current repair prepares code only and does not claim this migration is hosted.
+
+Replay identity is scoped to a case, the authenticated reviewer UUID and a client-generated operation UUID. An unchanged retry returns the original exact correction ID; changed text with the same ID is rejected. Distinct intentional saves remain separate entries. Existing corrections and original case snapshots are untouched. Replays still check the allowlist and AAL2. No request metadata is added to case-history responses.
+
+The editor retains an operation ID in memory through uncertain responses and cancel/reopen while that case remains mounted. It blocks edits/cancellation during a save, prevents overlapping clicks, and distinguishes a confirmed save from a history-refresh failure. It does not persist correction text/IDs in browser storage. After a reload or leaving the case, inspect the audited history before recording an uncertain correction again; cross-session retry continuity is not claimed.
+
+Run `node --test scripts/check-correction-replay.mjs` for isolated legacy/fixed replay, payload conflict, permissions, identity scoping and migration-replay checks. Run `supabase/ops/correction-replay-checks.sql` read-only after a separately authorized hosted migration. Keep QUESTIONNAIRE_APPROVED=false and do not publish the site as part of migration verification.

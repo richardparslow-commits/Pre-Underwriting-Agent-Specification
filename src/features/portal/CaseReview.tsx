@@ -6,7 +6,6 @@ import {
   ChevronDown,
   Loader2,
   MessageSquarePlus,
-  PencilLine,
   Sparkles,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -21,11 +20,12 @@ import type {
   ReviewLogEntry,
   SubmittedAnswer,
 } from "@/features/interview/types";
-import { recordCorrection, recordReview } from "@/lib/api";
+import { recordReview } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { ReviewHistory } from "./ReviewHistory";
 import { CorrectionHistory } from "./CorrectionHistory";
+import { CorrectionEditor } from "./CorrectionEditor";
 import { WithdrawalHistory } from "./WithdrawalHistory";
 import { phoneWithdrawal } from "@/lib/withdrawalHistory";
 import { StatusTimeline } from "@/features/intake/StatusTimeline";
@@ -142,10 +142,7 @@ export function CaseReview({
   const [error, setError] = useState<string | null>(null);
   const [clarifyOpen, setClarifyOpen] = useState(false);
   const [note, setNote] = useState("");
-  const [correctionOpen, setCorrectionOpen] = useState(false);
-  const [correctionText, setCorrectionText] = useState("");
-  const [correctionBusy, setCorrectionBusy] = useState(false);
-  const [correctionError, setCorrectionError] = useState<string | null>(null);
+
 
   const counts = {
     all: record.answers.length,
@@ -192,22 +189,6 @@ export function CaseReview({
     }
   }
 
-  async function saveCorrection() {
-    setCorrectionBusy(true);
-    setCorrectionError(null);
-    try {
-      await recordCorrection(record.reference, correctionText);
-      setCorrectionText("");
-      setCorrectionOpen(false);
-      await onRefresh();
-    } catch (saveError) {
-      setCorrectionError(
-        saveError instanceof Error ? saveError.message : "The correction was not recorded.",
-      );
-    } finally {
-      setCorrectionBusy(false);
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -529,59 +510,7 @@ export function CaseReview({
               cursor={record.correctionsCursor}
             />
 
-            {correctionOpen ? (
-              <div className="mt-4 space-y-2 border-t border-border pt-4">
-                <label htmlFor="correction-detail" className="field-label">
-                  What did the customer correct?
-                </label>
-                <Textarea
-                  id="correction-detail"
-                  value={correctionText}
-                  maxLength={4000}
-                  onChange={(event) => setCorrectionText(event.target.value)}
-                  placeholder="For example: the customer confirmed the surgery was in February, not March."
-                />
-                {correctionError ? (
-                  <p className="text-xs font-medium text-danger" role="alert">
-                    {correctionError}
-                  </p>
-                ) : null}
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    onClick={() => void saveCorrection()}
-                    disabled={correctionBusy || correctionText.trim().length === 0}
-                  >
-                    {correctionBusy ? <Loader2 className="animate-spin" aria-hidden /> : null}
-                    Save correction
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => {
-                      setCorrectionOpen(false);
-                      setCorrectionError(null);
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-                <p className="text-[0.7rem] leading-relaxed text-muted-foreground">
-                  This adds an entry beside the case. It does not change the submitted answers or
-                  send the customer an email.
-                </p>
-              </div>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                className="mt-3"
-                onClick={() => setCorrectionOpen(true)}
-              >
-                <PencilLine aria-hidden />
-                Record a correction
-              </Button>
-            )}
+            <CorrectionEditor key={record.reference} reference={record.reference} onRefresh={onRefresh} />
           </section>
 
           <ReviewHistory
