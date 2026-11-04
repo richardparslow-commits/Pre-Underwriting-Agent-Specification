@@ -1,0 +1,17 @@
+name: Isolated hosted quota verification
+on:
+  push:
+    branches: [codex/hosted-quota-check-20261104]
+    paths:
+      - .github/workflows/isolated-hosted-quota.yml
+      - scripts/isolated-hosted-quota-20261104.py
+permissions:
+  contents: read
+jobs:
+  isolated-egress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Exercise synthetic-only hosted quota from an independent network
+        run: python3 scripts/isolated-hosted-quota-20261104.py --family 4 --label github-independent-egress --output /tmp/lpp-hosted-quota-result.json
