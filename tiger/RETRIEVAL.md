@@ -40,3 +40,22 @@ Review expiry uses today even for historical as-of searches; retired sources sta
 
 Sources: Tiger's pg_textsearch documentation, retrieved through Tiger MCP search_docs:
 https://www.tigerdata.com/docs/deploy/tiger-cloud/tiger-cloud-aws/tiger-cloud-extensions/pg-textsearch
+
+## Authorized private reference imports
+
+`reference-import.sql` adds private-import approvals and page-preserving reference
+storage for user-authorized guides whose operational metadata is still unresolved.
+This preserves unknown carrier effective dates. Apply it after `retrieval.sql`.
+Run `reference-import.test.sql` for rollback-only checks.
+
+`search_private_reference(query, exact_source_id, 'TX', limit)` searches only the
+explicitly authorized source, returns PDF/printed-page citations and always labels
+its validation status. It refuses states other than TX. This separate reference
+corpus does not enter `search()` or imply current carrier/product eligibility.
+Original PDF and extraction SHA256 values and user authorization are retained.
+No external embedding calls are made. No public permissions are granted.
+
+The source corpus still requires exact issuing-company/product/state checks,
+carrier effective dates, currentness confirmation and visual table validation
+before operational activation. User permission to store a document does not
+establish those facts. No carrier rules are automatically converted into decisions.
