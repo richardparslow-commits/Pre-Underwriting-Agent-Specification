@@ -253,7 +253,7 @@ await pass(
   },
   (found) => found === true,
 );
-await pass("reviewer can add a correction through its RPC", () => query("select public.record_case_correction('LPP-2026-TEST01','Test correction')"), () => true);
+await pass("reviewer can add a correction through its RPC", () => query("select public.record_case_correction('LPP-2026-TEST01','Test correction','11111111-1111-4111-8111-111111111111'::uuid)"), () => true);
 await pass("audited case read includes the correction", () => query("select public.open_case_for_review('LPP-2026-TEST01') result"), (rows) => rows[0].result?.corrections?.[0]?.detail === "Test correction");
 
 await expectError(

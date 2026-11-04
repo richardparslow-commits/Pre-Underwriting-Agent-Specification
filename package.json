@@ -28,7 +28,7 @@
     "test:validation": "tsx --test src/features/intake/validation.test.ts",
     "test:reviewer-visibility": "tsx --test src/features/portal/reviewerVisibility.test.tsx src/features/portal/correctionHistory.test.tsx src/features/portal/safetyPaging.test.tsx src/features/portal/useCaseQueue.test.tsx src/lib/reviewerSignInFeedback.test.ts src/lib/queuePaging.test.ts src/lib/queueRpc.test.ts src/features/portal/mfaSetup.test.tsx src/features/portal/pendingFactorRecovery.test.ts src/features/portal/withdrawalHistory.test.tsx src/features/portal/phoneWithdrawalBadge.test.tsx",
     "check:reviewer-visibility": "node --test scripts/check-reviewer-visibility.mjs scripts/check-queue-page.mjs",
-    "check:db": "node scripts/check-db.mjs && node --test scripts/check-suppression-worker.mjs && node --test scripts/check-provider-evidence.mjs",
+    "check:db": "node scripts/check-db.mjs && node --test scripts/check-suppression-worker.mjs && node --test scripts/check-provider-evidence.mjs && node --test scripts/check-correction-replay.mjs",
     "report:reconciliation": "tsx scripts/report-reconciliation.ts",
     "test:regressions": "node --test scripts/run-ui-regressions.test.mjs && node scripts/run-ui-regressions.mjs"
   },
