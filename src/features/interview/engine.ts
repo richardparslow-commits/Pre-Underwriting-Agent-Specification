@@ -141,7 +141,7 @@ export function answerTextFor(question: Question, answer: AnswerRecord | undefin
   if (answer.values && answer.values.length > 0) {
     return answer.values.map((value) => optionLabel(question, value)).join(", ");
   }
-  if (answer.value) return optionLabel(question, answer.value);
+  if (answer.value) return optionLabel(question, answer.value).trim();
   if (question.compound) return "Details provided";
   return "No answer recorded";
 }

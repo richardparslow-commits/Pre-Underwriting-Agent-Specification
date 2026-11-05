@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  answerTextFor,
   buildDraftSummary,
   crisisDisclosed,
   dispositionFor,
@@ -13,6 +14,16 @@ import { QUESTION_BANK, QUESTION_BY_ID } from "./questionBank";
 import type { Answers, SubmittedAnswer } from "./types";
 
 const AT = "2026-10-27T12:00:00.000Z";
+
+test("review and submission trim surrounding whitespace while preserving text inside an answer", () => {
+  const question = QUESTION_BY_ID["MED-09"]!;
+  const answer = { value: "\n  Metformin  500 mg daily\t ", updatedAt: AT };
+  const row = toSubmittedAnswers({ [question.id]: answer }).find(
+    entry => entry.questionId === question.id,
+  );
+  assert.equal(answerTextFor(question, answer), "Metformin  500 mg daily");
+  assert.equal(row?.answerText, "Metformin  500 mg daily");
+});
 
 test("submission strips restored Yes-only details on No while preserving Yes details", () => {
   const question = QUESTION_BANK.find(q => q.reviewStatus === "approved" &&
