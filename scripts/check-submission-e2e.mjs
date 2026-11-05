@@ -196,6 +196,9 @@ test("browser retries recover the original receipt and protect the saved case fr
       if (fault === "broken-receipt") {
         return route.fulfill({ response: reply, body: '{"reference":' });
       }
+      if (fault === "incomplete-receipt") {
+        return route.fulfill({ response: reply, json: { reference: responses.at(-1).receipt.reference } });
+      }
       if (fault === "gateway-error") {
         return route.fulfill({ response: reply, status: 502, contentType: "text/html", body: "Bad gateway" });
       }
@@ -208,7 +211,8 @@ test("browser retries recover the original receipt and protect the saved case fr
     "We could not confirm whether this case was saved. Retry without changing your answers.",
     { exact: true },
   );
-  const { page, responses, submit } = await openReview(["disconnect", "broken-receipt"]);
+  const unreadableReceipts = ["broken-receipt", "incomplete-receipt"];
+  const { page, responses, submit } = await openReview(["disconnect", ...unreadableReceipts]);
   await submit.click();
   await retryGuidance(page).waitFor();
   assert.equal(responses.length, 1);
@@ -224,16 +228,19 @@ test("browser retries recover the original receipt and protect the saved case fr
   assert.equal(stored.rows[0].notification_state, "not_sent");
   assert.equal(stored.rows[0].payload.answers.find(row => row.questionId === "RES-01").disposition, "unresolved");
 
-  await Promise.all([
-    page.waitForResponse(response => response.url() === apiOrigin + endpoint && response.request().method() === "POST"),
-    submit.click(),
-  ]);
-  await page.getByText("Submission needs attention", { exact: true }).waitFor();
-  assert.equal(await retryGuidance(page).isVisible(), true, "a broken receipt must preserve uncertainty");
+  for (const fault of unreadableReceipts) {
+    await Promise.all([
+      page.waitForResponse(response => response.url() === apiOrigin + endpoint && response.request().method() === "POST"),
+      submit.click(),
+    ]);
+    await retryGuidance(page).waitFor().catch(error => {
+      throw new Error(`Expected safe retry guidance after ${fault}`, { cause: error });
+    });
+  }
   await submit.click();
   await page.getByRole("heading", { name: "Your answers are saved" }).waitFor();
   await page.getByText(first.receipt.reference, { exact: true }).waitFor();
-  assert.equal(responses.length, 3);
+  assert.equal(responses.length, 4);
   for (const replay of responses.slice(1)) {
     assert.equal(replay.status, 200);
     assert.equal(replay.key, first.key);
