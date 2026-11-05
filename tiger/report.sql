@@ -7,9 +7,12 @@ WITH recent_headers AS (
 ), stored AS (
   SELECT audit.run_id, count(*) AS total,
          count(DISTINCT audit.test_case_id) AS distinct_cases,
-         count(*) FILTER (WHERE NOT audit.passed) AS failed
+         count(*) FILTER (WHERE NOT audit.passed) AS failed,
+         bool_or(audit.specification_id IS DISTINCT FROM header.specification_id
+                 OR audit.specification_id IS DISTINCT FROM fixture.specification_id) AS wrong_specification
   FROM underwriting_eval.pre_underwriting_audit_log audit
   JOIN recent_headers header USING (run_id)
+  LEFT JOIN underwriting_eval.test_cases fixture ON fixture.id = audit.test_case_id
   GROUP BY audit.run_id
 ), recent_runs AS (
   SELECT header.run_id, header.created_at, header.source_commit, header.dirty_tree,
@@ -17,7 +20,7 @@ WITH recent_headers AS (
          coalesce(stored.total - stored.failed, 0) AS passed,
          coalesce(stored.failed, 0) AS failed, header.total AS expected_total,
          CASE
-           WHEN stored.total <> stored.distinct_cases OR stored.total > header.total
+           WHEN stored.wrong_specification OR stored.total <> stored.distinct_cases OR stored.total > header.total
                 OR stored.failed > header.failed THEN 'mismatch'
            WHEN coalesce(stored.total, 0) < header.total THEN 'incomplete'
            WHEN stored.failed <> header.failed THEN 'mismatch'

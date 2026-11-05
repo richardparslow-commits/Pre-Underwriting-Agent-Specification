@@ -63,7 +63,7 @@ test('Tiger report distinguishes an incomplete run from a complete or inconsiste
     await database.exec(schema.split("SELECT create_hypertable(")[0]);
     await database.exec(`
       INSERT INTO underwriting_eval.specifications (id, source_commit, content_hash, definition)
-      VALUES ('spec', 'commit', 'hash', '{}');
+      VALUES ('spec', 'commit', 'hash', '{}'), ('other-spec', 'other-commit', 'other-hash', '{}');
       INSERT INTO underwriting_eval.test_cases VALUES
         ('case-a', 'spec', '{}', '{}'), ('case-b', 'spec', '{}', '{}');
     `);
@@ -88,6 +88,21 @@ test('Tiger report distinguishes an incomplete run from a complete or inconsiste
     assert.deepEqual(await summary(), { total: 1, passed: 1, failed: 0, expected_total: 2, integrity: 'incomplete' });
     await insert('case-b', '2025-03-01T00:00:01Z', false);
     assert.deepEqual(await summary(), { total: 2, passed: 1, failed: 1, expected_total: 2, integrity: 'complete' });
+    await database.exec(`
+      UPDATE underwriting_eval.pre_underwriting_audit_log
+      SET specification_id = 'other-spec' WHERE test_case_id = 'case-b'
+    `);
+    assert.deepEqual(await summary(), { total: 2, passed: 1, failed: 1, expected_total: 2, integrity: 'mismatch' });
+    await database.exec(`
+      UPDATE underwriting_eval.pre_underwriting_audit_log
+      SET specification_id = 'spec' WHERE test_case_id = 'case-b';
+      UPDATE underwriting_eval.test_cases
+      SET specification_id = 'other-spec' WHERE id = 'case-b';
+    `);
+    assert.deepEqual(await summary(), { total: 2, passed: 1, failed: 1, expected_total: 2, integrity: 'mismatch' });
+    await database.exec(`
+      UPDATE underwriting_eval.test_cases SET specification_id = 'spec' WHERE id = 'case-b'
+    `);
     await insert('case-a', '2025-03-01T00:00:02Z', true);
     assert.deepEqual(await summary(), { total: 3, passed: 2, failed: 1, expected_total: 2, integrity: 'mismatch' });
   } finally {

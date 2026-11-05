@@ -8,23 +8,25 @@ const initialTables = schema.split('SELECT create_hypertable(')[0];
 const upgrade = schema.split('-- Retrieval capabilities')[0]
   .replace(/^SELECT create_hypertable\(.*\);$/m, '');
 
-test('schema replay preserves legacy audits and prevents new orphan or duplicate results', async () => {
+test('schema replay preserves legacy audits and prevents orphan, cross-specification, and duplicate results', async () => {
   const database = new PGlite();
   const legacyRun = '11111111-1111-4111-8111-111111111111';
   const currentRun = '22222222-2222-4222-8222-222222222222';
-  const insertAudit = (runId, timestamp) => database.query(`
+  const insertAudit = (runId, timestamp, caseId = 'test-case', spec = 'spec') => database.query(`
     INSERT INTO underwriting_eval.pre_underwriting_audit_log
       (run_id, test_case_id, evaluated_at, passed, specification_id,
        input_profile, matched_rules, outcome, expected)
-    VALUES ($1, 'test-case', $2, false, 'spec', '{}', '[]', '{}', '{}')
-  `, [runId, timestamp]);
+    VALUES ($1, $3, $2, false, $4, '{}', '[]', '{}', '{}')
+  `, [runId, timestamp, caseId, spec]);
 
   try {
     await database.exec(initialTables);
     await database.exec(`
       INSERT INTO underwriting_eval.specifications (id, source_commit, content_hash, definition)
-      VALUES ('spec', 'spec-commit', 'spec-hash', '{}');
-      INSERT INTO underwriting_eval.test_cases VALUES ('test-case', 'spec', '{}', '{}');
+      VALUES ('spec', 'spec-commit', 'spec-hash', '{}'),
+             ('other-spec', 'other-commit', 'other-hash', '{}');
+      INSERT INTO underwriting_eval.test_cases VALUES
+        ('test-case', 'spec', '{}', '{}'), ('other-case', 'other-spec', '{}', '{}');
     `);
     await insertAudit(legacyRun, '2025-01-01T00:00:00Z');
     await insertAudit(legacyRun, '2025-01-02T00:00:00Z');
@@ -53,6 +55,13 @@ test('schema replay preserves legacy audits and prevents new orphan or duplicate
     });
     await assert.rejects(insertAudit(currentRun, '2026-01-02T00:00:00Z'),
       { code: '23505', constraint: 'audit_result_keys_pkey' });
+    await assert.rejects(insertAudit(currentRun, '2026-01-03T00:00:00Z', 'other-case', 'other-spec'),
+      { code: '23503', constraint: 'audit_run_specification_fk' });
+    await assert.rejects(insertAudit(currentRun, '2026-01-03T00:00:00Z', 'other-case'),
+      { code: '23503', constraint: 'audit_case_specification_fk' });
+    await assert.rejects(database.exec(`
+      UPDATE underwriting_eval.test_cases SET specification_id = 'other-spec' WHERE id = 'test-case'
+    `), { code: '23503', constraint: 'audit_case_specification_fk' });
     const { rows } = await database.query(`
       SELECT run_id, passed FROM underwriting_eval.pre_underwriting_audit_log ORDER BY run_id
     `);

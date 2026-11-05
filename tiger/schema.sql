@@ -45,6 +45,33 @@ BEGIN
      REFERENCES underwriting_eval.evaluation_runs(run_id) NOT VALID;
  END IF;
 END $$;
+-- Keep historical mismatches readable, but require new results to use the
+-- same specification as both their run header and their test case.
+CREATE UNIQUE INDEX IF NOT EXISTS evaluation_runs_specification_key
+ON underwriting_eval.evaluation_runs (run_id, specification_id);
+CREATE UNIQUE INDEX IF NOT EXISTS test_cases_specification_key
+ON underwriting_eval.test_cases (id, specification_id);
+DO $$
+BEGIN
+ IF NOT EXISTS (
+   SELECT 1 FROM pg_constraint
+   WHERE conrelid = 'underwriting_eval.pre_underwriting_audit_log'::regclass
+     AND conname = 'audit_run_specification_fk'
+ ) THEN
+   ALTER TABLE underwriting_eval.pre_underwriting_audit_log
+     ADD CONSTRAINT audit_run_specification_fk FOREIGN KEY (run_id, specification_id)
+     REFERENCES underwriting_eval.evaluation_runs(run_id, specification_id) NOT VALID;
+ END IF;
+ IF NOT EXISTS (
+   SELECT 1 FROM pg_constraint
+   WHERE conrelid = 'underwriting_eval.pre_underwriting_audit_log'::regclass
+     AND conname = 'audit_case_specification_fk'
+ ) THEN
+   ALTER TABLE underwriting_eval.pre_underwriting_audit_log
+     ADD CONSTRAINT audit_case_specification_fk FOREIGN KEY (test_case_id, specification_id)
+     REFERENCES underwriting_eval.test_cases(id, specification_id) NOT VALID;
+ END IF;
+END $$;
 CREATE OR REPLACE FUNCTION underwriting_eval.reject_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN RAISE EXCEPTION 'Evaluation history and specifications are append-only'; END $$;
 
