@@ -6,7 +6,7 @@ import { buildDraftSummary, toSubmittedAnswers } from "@/features/interview/engi
 import type { CaseRecord } from "@/features/interview/types";
 import { CaseReview } from "./CaseReview";
 
-test("Needs attention includes answered questions named by a stored consistency flag", async () => {
+test("reviewers can reach flagged and summary answers from a filtered question record", async () => {
   const at = "2026-01-01T00:00:00Z";
   const answers = toSubmittedAnswers({
     "NIC-01": { state: "yes", updatedAt: at },
@@ -52,6 +52,23 @@ test("Needs attention includes answered questions named by a stored consistency 
       .map(row => row.props.id as string | undefined)
       .filter(id => id?.startsWith("answer-"));
     assert.deepEqual(displayed.sort(), ["answer-NIC-01", "answer-NIC-03", "answer-RES-01"]);
+
+    const summaryLink = view.root.findAllByType("a").find(link => link.props.href === "#answer-NIC-02");
+    assert.ok(summaryLink);
+    await act(async () => summaryLink.props.onClick?.({ button: 0 }));
+    assert.ok(view.root.findAllByType("li").some(row => row.props.id === "answer-NIC-02"));
+
+    const held = view.root.findAllByType("button").find(button => button.children.join("") === "Held 0");
+    assert.ok(held);
+    await act(async () => held.props.onClick());
+    const flagItem = view.root.findAllByType("li").find(row =>
+      row.findAllByType("p").some(p => p.children.join("") === "Overlapping answers to clarify"));
+    assert.ok(flagItem);
+    const flagLinks = flagItem.findAllByType("a");
+    assert.deepEqual(flagLinks.map(link => link.props.href), ["#answer-NIC-01", "#answer-NIC-03"]);
+    await act(async () => flagLinks[0]!.props.onClick({ button: 0 }));
+    const target = view.root.findAllByType("li").find(row => row.props.id === "answer-NIC-01");
+    assert.equal(target?.props.tabIndex, -1);
   } finally {
     await act(async () => view.unmount());
   }

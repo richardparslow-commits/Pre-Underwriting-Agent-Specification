@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { flushSync } from "react-dom";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -62,6 +63,7 @@ function AnswerRow({ answer, needsAttention }: { answer: SubmittedAnswer; needsA
   return (
     <li
       id={`answer-${answer.questionId}`}
+      tabIndex={-1}
       className={cn("scroll-mt-24 px-5 py-4", needsAttention && "bg-warn/[0.035]")}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -162,6 +164,25 @@ export function CaseReview({
     if (filter === "not_asked") return answer.disposition === "not_asked";
     return needsReview(answer, flaggedQuestionIds);
   });
+
+  function answerLink(id: string) {
+    return (
+      <a
+        key={id}
+        href={`#answer-${id}`}
+        className="ml-1 font-mono text-[0.65rem] text-accent underline decoration-accent/30 underline-offset-2"
+        onClick={event => {
+          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          if (filter !== "all" && !filtered.some(answer => answer.questionId === id)) {
+            // The row must exist before the browser follows the fragment link.
+            flushSync(() => setFilter("all"));
+          }
+        }}
+      >
+        {id}
+      </a>
+    );
+  }
 
   const notification = NOTIFICATION[record.notification.state];
   const unanswered = record.answers.filter((answer) => answer.disposition === "unresolved").length;
@@ -335,15 +356,7 @@ export function CaseReview({
                     {section.points.map((point) => (
                       <li key={`${section.section}-${point.questionIds.join("-")}-${point.text}`} className="text-sm leading-relaxed">
                         {point.text}{" "}
-                        {point.questionIds.map((id) => (
-                          <a
-                            key={id}
-                            href={`#answer-${id}`}
-                            className="ml-1 font-mono text-[0.65rem] text-accent underline decoration-accent/30 underline-offset-2"
-                          >
-                            {id}
-                          </a>
-                        ))}
+                        {point.questionIds.map(answerLink)}
                       </li>
                     ))}
                   </ul>
@@ -424,6 +437,7 @@ export function CaseReview({
                   <div>
                     <p className="text-sm font-medium">{flag.label}</p>
                     <p className="text-xs leading-relaxed text-muted-foreground">{flag.detail}</p>
+                    {flag.questionIds?.filter(id => record.answers.some(answer => answer.questionId === id)).map(answerLink)}
                   </div>
                 </li>
               ))}
