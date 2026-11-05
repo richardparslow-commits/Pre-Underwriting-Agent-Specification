@@ -189,6 +189,7 @@ export interface ServerFlag {
   label: string;
   detail: string;
   severity: "info" | "attention" | "urgent";
+  questionIds?: string[];
 }
 
 export interface ServerDraft {
@@ -579,6 +580,7 @@ function derivedFlags(answers: ServerAnswer[]): ServerFlag[] {
         .map(([narrow, wide]) => `${narrow} vs ${wide}`)
         .join("; ")}. Treat both answers as unconfirmed and ask the customer.`,
       severity: "attention",
+      questionIds: [...new Set(contradictions.flat())],
     });
   }
 

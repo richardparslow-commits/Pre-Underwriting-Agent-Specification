@@ -213,6 +213,13 @@ test("browser retries recover the original receipt and protect the saved case fr
   );
   const unreadableReceipts = ["broken-receipt", "incomplete-receipt"];
   const { page, responses, submit } = await openReview(["disconnect", ...unreadableReceipts]);
+  for (const [id, answer] of [["NIC-01", "yes"], ["NIC-03", "no"]]) {
+    const row = page.getByRole("listitem").filter({ has: page.getByText(id, { exact: true }) });
+    await row.getByRole("button", { name: "Answer", exact: true }).click();
+    await page.locator(`input[name="${id}"][value="${answer}"]`).check();
+    await page.getByRole("button", { name: "Review my answers" }).click();
+  }
+  await page.getByRole("checkbox", { name: /^I have reviewed the answers/ }).check();
   await submit.click();
   await retryGuidance(page).waitFor();
   assert.equal(responses.length, 1);
@@ -227,6 +234,27 @@ test("browser retries recover the original receipt and protect the saved case fr
   assert.equal(stored.rows[0].idempotency_key, first.key);
   assert.equal(stored.rows[0].notification_state, "not_sent");
   assert.equal(stored.rows[0].payload.answers.find(row => row.questionId === "RES-01").disposition, "unresolved");
+  const consistencyFlag = stored.rows[0].payload.flags.find(
+    flag => flag.id === "answer-consistency:contained:NIC-01>NIC-03",
+  );
+  assert.deepEqual(consistencyFlag?.questionIds, ["NIC-01", "NIC-03"]);
+  assert.equal(consistencyFlag.severity, "attention");
+  assert.equal(first.receipt.flags, undefined);
+
+  const reviewer = "11111111-1111-4111-8111-111111111111";
+  const reviewerEmail = "reviewer@example.invalid";
+  const opened = await db.transaction(async tx => {
+    await tx.query("insert into auth.users (id, email) values ($1, $2)", [reviewer, reviewerEmail]);
+    await tx.query("insert into public.reviewers (user_id, email, display_name) values ($1, $2, 'Synthetic reviewer')",
+      [reviewer, reviewerEmail]);
+    await tx.query("select set_config('request.jwt.claims', $1, true)",
+      [JSON.stringify({ sub: reviewer, email: reviewerEmail, aal: "aal2" })]);
+    await tx.exec("set local role authenticated");
+    return tx.query("select public.open_case_for_review($1) as result", [first.receipt.reference]);
+  });
+  const auditedCase = opened.rows[0].result;
+  assert.equal(auditedCase.review_log[0].action, "opened");
+  assert.deepEqual(auditedCase.case.payload.flags.find(flag => flag.id === consistencyFlag.id), consistencyFlag);
 
   for (const fault of unreadableReceipts) {
     await Promise.all([

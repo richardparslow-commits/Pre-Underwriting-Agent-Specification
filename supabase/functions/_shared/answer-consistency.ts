@@ -68,14 +68,15 @@ export function answerConsistencyFlags(
   const flag = (
     id: string,
     label: string,
-    questions: string,
+    questionIds: string[],
     message: string,
   ) => {
     flags.push({
       id: `answer-consistency:${id}`,
       label,
-      detail: `${questions}: ${message}`,
+      detail: `${questionIds.join(", ")}: ${message}`,
       severity: "attention",
+      questionIds,
     });
   };
 
@@ -84,7 +85,7 @@ export function answerConsistencyFlags(
       flag(
         `contained:${narrow}>${wide}`,
         "Overlapping answers to clarify",
-        `${narrow}, ${wide}`,
+        [narrow, wide],
         message,
       );
     }
@@ -101,7 +102,7 @@ export function answerConsistencyFlags(
         flag(
           `licence-status:${id}`,
           "Driver’s licence status to clarify",
-          `${id}, DRV-06`,
+          [id, "DRV-06"],
           "The licence was described as both currently valid and still suspended.",
         );
       }
@@ -114,7 +115,7 @@ export function answerConsistencyFlags(
         flag(
           `drinking-now:${id}>ALC-01`,
           "Alcohol use timeframe to clarify",
-          `${id}, ALC-01`,
+          [id, "ALC-01"],
           "The reported current drinking status may conflict with the twelve-month answer.",
         );
       }
@@ -131,7 +132,7 @@ export function answerConsistencyFlags(
       flag(
         "future-date:NIC-04",
         "Nicotine last-use date to clarify",
-        "NIC-04",
+        ["NIC-04"],
         "The reported last use is in a future month.",
       );
     } else {
@@ -140,7 +141,7 @@ export function answerConsistencyFlags(
           flag(
             `last-use:NIC-04>${id}`,
             "Nicotine use timeframe to clarify",
-            `NIC-04, ${id}`,
+            ["NIC-04", id],
             "The reported last-use month falls inside a window answered No.",
           );
         }
@@ -157,7 +158,7 @@ export function answerConsistencyFlags(
     flag(
       "future-year:MED-02.when",
       "Medical event date to clarify",
-      "MED-02",
+      ["MED-02"],
       "The date given for a past medical event is in the future.",
     );
   }
@@ -168,7 +169,7 @@ export function answerConsistencyFlags(
     flag(
       "outside-window:DRV-07",
       "Moving-violation date to clarify",
-      "DRV-07",
+      ["DRV-07"],
       "The reported year of the most recent violation falls outside the five-year question.",
     );
   }
@@ -179,7 +180,7 @@ export function answerConsistencyFlags(
     flag(
       "family-age:MED-25",
       "Family history age to clarify",
-      "MED-25",
+      ["MED-25"],
       "The age given is outside the question’s before-age-60 scope. Confirm who and what the answer refers to.",
     );
   }

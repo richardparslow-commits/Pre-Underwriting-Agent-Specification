@@ -50,13 +50,15 @@ const NOTIFICATION: Record<NotificationState, { label: string; tone: "ok" | "war
 
 type Filter = "all" | "attention" | "held" | "not_asked";
 
-function AnswerRow({ answer }: { answer: SubmittedAnswer }) {
-  const badge = DISPOSITION[answer.disposition];
-  const needsAttention =
+function needsReview(answer: SubmittedAnswer, flaggedQuestionIds: ReadonlySet<string>) {
+  return flaggedQuestionIds.has(answer.questionId) ||
     answer.disposition === "unresolved" ||
     answer.disposition === "declined" ||
     answer.disposition === "unknown";
+}
 
+function AnswerRow({ answer, needsAttention }: { answer: SubmittedAnswer; needsAttention: boolean }) {
+  const badge = DISPOSITION[answer.disposition];
   return (
     <li
       id={`answer-${answer.questionId}`}
@@ -144,11 +146,12 @@ export function CaseReview({
   const [note, setNote] = useState("");
 
 
+  const flaggedQuestionIds = new Set(record.flags
+    .filter(flag => flag.severity !== "info")
+    .flatMap(flag => flag.questionIds ?? []));
   const counts = {
     all: record.answers.length,
-    attention: record.answers.filter((answer) =>
-      ["unresolved", "declined", "unknown"].includes(answer.disposition),
-    ).length,
+    attention: record.answers.filter(answer => needsReview(answer, flaggedQuestionIds)).length,
     held: record.answers.filter((answer) => answer.disposition === "held_for_review").length,
     not_asked: record.answers.filter((answer) => answer.disposition === "not_asked").length,
   };
@@ -157,7 +160,7 @@ export function CaseReview({
     if (filter === "all") return true;
     if (filter === "held") return answer.disposition === "held_for_review";
     if (filter === "not_asked") return answer.disposition === "not_asked";
-    return ["unresolved", "declined", "unknown"].includes(answer.disposition);
+    return needsReview(answer, flaggedQuestionIds);
   });
 
   const notification = NOTIFICATION[record.notification.state];
@@ -378,7 +381,11 @@ export function CaseReview({
 
             <ul className="divide-y divide-border">
               {filtered.map((answer) => (
-                <AnswerRow key={answer.questionId} answer={answer} />
+                <AnswerRow
+                  key={answer.questionId}
+                  answer={answer}
+                  needsAttention={needsReview(answer, flaggedQuestionIds)}
+                />
               ))}
             </ul>
             {filtered.length === 0 ? (
