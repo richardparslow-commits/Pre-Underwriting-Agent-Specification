@@ -32,6 +32,27 @@ function withAnswer(answers: Answers, id: string, patch: Partial<Answers[string]
   return { ...answers, [id]: { ...(answers[id] ?? {}), ...patch, updatedAt: AT } };
 }
 
+test("restored military aviation details require an explicit Yes before submission", () => {
+  const answers: Answers = {
+    "MIL-01": { state: "yes", updatedAt: AT },
+    "MIL-02": { fields: { role: "crew", hours: "200" }, updatedAt: AT },
+  };
+
+  const unanswered = toSubmittedAnswers(answers).find(row => row.questionId === "MIL-02");
+  assert(unanswered);
+  assert.equal(unanswered.disposition, "unresolved");
+  assert.equal(unanswered.answerText, "Not answered");
+  assert.equal(unanswered.answerState, undefined);
+  assert.deepEqual(unanswered.fields, []);
+
+  const confirmed = toSubmittedAnswers(withAnswer(answers, "MIL-02", { state: "yes" }))
+    .find(row => row.questionId === "MIL-02");
+  assert(confirmed);
+  assert.equal(confirmed.disposition, "answered");
+  assert.equal(confirmed.answerState, "yes");
+  assert.deepEqual(confirmed.fields?.map(field => field.value), ["Air crew", "200"]);
+});
+
 test("closing a parent branch removes the descendant answer and its details", () => {
   const parent = QUESTION_BY_ID["MH-01"];
   const child = QUESTION_BY_ID["MH-02"];

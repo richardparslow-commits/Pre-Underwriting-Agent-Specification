@@ -88,7 +88,7 @@ export function answerHasContent(question: Question, answer: AnswerRecord | unde
   if (!answer) return false;
 
   if (question.kind === "yesno") {
-    return answer.state !== undefined || Object.values(answer.fields ?? {}).some(hasText);
+    return answer.state !== undefined;
   }
 
   if (question.compound) {
