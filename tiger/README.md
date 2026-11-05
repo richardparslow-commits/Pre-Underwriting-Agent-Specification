@@ -37,6 +37,10 @@ suites are not automatically comparable. To inspect recent runs and failures:
 tiger db query obr0cb2d7s --file tiger/report.sql
 ```
 
+The report also includes older runs recorded before run headers existed. It
+uses the first audit timestamp and counts the stored results for those runs.
+Unavailable Git and fixture metadata appear as null.
+
 The engine deliberately has no carrier screening, knockout decisions, or health
 classes. No medical rating rules are invented. `carrier_rules` is an empty,
 versioned staging structure for future source-backed rules. No RAG embeddings
