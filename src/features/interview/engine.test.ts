@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildDraftSummary,
   crisisDisclosed,
   dispositionFor,
+  isVisible,
   ORDERED_QUESTIONS,
   pruneBranchClosedAnswers,
   toSubmittedAnswers,
@@ -59,6 +61,16 @@ test("closing a nested branch removes descendants that are only visible through 
   assert.equal(answers["MIL-04"]?.values?.[0], "proficiency");
 
   const closed = withAnswer(answers, "MIL-01", { state: "no" });
+  const mission = QUESTION_BY_ID["MIL-04"]!;
+  assert.equal(isVisible(mission, answers), true);
+  assert.equal(isVisible(mission, closed), false);
+  const submitted = toSubmittedAnswers(closed);
+  const missionRow = submitted.find(row => row.questionId === mission.id);
+  assert.ok(missionRow);
+  assert.equal(missionRow.disposition, "not_asked");
+  assert.equal(missionRow.answerValues, undefined);
+  assert.doesNotMatch(JSON.stringify(buildDraftSummary(submitted)), /Proficiency flying only/);
+
   const pruned = pruneBranchClosedAnswers(closed);
 
   assert.equal(pruned["MIL-02"], undefined);

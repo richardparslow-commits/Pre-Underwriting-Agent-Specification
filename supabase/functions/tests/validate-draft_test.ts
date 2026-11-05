@@ -487,3 +487,33 @@ Deno.test("does not flag consistent short and long windows", () => {
     false,
   );
 });
+
+for (const [event, expected] of [
+  ["Convicted of DUI or DWI", false],
+  ["Licence suspended or revoked", true],
+  ["Both", true],
+  [null, false],
+] as const) {
+  Deno.test(`driving contradiction checks the reported event: ${event ?? "unspecified"}`, () => {
+    const draft = accepted(buildValidDraft({
+      answers: buildAnswers({
+        "DRV-01": {
+          disposition: "answered",
+          answerState: "yes",
+          answerText: "Yes",
+          details: event ? [{ label: "What happened?", value: event }] : [],
+        },
+        "DRV-02": {
+          disposition: "answered",
+          answerState: "no",
+          answerText: "No",
+        },
+      }),
+    }));
+
+    assertEquals(
+      draft.flags.some(flag => flag.id === "timeframe-contradiction"),
+      expected,
+    );
+  });
+}

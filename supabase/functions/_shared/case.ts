@@ -314,9 +314,8 @@ const SERVER_BY_ID = new Map(SERVER_BANK.map((question) => [question.id, questio
 
 /**
  * Pairs where the first row covers a shorter reporting window that is wholly
- * contained in the second row's window, asking about the same conduct. A yes
- * followed by a no cannot both be true, so the reviewer sees a flag instead of
- * having to compare timeframes by hand.
+ * contained in the second row's window. The driving pair overlaps only for
+ * reported suspensions or revocations, so it also needs the event detail.
  */
 const SUBSET_WINDOWS: ReadonlyArray<readonly [narrow: string, wide: string]> = [
   ["NIC-01", "NIC-02"],
@@ -557,18 +556,20 @@ function derivedFlags(answers: ServerAnswer[]): ServerFlag[] {
     });
   }
 
-  // Deterministic subset-window contradictions. Each pair asks about the same
-  // conduct over a longer window, so a "yes" in the shorter window and a "no"
-  // in the longer one cannot both be true. Only these literal overlaps are
-  // flagged; clinical judgement and occupation context stay with the reviewer.
+  // Compare only explicit disclosures about conduct covered by both questions.
   const answerById = new Map(
     answers.map((answer) => [answer.questionId, answer]),
   );
-  const stateOf = (questionId: string) =>
-    answerById.get(questionId)?.answerState;
-  const contradictions = SUBSET_WINDOWS.filter(
-    ([narrow, wide]) => stateOf(narrow) === "yes" && stateOf(wide) === "no",
-  );
+  const contradictions = SUBSET_WINDOWS.filter(([narrow, wide]) => {
+    const shortAnswer = answerById.get(narrow);
+    if (shortAnswer?.answerState !== "yes" || answerById.get(wide)?.answerState !== "no") {
+      return false;
+    }
+    if (narrow !== "DRV-01") return true;
+
+    const event = shortAnswer.details?.find(detail => detail.label === "What happened?")?.value;
+    return event === "Licence suspended or revoked" || event === "Both";
+  });
   if (contradictions.length > 0) {
     flags.push({
       id: "timeframe-contradiction",
