@@ -127,7 +127,24 @@ async function startEndpoint(t, appOrigin, databaseOrigin) {
   return loopback(port);
 }
 
-test("browser recovers the original case after its saved submission response is lost", {
+async function reviewSyntheticInterview(page, appOrigin) {
+  await page.goto(`${appOrigin}/start`);
+  await page.locator("#firstName").fill("Synthetic");
+  await page.locator("#lastName").fill("Retry");
+  await page.locator("#state").selectOption("TX");
+  await page.locator("#dateOfBirth").fill("1980-01-01");
+  await page.locator("#email").fill("synthetic@example.invalid");
+  await page.locator('input[name="preferredContact"][value="email"]').check();
+  await page.locator("#privacy-ack").check();
+  await page.locator("#adult-attested").check();
+  await page.getByRole("button", { name: "Continue to intake permission" }).click();
+  await page.locator('input[aria-describedby="intake-permission-text"]').check();
+  await page.getByRole("button", { name: "Begin the interview" }).click();
+  await page.getByRole("button", { name: "Review my answers" }).click();
+  await page.getByRole("checkbox", { name: /^I have reviewed the answers/ }).check();
+}
+
+test("browser retries recover the original receipt and protect the saved case from edits", {
   timeout: 75_000,
 }, async (t) => {
   const db = new PGlite();
@@ -156,48 +173,44 @@ test("browser recovers the original case after its saved submission response is 
 
   const browser = await chromium.launch({ channel: process.env.SUBMISSION_E2E_BROWSER_CHANNEL });
   t.after(() => browser.close());
-  const page = await browser.newPage({ serviceWorkers: "block" });
-  page.setDefaultTimeout(7_000);
-  const responses = [];
-  await page.route("**/*", async route => {
-    const request = route.request();
-    const url = new URL(request.url());
-    if (url.origin === appOrigin) return route.continue();
-    if (url.origin !== apiOrigin || url.pathname !== endpoint) return route.abort();
-    if (request.method() !== "POST") return route.continue();
+  async function openReview(faults) {
+    const page = await browser.newPage({ serviceWorkers: "block" });
+    page.setDefaultTimeout(7_000);
+    const responses = [];
+    await page.route("**/*", async route => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (url.origin === appOrigin) return route.continue();
+      if (url.origin !== apiOrigin || url.pathname !== endpoint) return route.abort();
+      if (request.method() !== "POST") return route.continue();
 
-    const reply = await route.fetch({ timeout: 10_000, maxRedirects: 0 });
-    responses.push({
-      status: reply.status(),
-      key: request.headers()["idempotency-key"],
-      receipt: await reply.json(),
+      const reply = await route.fetch({ timeout: 10_000, maxRedirects: 0 });
+      responses.push({
+        status: reply.status(),
+        key: request.headers()["idempotency-key"],
+        email: request.postDataJSON().lead.email,
+        receipt: await reply.json(),
+      });
+      const fault = faults[responses.length - 1];
+      if (fault === "disconnect") return route.abort("connectionreset");
+      if (fault === "broken-receipt") {
+        return route.fulfill({ response: reply, body: '{"reference":' });
+      }
+      if (fault === "gateway-error") {
+        return route.fulfill({ response: reply, status: 502, contentType: "text/html", body: "Bad gateway" });
+      }
+      return route.fulfill({ response: reply });
     });
-    if (responses.length === 1) return route.abort("connectionreset");
-    return route.fulfill({ response: reply });
-  });
-
-  await page.goto(`${appOrigin}/start`);
-  await page.locator("#firstName").fill("Synthetic");
-  await page.locator("#lastName").fill("Retry");
-  await page.locator("#state").selectOption("TX");
-  await page.locator("#dateOfBirth").fill("1980-01-01");
-  await page.locator("#email").fill("synthetic@example.invalid");
-  await page.locator('input[name="preferredContact"][value="email"]').check();
-  await page.locator("#privacy-ack").check();
-  await page.locator("#adult-attested").check();
-  await page.getByRole("button", { name: "Continue to intake permission" }).click();
-  await page.locator('input[aria-describedby="intake-permission-text"]').check();
-  await page.getByRole("button", { name: "Begin the interview" }).click();
-  await page.getByRole("button", { name: "Review my answers" }).click();
-  await page.getByRole("checkbox", { name: /^I have reviewed the answers/ }).check();
-
-  const submit = page.getByRole("button", { name: "Submit for Richard's Review" });
-  await submit.click();
-  await page.getByText("Submission needs attention", { exact: true }).waitFor();
-  assert.equal(await page.getByText(
+    await reviewSyntheticInterview(page, appOrigin);
+    return { page, responses, submit: page.getByRole("button", { name: "Submit for Richard's Review" }) };
+  }
+  const retryGuidance = (page) => page.getByText(
     "We could not confirm whether this case was saved. Retry without changing your answers.",
     { exact: true },
-  ).isVisible(), true, "a lost response should explain how to retry safely");
+  );
+  const { page, responses, submit } = await openReview(["disconnect", "broken-receipt"]);
+  await submit.click();
+  await retryGuidance(page).waitFor();
   assert.equal(responses.length, 1);
   assert.equal(responses[0].status, 201);
   const first = responses[0];
@@ -211,13 +224,48 @@ test("browser recovers the original case after its saved submission response is 
   assert.equal(stored.rows[0].notification_state, "not_sent");
   assert.equal(stored.rows[0].payload.answers.find(row => row.questionId === "RES-01").disposition, "unresolved");
 
+  await Promise.all([
+    page.waitForResponse(response => response.url() === apiOrigin + endpoint && response.request().method() === "POST"),
+    submit.click(),
+  ]);
+  await page.getByText("Submission needs attention", { exact: true }).waitFor();
+  assert.equal(await retryGuidance(page).isVisible(), true, "a broken receipt must preserve uncertainty");
   await submit.click();
   await page.getByRole("heading", { name: "Your answers are saved" }).waitFor();
   await page.getByText(first.receipt.reference, { exact: true }).waitFor();
-  assert.equal(responses.length, 2);
-  assert.equal(responses[1].status, 200);
-  assert.equal(responses[1].key, first.key);
-  assert.equal(responses[1].receipt.replayed, true);
-  assert.equal(responses[1].receipt.reference, first.receipt.reference);
+  assert.equal(responses.length, 3);
+  for (const replay of responses.slice(1)) {
+    assert.equal(replay.status, 200);
+    assert.equal(replay.key, first.key);
+    assert.equal(replay.receipt.replayed, true);
+    assert.equal(replay.receipt.reference, first.receipt.reference);
+  }
   assert.deepEqual((await db.query("select count(*)::int as count from public.cases")).rows, [{ count: 1 }]);
+
+  const edited = await openReview(["gateway-error"]);
+  await Promise.all([
+    edited.page.waitForResponse(response => response.url() === apiOrigin + endpoint && response.status() === 502),
+    edited.submit.click(),
+  ]);
+  await edited.page.getByText("Submission needs attention", { exact: true }).waitFor();
+  assert.equal(await retryGuidance(edited.page).isVisible(), true, "a gateway error must preserve uncertainty");
+  assert.equal(edited.responses[0].status, 201);
+  await edited.page.getByRole("button", { name: "Edit contact details" }).click();
+  await edited.page.locator("#email").fill("changed@example.invalid");
+  await edited.page.getByRole("button", { name: "Continue to intake permission" }).click();
+  await edited.page.getByRole("button", { name: "Review my answers" }).click();
+  await edited.page.getByRole("checkbox", { name: /^I have reviewed the answers/ }).check();
+  await edited.submit.click();
+
+  const original = edited.responses[0];
+  await edited.page.getByText(new RegExp(`Case ${original.receipt.reference} was already saved with different content`)).waitFor();
+  assert.equal(edited.responses.length, 2);
+  assert.equal(edited.responses[1].status, 409);
+  assert.equal(edited.responses[1].key, original.key);
+  assert.equal(edited.responses[1].email, "changed@example.invalid");
+  assert.equal(edited.responses[1].receipt.code, "submission_conflict");
+  const cases = await db.query("select reference, payload->'lead'->>'email' as email from public.cases order by reference");
+  assert.deepEqual(cases.rows, [first.receipt.reference, original.receipt.reference].sort().map(reference => ({
+    reference, email: "synthetic@example.invalid",
+  })));
 });

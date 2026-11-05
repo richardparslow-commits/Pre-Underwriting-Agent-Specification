@@ -331,6 +331,9 @@ function ensurePreviewSeed(): void {
 // Submission
 // ---------------------------------------------------------------------------
 
+const UNCONFIRMED_SUBMISSION =
+  "We could not confirm whether this case was saved. Retry without changing your answers.";
+
 async function submitLive(draft: CaseDraft, submissionKey: string): Promise<SubmissionReceipt> {
   if (!SUBMIT_CASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error("The submission service is not configured.");
@@ -346,7 +349,7 @@ async function submitLive(draft: CaseDraft, submissionKey: string): Promise<Subm
     },
     body: JSON.stringify(draft),
   }).catch(() => {
-    throw new Error("We could not confirm whether this case was saved. Retry without changing your answers.");
+    throw new Error(UNCONFIRMED_SUBMISSION);
   });
 
   const body: unknown = await response.json().catch(() => null);
@@ -355,12 +358,12 @@ async function submitLive(draft: CaseDraft, submissionKey: string): Promise<Subm
     const message =
       body && typeof body === "object" && "error" in body && typeof body.error === "string"
         ? body.error
-        : "The case could not be submitted. Nothing was sent.";
+        : UNCONFIRMED_SUBMISSION;
     throw new Error(message);
   }
 
   if (!body || typeof body !== "object" || !("reference" in body)) {
-    throw new Error("The submission service returned an unexpected response.");
+    throw new Error(UNCONFIRMED_SUBMISSION);
   }
 
   return body as SubmissionReceipt;
