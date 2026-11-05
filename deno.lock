@@ -31,6 +31,7 @@
         "npm:clsx@^2.1.1",
         "npm:lovable-tagger@^1.1.7",
         "npm:lucide-react@0.462",
+        "npm:playwright@1.64.1",
         "npm:postcss@^8.4.49",
         "npm:react-dom@^18.3.1",
         "npm:react-router-dom@^7.18.5",

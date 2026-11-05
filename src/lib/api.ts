@@ -345,6 +345,8 @@ async function submitLive(draft: CaseDraft, submissionKey: string): Promise<Subm
       "Idempotency-Key": submissionKey,
     },
     body: JSON.stringify(draft),
+  }).catch(() => {
+    throw new Error("We could not confirm whether this case was saved. Retry without changing your answers.");
   });
 
   const body: unknown = await response.json().catch(() => null);
