@@ -31,7 +31,7 @@
     "check:db": "node scripts/check-db.mjs && node --test scripts/check-suppression-worker.mjs && node --test scripts/check-provider-evidence.mjs && node --test scripts/check-correction-replay.mjs",
     "report:reconciliation": "tsx scripts/report-reconciliation.ts",
     "test:regressions": "node --test scripts/run-ui-regressions.test.mjs && node scripts/run-ui-regressions.mjs",
-    "test:tiger": "node --test tiger/report.test.mjs && tsx tiger/verify.ts",
+    "test:tiger": "node --test tiger/*.test.mjs && tsx tiger/verify.ts",
     "test:tiger:live": "tsx tiger/verify.ts --live"
   },
   "dependencies": {

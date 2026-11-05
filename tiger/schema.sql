@@ -31,6 +31,20 @@ CREATE TABLE IF NOT EXISTS underwriting_eval.pre_underwriting_audit_log (
  PRIMARY KEY(evaluated_at, run_id, test_case_id)
 );
 SELECT create_hypertable('underwriting_eval.pre_underwriting_audit_log', 'evaluated_at', if_not_exists => true);
+-- Historical audits predate run headers. Enforce the link on new writes
+-- while preserving those existing rows and their original metadata.
+DO $$
+BEGIN
+ IF NOT EXISTS (
+   SELECT 1 FROM pg_constraint
+   WHERE conrelid = 'underwriting_eval.pre_underwriting_audit_log'::regclass
+     AND conname = 'audit_run_header_fk'
+ ) THEN
+   ALTER TABLE underwriting_eval.pre_underwriting_audit_log
+     ADD CONSTRAINT audit_run_header_fk FOREIGN KEY (run_id)
+     REFERENCES underwriting_eval.evaluation_runs(run_id) NOT VALID;
+ END IF;
+END $$;
 CREATE OR REPLACE FUNCTION underwriting_eval.reject_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN RAISE EXCEPTION 'Evaluation history and specifications are append-only'; END $$;
 DROP TRIGGER IF EXISTS audit_append_only ON underwriting_eval.pre_underwriting_audit_log;

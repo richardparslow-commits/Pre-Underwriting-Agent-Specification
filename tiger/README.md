@@ -41,6 +41,10 @@ The report also includes older runs recorded before run headers existed. It
 uses the first audit timestamp and counts the stored results for those runs.
 Unavailable Git and fixture metadata appear as null.
 
+New audit rows require an existing run header. The schema upgrade adds this
+foreign key without validating historical rows, so earlier audits stay
+readable. Writers create the run header before inserting its audit results.
+
 The engine deliberately has no carrier screening, knockout decisions, or health
 classes. No medical rating rules are invented. `carrier_rules` is an empty,
 versioned staging structure for future source-backed rules. No RAG embeddings
