@@ -38,6 +38,34 @@ Deno.test("accepts a complete canonical draft and rebuilds source rows", () => {
   assertEquals(draft.adultAttested, true);
 });
 
+Deno.test("keeps private client metadata out of the canonical submission", () => {
+  const body = buildValidDraft();
+  assert(typeof body.lead === "object" && body.lead !== null);
+  const draft = accepted({
+    ...body,
+    _agent_scratchpad: "scratchpad-only-marker",
+    lead: { ...body.lead, _raw_ssn_unmasked: "private-identifier-marker" },
+    answers: buildAnswers({
+      "MED-01": {
+        _tentative_underwriting_class: "tentative-class-marker",
+        _unverified_rx_prefill: ["unverified-medication-marker"],
+      },
+    }),
+  });
+
+  const serialized = JSON.stringify(draft);
+  for (const marker of [
+    "scratchpad-only-marker",
+    "private-identifier-marker",
+    "tentative-class-marker",
+    "unverified-medication-marker",
+  ]) {
+    assert(!serialized.includes(marker), `Private client field survived validation: ${marker}`);
+  }
+  assertEquals(draft.lead.state, "TX");
+  assertEquals(draft.answers.length, SERVER_BANK.length);
+});
+
 Deno.test("a compound answer's prose is rebuilt, not trusted from the caller", () => {
   // Unbranched so the row is applicable in the default fixture.
   const compound = SERVER_BANK.find(
