@@ -346,6 +346,39 @@ Deno.test("rejects a forged questionnaire version", () => {
   );
 });
 
+Deno.test("accepts unanswered single-choice rows and rebuilds their summaries", () => {
+  for (const [disposition, answerState, answerText] of [
+    ["unresolved", undefined, "Not answered"],
+    ["unknown", "unknown", "I'm not sure"],
+    ["declined", "declined", "Prefer not to answer"],
+  ] as const) {
+    const draft = accepted(buildValidDraft({
+      answers: buildAnswers({
+        "RES-01": { disposition, answerState, answerText, answerValues: undefined },
+      }),
+    }));
+    const row = draft.answers.find((answer) => answer.questionId === "RES-01");
+    assertEquals(row?.disposition, disposition);
+    assertEquals(row?.answerState, answerState);
+    assertEquals(row?.answerValues, undefined);
+    assertEquals(row?.answerText, answerText);
+  }
+});
+
+Deno.test("rejects a residency option attached to an unresolved row", () => {
+  const body = buildValidDraft({
+    answers: buildAnswers({
+      "RES-01": {
+        disposition: "unresolved",
+        answerText: "Not answered",
+        answerValues: ["permanent"],
+      },
+    }),
+  });
+
+  assertEquals(rejected(body), "An unresolved answer cannot carry answer content");
+});
+
 Deno.test("rejects prose that does not match the chosen option", () => {
   const body = buildValidDraft({
     answers: buildAnswers({

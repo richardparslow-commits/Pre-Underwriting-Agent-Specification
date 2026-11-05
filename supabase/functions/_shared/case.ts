@@ -864,10 +864,9 @@ export function validateDraft(body: unknown): ValidationResult {
       return { ok: false, reason: "Incomplete answer record" };
     }
 
-    // A single-choice row has a closed option set. The prose must be one of
-    // the approved labels, and any structured value must agree with it; a
-    // forged pair must not reach the reviewer summary.
-    if (question.kind === "single_choice") {
+    // Only answered single-choice rows carry option labels. Other dispositions
+    // are validated and given canonical summaries below.
+    if (question.kind === "single_choice" && disposition === "answered") {
       const allowed = new Set(question.options.map((option) => option.label));
       if (!allowed.has(answerText)) {
         return { ok: false, reason: "The answer is not a valid option" };
