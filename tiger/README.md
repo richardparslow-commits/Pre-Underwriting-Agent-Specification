@@ -45,6 +45,11 @@ New audit rows require an existing run header. The schema upgrade adds this
 foreign key without validating historical rows, so earlier audits stay
 readable. Writers create the run header before inserting its audit results.
 
+Each new result also reserves its run and test case pair in the same
+transaction. A second write for the pair fails even with a different audit
+timestamp. The upgrade reserves keys for existing results and retains all
+historical audit rows, including any duplicates already present.
+
 The engine deliberately has no carrier screening, knockout decisions, or health
 classes. No medical rating rules are invented. `carrier_rules` is an empty,
 versioned staging structure for future source-backed rules. No RAG embeddings
