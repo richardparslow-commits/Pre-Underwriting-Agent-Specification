@@ -283,6 +283,8 @@ export function toSubmittedAnswers(answers: Answers): SubmittedAnswer[] {
   return ORDERED_QUESTIONS.map((question) => {
     const answer = answers[question.id];
     const disposition = dispositionFor(question, answer, answers);
+    const includeDetail = disposition === "answered" &&
+      (question.kind !== "yesno" || answer?.state === "yes");
 
     return {
       questionId: question.id,
@@ -310,10 +312,10 @@ export function toSubmittedAnswers(answers: Answers): SubmittedAnswer[] {
             : disposition === "unresolved"
               ? "Not answered"
               : answerTextFor(question, answer),
-      // A closed branch or a held row must not carry the detail entered before
-      // the parent changed. Only an answered row emits component/detail data.
-      fields: disposition === "answered" ? fieldEntries(question, answer) : [],
-      details: disposition === "answered" ? detailEntries(question, answer) : [],
+      // Restored answers may retain old Yes-only detail after changing to No.
+      // Apply the server's contract here as well as in the question component.
+      fields: includeDetail ? fieldEntries(question, answer) : [],
+      details: includeDetail ? detailEntries(question, answer) : [],
     } satisfies SubmittedAnswer;
   });
 }

@@ -8,9 +8,23 @@ import {
   toSubmittedAnswers,
 } from "./engine";
 import { QUESTION_BANK, QUESTION_BY_ID } from "./questionBank";
-import type { Answers } from "./types";
+import type { Answers, SubmittedAnswer } from "./types";
 
 const AT = "2026-10-27T12:00:00.000Z";
+
+test("submission strips restored Yes-only details on No while preserving Yes details", () => {
+  const question = QUESTION_BANK.find(q => q.reviewStatus === "approved" &&
+    q.kind === "yesno" && !q.askWhen && q.detailPrompts?.length);
+  assert(question);
+  const details = Object.fromEntries(question.detailPrompts!.map(prompt => [prompt.id, "synthetic detail"]));
+  for (const state of ["yes", "no"] as const) {
+    const row: SubmittedAnswer = toSubmittedAnswers({ [question.id]: { state, details, updatedAt: AT } })
+      .find(r => r.questionId === question.id)!;
+    assert.equal(row.answerState, state);
+    assert.ok(row.details);
+    assert.equal(row.details.length, state === "yes" ? question.detailPrompts!.length : 0);
+  }
+});
 
 function withAnswer(answers: Answers, id: string, patch: Partial<Answers[string]>): Answers {
   return { ...answers, [id]: { ...(answers[id] ?? {}), ...patch, updatedAt: AT } };

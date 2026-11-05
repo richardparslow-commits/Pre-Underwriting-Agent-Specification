@@ -14,6 +14,14 @@ CREATE TABLE IF NOT EXISTS underwriting_eval.test_cases (
  id text PRIMARY KEY, specification_id text NOT NULL REFERENCES underwriting_eval.specifications(id),
  synthetic_input jsonb NOT NULL, expected jsonb NOT NULL
 );
+CREATE TABLE IF NOT EXISTS underwriting_eval.evaluation_runs (
+ run_id uuid PRIMARY KEY,
+ specification_id text NOT NULL REFERENCES underwriting_eval.specifications(id),
+ source_commit text NOT NULL, dirty_tree boolean NOT NULL,
+ code_hash text NOT NULL, suite_hash text NOT NULL,
+ total integer NOT NULL CHECK (total > 0), failed integer NOT NULL CHECK (failed BETWEEN 0 AND total),
+ created_at timestamptz NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS underwriting_eval.pre_underwriting_audit_log (
  evaluated_at timestamptz NOT NULL DEFAULT now(), run_id uuid NOT NULL,
  test_case_id text NOT NULL REFERENCES underwriting_eval.test_cases(id),
@@ -31,6 +39,12 @@ FOR EACH ROW EXECUTE FUNCTION underwriting_eval.reject_mutation();
 DROP TRIGGER IF EXISTS spec_append_only ON underwriting_eval.specifications;
 CREATE TRIGGER spec_append_only BEFORE UPDATE OR DELETE ON underwriting_eval.specifications
 FOR EACH ROW EXECUTE FUNCTION underwriting_eval.reject_mutation();
+DROP TRIGGER IF EXISTS run_append_only ON underwriting_eval.evaluation_runs;
+CREATE TRIGGER run_append_only BEFORE UPDATE OR DELETE ON underwriting_eval.evaluation_runs
+FOR EACH ROW EXECUTE FUNCTION underwriting_eval.reject_mutation();
+DROP TRIGGER IF EXISTS run_no_truncate ON underwriting_eval.evaluation_runs;
+CREATE TRIGGER run_no_truncate BEFORE TRUNCATE ON underwriting_eval.evaluation_runs
+FOR EACH STATEMENT EXECUTE FUNCTION underwriting_eval.reject_mutation();
 REVOKE ALL ON SCHEMA underwriting_eval FROM PUBLIC;
 REVOKE ALL ON ALL TABLES IN SCHEMA underwriting_eval FROM PUBLIC;
 
