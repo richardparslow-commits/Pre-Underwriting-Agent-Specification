@@ -11,6 +11,7 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.1
 import { QUESTIONNAIRE_VERSION, SERVER_BANK } from "./bank.generated.ts";
 import { CONSENT_POLICY } from "./policy.generated.ts";
 import { leadTextErrors } from "./lead-validation.ts";
+import { answerConsistencyFlags } from "./answer-consistency.ts";
 
 // -----------------------------------------------------------------------------
 // CORS
@@ -1117,7 +1118,7 @@ export function validateDraft(body: unknown): ValidationResult {
     answers,
     consents,
     acknowledgements,
-    flags: derivedFlags(answers),
+    flags: [...derivedFlags(answers), ...answerConsistencyFlags(answers, completedAt)],
     crisisDisclosure: answers.some(
       (answer) => answer.questionId === "MH-05" && answer.answerState === "yes",
     ),
