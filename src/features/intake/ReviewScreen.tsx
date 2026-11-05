@@ -2,14 +2,7 @@ import { AlertTriangle, ArrowLeft, Check, Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, Badge, Checkbox } from "@/components/ui/surface";
 import { MARKETING, MARKETING_ENABLED, SITE } from "@/config/site";
-import {
-  answerTextFor,
-  detailEntries,
-  dispositionFor,
-  fieldEntries,
-  visibleQuestions,
-} from "@/features/interview/engine";
-import { QUESTION_BANK } from "@/features/interview/questionBank";
+import { toSubmittedAnswers } from "@/features/interview/engine";
 import { SECTIONS } from "@/features/interview/sections";
 import { SUBMISSION_ACKNOWLEDGEMENT_TEXT } from "@/features/consent/consentTexts";
 import type { ConsentSelection } from "@/features/consent/consentTexts";
@@ -57,11 +50,12 @@ export function ReviewScreen({
   onSubmit,
   onBack,
 }: ReviewScreenProps) {
-  const visible = visibleQuestions(answers);
-  const pending = visible.filter(
-    (question) => dispositionFor(question, answers[question.id], answers) === "unresolved",
+  const submitted = toSubmittedAnswers(answers);
+  const visible = submitted.filter(
+    row => row.disposition !== "held_for_review" && row.disposition !== "not_asked",
   );
-  const held = QUESTION_BANK.filter((question) => question.reviewStatus === "human_review_required");
+  const pending = visible.filter(row => row.disposition === "unresolved");
+  const held = submitted.filter(row => row.disposition === "held_for_review");
   const marketingGiven = consent.marketingCall || consent.marketingText;
   const marketingWithdrawal = [
     MARKETING.texts ? "replying STOP" : null,
@@ -159,14 +153,14 @@ export function ReviewScreen({
           <div className="mt-3 flex flex-wrap gap-2">
             {pending.slice(0, 6).map((question) => (
               <Button
-                key={question.id}
+                key={question.questionId}
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => onEditQuestion(question.id)}
+                onClick={() => onEditQuestion(question.questionId)}
                 disabled={submitting}
               >
-                {question.id}: {question.customerText.slice(0, 46)}
+                {question.questionId}: {question.customerText.slice(0, 46)}
                 {question.customerText.length > 46 ? "…" : ""}
               </Button>
             ))}
@@ -187,23 +181,20 @@ export function ReviewScreen({
               </div>
               <ul className="divide-y divide-border">
                 {questions.map((question) => {
-                  const answer = answers[question.id];
-                  const disposition = dispositionFor(question, answer, answers);
+                  const { disposition, fields = [], details = [] } = question;
                   const badge = DISPOSITION_BADGE[disposition];
-                  const fields = fieldEntries(question, answer);
-                  const details = detailEntries(question, answer);
                   const needsAttention = disposition === "unresolved";
 
                   return (
                     <li
-                      key={question.id}
+                      key={question.questionId}
                       className={cn("px-5 py-4", needsAttention && "bg-warn/[0.04]")}
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-[0.7rem] font-semibold tracking-[0.08em] text-muted-foreground">
-                              {question.id}
+                              {question.questionId}
                             </span>
                             {question.timeframe ? (
                               <span className="text-[0.7rem] text-muted-foreground">
@@ -218,7 +209,7 @@ export function ReviewScreen({
                               ? "No answer recorded"
                               : disposition === "declined"
                                 ? "You chose not to answer"
-                                : answerTextFor(question, answer)}
+                                : question.answerText}
                           </p>
 
                           {fields.length > 0 ? (
@@ -251,8 +242,8 @@ export function ReviewScreen({
                           type="button"
                           variant={needsAttention ? "outline" : "ghost"}
                           size="sm"
-                          onClick={() => onEditQuestion(question.id)}
-                disabled={submitting}
+                          onClick={() => onEditQuestion(question.questionId)}
+                          disabled={submitting}
                         >
                           <Pencil aria-hidden />
                           {needsAttention ? "Answer" : "Change"}

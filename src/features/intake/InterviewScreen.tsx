@@ -3,7 +3,7 @@ import { ClipboardCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge, Progress } from "@/components/ui/surface";
 import { SECTIONS } from "@/features/interview/sections";
-import { visibleQuestions } from "@/features/interview/engine";
+import { visibleQuestions, type Progress as InterviewProgress } from "@/features/interview/engine";
 import type { AnswerRecord, Answers, Question } from "@/features/interview/types";
 import { cn } from "@/lib/utils";
 import { CrisisPanel } from "./CrisisPanel";
@@ -11,6 +11,7 @@ import { QuestionCard } from "./QuestionCard";
 
 interface InterviewScreenProps {
   answers: Answers;
+  sectionProgress: InterviewProgress["sections"];
   current: Question;
   crisis: boolean;
   prefilled?: boolean;
@@ -22,6 +23,7 @@ interface InterviewScreenProps {
 
 export function InterviewScreen({
   answers,
+  sectionProgress,
   current,
   crisis,
   prefilled,
@@ -34,15 +36,7 @@ export function InterviewScreen({
   const questions = visibleQuestions(answers);
   const position = Math.max(1, questions.findIndex((question) => question.id === current.id) + 1);
   const total = questions.length;
-  const answeredInSection = questions.filter(
-    (question) =>
-      question.section === current.section &&
-      (answers[question.id]?.state !== undefined ||
-        answers[question.id]?.value !== undefined ||
-        (answers[question.id]?.values?.length ?? 0) > 0 ||
-        Object.keys(answers[question.id]?.fields ?? {}).length > 0),
-  ).length;
-  const sectionQuestions = questions.filter((question) => question.section === current.section).length;
+  const currentSection = sectionProgress.find(section => section.id === current.section);
   const percent = total === 0 ? 0 : (position / total) * 100;
 
   // Move focus to the new question heading so screen-reader users hear it.
@@ -57,23 +51,13 @@ export function InterviewScreen({
           <div>
             <p className="eyebrow">Sections</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {answeredInSection} of {sectionQuestions} in this section
+              {currentSection?.answered ?? 0} of {currentSection?.total ?? 0} in this section
             </p>
           </div>
           <ol className="space-y-1">
-            {SECTIONS.map((section) => {
-              const sectionQuestionsForId = questions.filter(
-                (question) => question.section === section.id,
-              );
-              if (sectionQuestionsForId.length === 0) return null;
+            {sectionProgress.map((section) => {
               const isCurrent = section.id === current.section;
-              const done = sectionQuestionsForId.every(
-                (question) =>
-                  (answers[question.id]?.state !== undefined ||
-                    answers[question.id]?.value !== undefined ||
-                    (answers[question.id]?.values?.length ?? 0) > 0 ||
-                    Object.keys(answers[question.id]?.fields ?? {}).length > 0),
-              );
+              const done = section.answered === section.total;
 
               return (
                 <li key={section.id}>
@@ -97,7 +81,7 @@ export function InterviewScreen({
                     >
                       {done ? "✓" : ""}
                     </span>
-                    {section.shortTitle}
+                    {section.title}
                   </div>
                 </li>
               );
