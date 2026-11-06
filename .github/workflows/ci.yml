@@ -126,7 +126,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [ui, server, database, tiger]
+        suite: [ui, server, database, tiger, browser]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -134,7 +134,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
-      - if: matrix.suite == 'server'
+      - if: matrix.suite == 'server' || matrix.suite == 'browser'
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
         with:
           deno-version: v2.9.6
@@ -152,3 +152,20 @@ jobs:
         run: |
           npm run check:db
           npm run check:reviewer-visibility
+      - name: Install Playwright Chromium
+        if: matrix.suite == 'browser'
+        run: npm exec -- playwright install --with-deps chromium
+      - name: Browser submission and retry regression
+        if: matrix.suite == 'browser'
+        env:
+          SUBMISSION_E2E_TRACE_DIR: ${{ runner.temp }}/submission-e2e-traces
+        run: npm run test:submission-e2e
+      - name: Upload browser failure traces
+        if: failure() && matrix.suite == 'browser'
+        # v4.6.2 — pinned to a commit.
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: submission-e2e-traces
+          path: ${{ runner.temp }}/submission-e2e-traces/*.zip
+          if-no-files-found: ignore
+          retention-days: 7

@@ -2,8 +2,9 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { readdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile } from "node:fs/promises";
 import { createServer } from "node:http";
+import { join } from "node:path";
 import { createInterface } from "node:readline";
 import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
@@ -172,9 +173,25 @@ test("browser retries recover the original receipt and protect the saved case fr
   });
 
   const browser = await chromium.launch({ channel: process.env.SUBMISSION_E2E_BROWSER_CHANNEL });
-  t.after(() => browser.close());
+  const traceDir = process.env.SUBMISSION_E2E_TRACE_DIR;
+  const tracedContexts = [];
+  t.after(async () => {
+    try {
+      for (const [index, context] of tracedContexts.entries()) {
+        await context.tracing.stop({ path: join(traceDir, `submission-${index + 1}.zip`) });
+      }
+    } finally {
+      await browser.close();
+    }
+  });
+  if (traceDir) await mkdir(traceDir, { recursive: true });
   async function openReview(faults) {
     const page = await browser.newPage({ serviceWorkers: "block" });
+    if (traceDir) {
+      const context = page.context();
+      await context.tracing.start({ screenshots: true, snapshots: true });
+      tracedContexts.push(context);
+    }
     page.setDefaultTimeout(7_000);
     const responses = [];
     await page.route("**/*", async route => {
