@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { flushSync } from "react-dom";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -50,16 +51,19 @@ const NOTIFICATION: Record<NotificationState, { label: string; tone: "ok" | "war
 
 type Filter = "all" | "attention" | "held" | "not_asked";
 
-function AnswerRow({ answer }: { answer: SubmittedAnswer }) {
-  const badge = DISPOSITION[answer.disposition];
-  const needsAttention =
+function needsReview(answer: SubmittedAnswer, flaggedQuestionIds: ReadonlySet<string>) {
+  return flaggedQuestionIds.has(answer.questionId) ||
     answer.disposition === "unresolved" ||
     answer.disposition === "declined" ||
     answer.disposition === "unknown";
+}
 
+function AnswerRow({ answer, needsAttention }: { answer: SubmittedAnswer; needsAttention: boolean }) {
+  const badge = DISPOSITION[answer.disposition];
   return (
     <li
       id={`answer-${answer.questionId}`}
+      tabIndex={-1}
       className={cn("scroll-mt-24 px-5 py-4", needsAttention && "bg-warn/[0.035]")}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -144,11 +148,12 @@ export function CaseReview({
   const [note, setNote] = useState("");
 
 
+  const flaggedQuestionIds = new Set(record.flags
+    .filter(flag => flag.severity !== "info")
+    .flatMap(flag => flag.questionIds ?? []));
   const counts = {
     all: record.answers.length,
-    attention: record.answers.filter((answer) =>
-      ["unresolved", "declined", "unknown"].includes(answer.disposition),
-    ).length,
+    attention: record.answers.filter(answer => needsReview(answer, flaggedQuestionIds)).length,
     held: record.answers.filter((answer) => answer.disposition === "held_for_review").length,
     not_asked: record.answers.filter((answer) => answer.disposition === "not_asked").length,
   };
@@ -157,8 +162,27 @@ export function CaseReview({
     if (filter === "all") return true;
     if (filter === "held") return answer.disposition === "held_for_review";
     if (filter === "not_asked") return answer.disposition === "not_asked";
-    return ["unresolved", "declined", "unknown"].includes(answer.disposition);
+    return needsReview(answer, flaggedQuestionIds);
   });
+
+  function answerLink(id: string) {
+    return (
+      <a
+        key={id}
+        href={`#answer-${id}`}
+        className="ml-1 font-mono text-[0.65rem] text-accent underline decoration-accent/30 underline-offset-2"
+        onClick={event => {
+          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          if (filter !== "all" && !filtered.some(answer => answer.questionId === id)) {
+            // The row must exist before the browser follows the fragment link.
+            flushSync(() => setFilter("all"));
+          }
+        }}
+      >
+        {id}
+      </a>
+    );
+  }
 
   const notification = NOTIFICATION[record.notification.state];
   const unanswered = record.answers.filter((answer) => answer.disposition === "unresolved").length;
@@ -332,15 +356,7 @@ export function CaseReview({
                     {section.points.map((point) => (
                       <li key={`${section.section}-${point.questionIds.join("-")}-${point.text}`} className="text-sm leading-relaxed">
                         {point.text}{" "}
-                        {point.questionIds.map((id) => (
-                          <a
-                            key={id}
-                            href={`#answer-${id}`}
-                            className="ml-1 font-mono text-[0.65rem] text-accent underline decoration-accent/30 underline-offset-2"
-                          >
-                            {id}
-                          </a>
-                        ))}
+                        {point.questionIds.map(answerLink)}
                       </li>
                     ))}
                   </ul>
@@ -378,7 +394,11 @@ export function CaseReview({
 
             <ul className="divide-y divide-border">
               {filtered.map((answer) => (
-                <AnswerRow key={answer.questionId} answer={answer} />
+                <AnswerRow
+                  key={answer.questionId}
+                  answer={answer}
+                  needsAttention={needsReview(answer, flaggedQuestionIds)}
+                />
               ))}
             </ul>
             {filtered.length === 0 ? (
@@ -417,6 +437,7 @@ export function CaseReview({
                   <div>
                     <p className="text-sm font-medium">{flag.label}</p>
                     <p className="text-xs leading-relaxed text-muted-foreground">{flag.detail}</p>
+                    {flag.questionIds?.filter(id => record.answers.some(answer => answer.questionId === id)).map(answerLink)}
                   </div>
                 </li>
               ))}

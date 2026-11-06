@@ -75,6 +75,42 @@ test("review is available outside the desktop sidebar and preserves an unanswere
   });
 });
 
+test("interview progress excludes restored military details without a Yes or No answer", async () => {
+  await fixture(async (view, read) => {
+    await act(async () => {
+      read().setAnswer("MIL-01", { state: "yes" });
+      read().setAnswer("MIL-02", { fields: { aircraft: "Synthetic retained aircraft" } });
+      read().setAnswer("MIL-03", { state: "no" });
+      read().goToQuestion("MIL-02");
+    });
+    assert.match(text(view.root), /2 of 3 in this section/);
+    const current = view.root.findAllByType("div").find(node => node.props["aria-current"] === "step");
+    assert.ok(current);
+    assert.doesNotMatch(text(current), /✓/);
+  });
+});
+
+test("review shows only the military details that the submitted answer will include", async () => {
+  await fixture(async (view, read) => {
+    await act(async () => {
+      read().setAnswer("MIL-01", { state: "yes" });
+      read().setAnswer("MIL-02", { fields: { aircraft: "Synthetic retained aircraft" } });
+      read().finishInterview();
+    });
+    const aviation = () => view.root.findAllByType("li").find(node => text(node).includes("MIL-02"))!;
+    assert.match(text(aviation()), /Not answered/);
+    assert.doesNotMatch(text(aviation()), /Synthetic retained aircraft/);
+
+    await act(async () => read().setAnswer("MIL-02", { state: "no" }));
+    assert.doesNotMatch(text(aviation()), /Synthetic retained aircraft/);
+    await act(async () => read().setAnswer("MIL-02", { state: "yes" }));
+    assert.match(text(aviation()), /Synthetic retained aircraft/);
+    await act(async () => read().confirmReview(true));
+    const submitted = read().draft?.answers.find(answer => answer.questionId === "MIL-02");
+    assert.equal(submitted?.fields?.[0]?.value, "Synthetic retained aircraft");
+  });
+});
+
 test("editing MH-03 from review returns directly with the edit, other answers and permissions intact", async () => {
   await fixture(async (view, read) => {
     await act(async () => read().setAnswer("ID-02", { value: "Synthetic retained occupation" }));

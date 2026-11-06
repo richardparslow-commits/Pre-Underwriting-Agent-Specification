@@ -11,6 +11,7 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.1
 import { QUESTIONNAIRE_VERSION, SERVER_BANK } from "./bank.generated.ts";
 import { CONSENT_POLICY } from "./policy.generated.ts";
 import { leadTextErrors } from "./lead-validation.ts";
+import { answerConsistencyFlags } from "./answer-consistency.ts";
 
 // -----------------------------------------------------------------------------
 // CORS
@@ -188,6 +189,7 @@ export interface ServerFlag {
   label: string;
   detail: string;
   severity: "info" | "attention" | "urgent";
+  questionIds?: string[];
 }
 
 export interface ServerDraft {
@@ -314,9 +316,8 @@ const SERVER_BY_ID = new Map(SERVER_BANK.map((question) => [question.id, questio
 
 /**
  * Pairs where the first row covers a shorter reporting window that is wholly
- * contained in the second row's window, asking about the same conduct. A yes
- * followed by a no cannot both be true, so the reviewer sees a flag instead of
- * having to compare timeframes by hand.
+ * contained in the second row's window. The driving pair overlaps only for
+ * reported suspensions or revocations, so it also needs the event detail.
  */
 const SUBSET_WINDOWS: ReadonlyArray<readonly [narrow: string, wide: string]> = [
   ["NIC-01", "NIC-02"],
@@ -557,18 +558,20 @@ function derivedFlags(answers: ServerAnswer[]): ServerFlag[] {
     });
   }
 
-  // Deterministic subset-window contradictions. Each pair asks about the same
-  // conduct over a longer window, so a "yes" in the shorter window and a "no"
-  // in the longer one cannot both be true. Only these literal overlaps are
-  // flagged; clinical judgement and occupation context stay with the reviewer.
+  // Compare only explicit disclosures about conduct covered by both questions.
   const answerById = new Map(
     answers.map((answer) => [answer.questionId, answer]),
   );
-  const stateOf = (questionId: string) =>
-    answerById.get(questionId)?.answerState;
-  const contradictions = SUBSET_WINDOWS.filter(
-    ([narrow, wide]) => stateOf(narrow) === "yes" && stateOf(wide) === "no",
-  );
+  const contradictions = SUBSET_WINDOWS.filter(([narrow, wide]) => {
+    const shortAnswer = answerById.get(narrow);
+    if (shortAnswer?.answerState !== "yes" || answerById.get(wide)?.answerState !== "no") {
+      return false;
+    }
+    if (narrow !== "DRV-01") return true;
+
+    const event = shortAnswer.details?.find(detail => detail.label === "What happened?")?.value;
+    return event === "Licence suspended or revoked" || event === "Both";
+  });
   if (contradictions.length > 0) {
     flags.push({
       id: "timeframe-contradiction",
@@ -577,6 +580,7 @@ function derivedFlags(answers: ServerAnswer[]): ServerFlag[] {
         .map(([narrow, wide]) => `${narrow} vs ${wide}`)
         .join("; ")}. Treat both answers as unconfirmed and ask the customer.`,
       severity: "attention",
+      questionIds: [...new Set(contradictions.flat())],
     });
   }
 
@@ -863,10 +867,9 @@ export function validateDraft(body: unknown): ValidationResult {
       return { ok: false, reason: "Incomplete answer record" };
     }
 
-    // A single-choice row has a closed option set. The prose must be one of
-    // the approved labels, and any structured value must agree with it; a
-    // forged pair must not reach the reviewer summary.
-    if (question.kind === "single_choice") {
+    // Only answered single-choice rows carry option labels. Other dispositions
+    // are validated and given canonical summaries below.
+    if (question.kind === "single_choice" && disposition === "answered") {
       const allowed = new Set(question.options.map((option) => option.label));
       if (!allowed.has(answerText)) {
         return { ok: false, reason: "The answer is not a valid option" };
@@ -1117,7 +1120,7 @@ export function validateDraft(body: unknown): ValidationResult {
     answers,
     consents,
     acknowledgements,
-    flags: derivedFlags(answers),
+    flags: [...derivedFlags(answers), ...answerConsistencyFlags(answers, completedAt)],
     crisisDisclosure: answers.some(
       (answer) => answer.questionId === "MH-05" && answer.answerState === "yes",
     ),

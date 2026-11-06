@@ -38,6 +38,34 @@ Deno.test("accepts a complete canonical draft and rebuilds source rows", () => {
   assertEquals(draft.adultAttested, true);
 });
 
+Deno.test("keeps private client metadata out of the canonical submission", () => {
+  const body = buildValidDraft();
+  assert(typeof body.lead === "object" && body.lead !== null);
+  const draft = accepted({
+    ...body,
+    _agent_scratchpad: "scratchpad-only-marker",
+    lead: { ...body.lead, _raw_ssn_unmasked: "private-identifier-marker" },
+    answers: buildAnswers({
+      "MED-01": {
+        _tentative_underwriting_class: "tentative-class-marker",
+        _unverified_rx_prefill: ["unverified-medication-marker"],
+      },
+    }),
+  });
+
+  const serialized = JSON.stringify(draft);
+  for (const marker of [
+    "scratchpad-only-marker",
+    "private-identifier-marker",
+    "tentative-class-marker",
+    "unverified-medication-marker",
+  ]) {
+    assert(!serialized.includes(marker), `Private client field survived validation: ${marker}`);
+  }
+  assertEquals(draft.lead.state, "TX");
+  assertEquals(draft.answers.length, SERVER_BANK.length);
+});
+
 Deno.test("a compound answer's prose is rebuilt, not trusted from the caller", () => {
   // Unbranched so the row is applicable in the default fixture.
   const compound = SERVER_BANK.find(
@@ -318,6 +346,39 @@ Deno.test("rejects a forged questionnaire version", () => {
   );
 });
 
+Deno.test("accepts unanswered single-choice rows and rebuilds their summaries", () => {
+  for (const [disposition, answerState, answerText] of [
+    ["unresolved", undefined, "Not answered"],
+    ["unknown", "unknown", "I'm not sure"],
+    ["declined", "declined", "Prefer not to answer"],
+  ] as const) {
+    const draft = accepted(buildValidDraft({
+      answers: buildAnswers({
+        "RES-01": { disposition, answerState, answerText, answerValues: undefined },
+      }),
+    }));
+    const row = draft.answers.find((answer) => answer.questionId === "RES-01");
+    assertEquals(row?.disposition, disposition);
+    assertEquals(row?.answerState, answerState);
+    assertEquals(row?.answerValues, undefined);
+    assertEquals(row?.answerText, answerText);
+  }
+});
+
+Deno.test("rejects a residency option attached to an unresolved row", () => {
+  const body = buildValidDraft({
+    answers: buildAnswers({
+      "RES-01": {
+        disposition: "unresolved",
+        answerText: "Not answered",
+        answerValues: ["permanent"],
+      },
+    }),
+  });
+
+  assertEquals(rejected(body), "An unresolved answer cannot carry answer content");
+});
+
 Deno.test("rejects prose that does not match the chosen option", () => {
   const body = buildValidDraft({
     answers: buildAnswers({
@@ -487,3 +548,33 @@ Deno.test("does not flag consistent short and long windows", () => {
     false,
   );
 });
+
+for (const [event, expected] of [
+  ["Convicted of DUI or DWI", false],
+  ["Licence suspended or revoked", true],
+  ["Both", true],
+  [null, false],
+] as const) {
+  Deno.test(`driving contradiction checks the reported event: ${event ?? "unspecified"}`, () => {
+    const draft = accepted(buildValidDraft({
+      answers: buildAnswers({
+        "DRV-01": {
+          disposition: "answered",
+          answerState: "yes",
+          answerText: "Yes",
+          details: event ? [{ label: "What happened?", value: event }] : [],
+        },
+        "DRV-02": {
+          disposition: "answered",
+          answerState: "no",
+          answerText: "No",
+        },
+      }),
+    }));
+
+    assertEquals(
+      draft.flags.some(flag => flag.id === "timeframe-contradiction"),
+      expected,
+    );
+  });
+}

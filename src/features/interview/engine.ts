@@ -1,5 +1,5 @@
 import { SECTION_BY_ID, SECTIONS } from "./sections";
-import { QUESTION_BANK } from "./questionBank";
+import { QUESTION_BANK, QUESTION_BY_ID } from "./questionBank";
 import { QUESTIONNAIRE_VERSION } from "./types";
 import type {
   AnswerRecord,
@@ -44,15 +44,20 @@ export function questionIndex(id: string): number {
 export function isApplicable(question: Question, answers: Answers): boolean {
   if (!question.askWhen) return true;
 
-  const parent = answers[question.askWhen.questionId];
-  if (!parent) return false;
-
-  const selected = new Set<string>();
-  if (parent.state) selected.add(parent.state);
-  if (parent.value) selected.add(parent.value);
-  for (const value of parent.values ?? []) selected.add(value);
-
-  return question.askWhen.includes.some((option) => selected.has(option));
+  const visited = new Set([question.id]);
+  let branch: Question["askWhen"] = question.askWhen;
+  while (branch) {
+    const parent: Question | undefined = QUESTION_BY_ID[branch.questionId];
+    const answer = answers[branch.questionId];
+    if (!parent || !answer || parent.reviewStatus === "human_review_required" || visited.has(parent.id)) {
+      return false;
+    }
+    const selected = [answer.state, answer.value, ...(answer.values ?? [])];
+    if (!branch.includes.some(option => selected.includes(option))) return false;
+    visited.add(parent.id);
+    branch = parent.askWhen;
+  }
+  return true;
 }
 
 export function isVisible(question: Question, answers: Answers): boolean {
@@ -83,7 +88,7 @@ export function answerHasContent(question: Question, answer: AnswerRecord | unde
   if (!answer) return false;
 
   if (question.kind === "yesno") {
-    return answer.state !== undefined || Object.values(answer.fields ?? {}).some(hasText);
+    return answer.state !== undefined;
   }
 
   if (question.compound) {
@@ -136,7 +141,7 @@ export function answerTextFor(question: Question, answer: AnswerRecord | undefin
   if (answer.values && answer.values.length > 0) {
     return answer.values.map((value) => optionLabel(question, value)).join(", ");
   }
-  if (answer.value) return optionLabel(question, answer.value);
+  if (answer.value) return optionLabel(question, answer.value).trim();
   if (question.compound) return "Details provided";
   return "No answer recorded";
 }
@@ -244,29 +249,18 @@ export function crisisDisclosed(answers: Answers): boolean {
  * portal. Held rows are never pruned because they are not branch answers.
  */
 export function pruneBranchClosedAnswers(answers: Answers): Answers {
-  let current = answers;
-
-  // Removing a direct child can make a grandchild unreachable only on the next
-  // pass. Keep recomputing visibility until no answer is removed, so a stale
-  // nested answer cannot reappear if the customer later reopens the branch.
-  for (;;) {
-    const visible = new Set(visibleQuestions(current).map((question) => question.id));
-    const next: Answers = {};
-    let changed = false;
-
-    for (const [questionId, answer] of Object.entries(current)) {
-      const question = ORDERED_QUESTIONS.find((candidate) => candidate.id === questionId);
-      if (!question) continue;
-      if (question.askWhen && !visible.has(questionId)) {
-        changed = true;
-        continue;
-      }
-      next[questionId] = answer;
+  const next: Answers = {};
+  let changed = false;
+  for (const [questionId, answer] of Object.entries(answers)) {
+    const question = ORDERED_QUESTIONS.find(candidate => candidate.id === questionId);
+    if (!question) continue;
+    if (question.askWhen && !isVisible(question, answers)) {
+      changed = true;
+      continue;
     }
-
-    if (!changed) return current;
-    current = next;
+    next[questionId] = answer;
   }
+  return changed ? next : answers;
 }
 
 export function unansweredQuestions(answers: Answers): Question[] {
@@ -283,6 +277,8 @@ export function toSubmittedAnswers(answers: Answers): SubmittedAnswer[] {
   return ORDERED_QUESTIONS.map((question) => {
     const answer = answers[question.id];
     const disposition = dispositionFor(question, answer, answers);
+    const includeDetail = disposition === "answered" &&
+      (question.kind !== "yesno" || answer?.state === "yes");
 
     return {
       questionId: question.id,
@@ -310,10 +306,10 @@ export function toSubmittedAnswers(answers: Answers): SubmittedAnswer[] {
             : disposition === "unresolved"
               ? "Not answered"
               : answerTextFor(question, answer),
-      // A closed branch or a held row must not carry the detail entered before
-      // the parent changed. Only an answered row emits component/detail data.
-      fields: disposition === "answered" ? fieldEntries(question, answer) : [],
-      details: disposition === "answered" ? detailEntries(question, answer) : [],
+      // Restored answers may retain old Yes-only detail after changing to No.
+      // Apply the server's contract here as well as in the question component.
+      fields: includeDetail ? fieldEntries(question, answer) : [],
+      details: includeDetail ? detailEntries(question, answer) : [],
     } satisfies SubmittedAnswer;
   });
 }

@@ -27,7 +27,10 @@ export function normaliseUsPhone(value: string): string | null {
 /** Age in whole years on a given date, computed in UTC. */
 export function ageOn(dateOfBirth: string, onDate = new Date()): number {
   const birth = new Date(`${dateOfBirth}T00:00:00.000Z`);
-  if (Number.isNaN(birth.getTime())) return Number.NaN;
+  // Date normalises impossible calendar days (February 30 becomes March 1).
+  // Match the server's strict date-only check instead of accepting that rollover.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth) || Number.isNaN(birth.getTime()) ||
+      birth.toISOString().slice(0, 10) !== dateOfBirth || Number.isNaN(onDate.getTime())) return Number.NaN;
   let age = onDate.getUTCFullYear() - birth.getUTCFullYear();
   const month = onDate.getUTCMonth() - birth.getUTCMonth();
   if (month < 0 || (month === 0 && onDate.getUTCDate() < birth.getUTCDate())) age -= 1;

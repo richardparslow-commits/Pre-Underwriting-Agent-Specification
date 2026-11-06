@@ -230,6 +230,7 @@ export interface CaseFlag {
   label: string;
   detail: string;
   severity: "info" | "attention" | "urgent";
+  questionIds?: string[];
 }
 
 export interface DraftSummary {

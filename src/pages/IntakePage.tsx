@@ -67,6 +67,7 @@ export default function IntakePage() {
         {interview.step === "interview" && current ? (
           <InterviewScreen
             answers={interview.answers}
+            sectionProgress={interview.progress.sections}
             current={current}
             crisis={interview.crisis}
             prefilled={interview.prefilledIds.includes(current.id)}

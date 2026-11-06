@@ -331,6 +331,26 @@ function ensurePreviewSeed(): void {
 // Submission
 // ---------------------------------------------------------------------------
 
+const UNCONFIRMED_SUBMISSION =
+  "We could not confirm whether this case was saved. Retry without changing your answers.";
+
+function isSubmissionReceipt(value: unknown): value is SubmissionReceipt {
+  if (!value || typeof value !== "object") return false;
+  const { reference, submittedAt, status, notification } = value as Record<string, unknown>;
+  if (typeof reference !== "string" || !reference.trim() ||
+      typeof submittedAt !== "string" || !Number.isFinite(Date.parse(submittedAt)) ||
+      typeof status !== "string" || !["saved", "submitted", "reviewed", "needs_clarification"].includes(status) ||
+      !notification || typeof notification !== "object") {
+    return false;
+  }
+
+  const { state, updatedAt, attempts, detail } = notification as Record<string, unknown>;
+  return typeof state === "string" && ["not_sent", "queued", "accepted", "delivered", "failed"].includes(state) &&
+    typeof updatedAt === "string" && Number.isFinite(Date.parse(updatedAt)) &&
+    typeof attempts === "number" && Number.isSafeInteger(attempts) && attempts >= 0 &&
+    (detail === undefined || typeof detail === "string");
+}
+
 async function submitLive(draft: CaseDraft, submissionKey: string): Promise<SubmissionReceipt> {
   if (!SUBMIT_CASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error("The submission service is not configured.");
@@ -345,6 +365,8 @@ async function submitLive(draft: CaseDraft, submissionKey: string): Promise<Subm
       "Idempotency-Key": submissionKey,
     },
     body: JSON.stringify(draft),
+  }).catch(() => {
+    throw new Error(UNCONFIRMED_SUBMISSION);
   });
 
   const body: unknown = await response.json().catch(() => null);
@@ -353,15 +375,15 @@ async function submitLive(draft: CaseDraft, submissionKey: string): Promise<Subm
     const message =
       body && typeof body === "object" && "error" in body && typeof body.error === "string"
         ? body.error
-        : "The case could not be submitted. Nothing was sent.";
+        : UNCONFIRMED_SUBMISSION;
     throw new Error(message);
   }
 
-  if (!body || typeof body !== "object" || !("reference" in body)) {
-    throw new Error("The submission service returned an unexpected response.");
+  if (!isSubmissionReceipt(body)) {
+    throw new Error(UNCONFIRMED_SUBMISSION);
   }
 
-  return body as SubmissionReceipt;
+  return body;
 }
 
 export async function submitCase(

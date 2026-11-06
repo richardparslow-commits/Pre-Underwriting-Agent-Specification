@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normaliseUsPhone, validateLead } from "./validation";
+import { ageOn, normaliseUsPhone, validateLead } from "./validation";
 import type { LeadDetails } from "@/features/interview/types";
 
 const BASE: Partial<LeadDetails> = {
@@ -16,6 +16,21 @@ const BASE: Partial<LeadDetails> = {
 function errors(patch: Partial<LeadDetails>) {
   return validateLead({ ...BASE, ...patch });
 }
+
+test("impossible calendar dates are rejected rather than normalised", () => {
+  for (const dateOfBirth of ["1980-02-30", "1981-02-29", "1980-04-31"]) {
+    assert.ok(errors({ dateOfBirth }).dateOfBirth, dateOfBirth);
+    assert.ok(Number.isNaN(ageOn(dateOfBirth)), dateOfBirth);
+  }
+  assert.equal(errors({ dateOfBirth: "1980-02-29" }).dateOfBirth, undefined);
+});
+
+test("adult boundary uses the actual birthday in UTC", () => {
+  const on = new Date("2026-11-04T00:00:00Z");
+  assert.equal(ageOn("2008-11-04", on), 18);
+  assert.equal(ageOn("2008-11-05", on), 17);
+  assert.ok(Number.isNaN(ageOn("1980-01-01", new Date("invalid"))));
+});
 
 test("a phone or text preference requires a reachable number", () => {
   assert.match(errors({ preferredContact: "phone" }).phone ?? "", /phone number/i);

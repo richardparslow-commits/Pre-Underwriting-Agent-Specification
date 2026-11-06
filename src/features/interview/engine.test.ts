@@ -1,20 +1,68 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  answerTextFor,
+  buildDraftSummary,
   crisisDisclosed,
   dispositionFor,
+  isVisible,
   ORDERED_QUESTIONS,
   pruneBranchClosedAnswers,
   toSubmittedAnswers,
 } from "./engine";
 import { QUESTION_BANK, QUESTION_BY_ID } from "./questionBank";
-import type { Answers } from "./types";
+import type { Answers, SubmittedAnswer } from "./types";
 
 const AT = "2026-10-27T12:00:00.000Z";
+
+test("review and submission trim surrounding whitespace while preserving text inside an answer", () => {
+  const question = QUESTION_BY_ID["MED-09"]!;
+  const answer = { value: "\n  Metformin  500 mg daily\t ", updatedAt: AT };
+  const row = toSubmittedAnswers({ [question.id]: answer }).find(
+    entry => entry.questionId === question.id,
+  );
+  assert.equal(answerTextFor(question, answer), "Metformin  500 mg daily");
+  assert.equal(row?.answerText, "Metformin  500 mg daily");
+});
+
+test("submission strips restored Yes-only details on No while preserving Yes details", () => {
+  const question = QUESTION_BANK.find(q => q.reviewStatus === "approved" &&
+    q.kind === "yesno" && !q.askWhen && q.detailPrompts?.length);
+  assert(question);
+  const details = Object.fromEntries(question.detailPrompts!.map(prompt => [prompt.id, "synthetic detail"]));
+  for (const state of ["yes", "no"] as const) {
+    const row: SubmittedAnswer = toSubmittedAnswers({ [question.id]: { state, details, updatedAt: AT } })
+      .find(r => r.questionId === question.id)!;
+    assert.equal(row.answerState, state);
+    assert.ok(row.details);
+    assert.equal(row.details.length, state === "yes" ? question.detailPrompts!.length : 0);
+  }
+});
 
 function withAnswer(answers: Answers, id: string, patch: Partial<Answers[string]>): Answers {
   return { ...answers, [id]: { ...(answers[id] ?? {}), ...patch, updatedAt: AT } };
 }
+
+test("restored military aviation details require an explicit Yes before submission", () => {
+  const answers: Answers = {
+    "MIL-01": { state: "yes", updatedAt: AT },
+    "MIL-02": { fields: { role: "crew", hours: "200" }, updatedAt: AT },
+  };
+
+  const unanswered = toSubmittedAnswers(answers).find(row => row.questionId === "MIL-02");
+  assert(unanswered);
+  assert.equal(unanswered.disposition, "unresolved");
+  assert.equal(unanswered.answerText, "Not answered");
+  assert.equal(unanswered.answerState, undefined);
+  assert.deepEqual(unanswered.fields, []);
+
+  const confirmed = toSubmittedAnswers(withAnswer(answers, "MIL-02", { state: "yes" }))
+    .find(row => row.questionId === "MIL-02");
+  assert(confirmed);
+  assert.equal(confirmed.disposition, "answered");
+  assert.equal(confirmed.answerState, "yes");
+  assert.deepEqual(confirmed.fields?.map(field => field.value), ["Air crew", "200"]);
+});
 
 test("closing a parent branch removes the descendant answer and its details", () => {
   const parent = QUESTION_BY_ID["MH-01"];
@@ -45,6 +93,16 @@ test("closing a nested branch removes descendants that are only visible through 
   assert.equal(answers["MIL-04"]?.values?.[0], "proficiency");
 
   const closed = withAnswer(answers, "MIL-01", { state: "no" });
+  const mission = QUESTION_BY_ID["MIL-04"]!;
+  assert.equal(isVisible(mission, answers), true);
+  assert.equal(isVisible(mission, closed), false);
+  const submitted = toSubmittedAnswers(closed);
+  const missionRow = submitted.find(row => row.questionId === mission.id);
+  assert.ok(missionRow);
+  assert.equal(missionRow.disposition, "not_asked");
+  assert.equal(missionRow.answerValues, undefined);
+  assert.doesNotMatch(JSON.stringify(buildDraftSummary(submitted)), /Proficiency flying only/);
+
   const pruned = pruneBranchClosedAnswers(closed);
 
   assert.equal(pruned["MIL-02"], undefined);
