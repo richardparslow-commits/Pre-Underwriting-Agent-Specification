@@ -641,17 +641,22 @@ export async function recordReview(
 
   if (!supabase) throw new Error("Sign-in is not configured.");
 
-  const { error } = await supabase.rpc("record_case_review", {
-    p_reference: reference,
-    p_action: action,
-    p_note: note ?? null,
-    // The database refuses a decision taken on a page whose status or case
-    // revision has moved on, instead of applying it over a clarification
-    // request or correction.
-    p_expected_status: expectedStatus ?? null,
-    p_expected_revision: expectedRevision ?? null,
-    p_request_id: requestId,
-  });
+  let error: { code?: string; name?: string; message?: string } | null = null;
+  try {
+    ({ error } = await supabase.rpc("record_case_review", {
+      p_reference: reference,
+      p_action: action,
+      p_note: note ?? null,
+      // The database refuses a decision taken on a page whose status or case
+      // revision has moved on, instead of applying it over a clarification
+      // request or correction.
+      p_expected_status: expectedStatus ?? null,
+      p_expected_revision: expectedRevision ?? null,
+      p_request_id: requestId,
+    }));
+  } catch (failure) {
+    throw reviewActionFailure(failure);
+  }
 
   if (error) {
     const message = error.message ?? "";
@@ -660,7 +665,7 @@ export async function recordReview(
       throw new Error(
         "This review retry was already used for a different decision. Refresh the case before recording another.",
       );
-    throw new Error("The review action could not be recorded.");
+    throw reviewActionFailure(error);
   }
 }
 
@@ -688,6 +693,17 @@ function isLostConnection(error: unknown): boolean {
         : "";
   return /failed to fetch|networkerror|network request failed|load failed|authretryablefetch|network_error/i.test(
     `${code} ${name} ${message}`,
+  );
+}
+
+export const REVIEW_CONNECTION_LOST =
+  "The review action could not be recorded because the connection was lost. Try again once you are back online.";
+
+export function reviewActionFailure(error: unknown): Error {
+  return new Error(
+    isLostConnection(error)
+      ? REVIEW_CONNECTION_LOST
+      : "The review action could not be recorded.",
   );
 }
 

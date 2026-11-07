@@ -1,7 +1,30 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { getCase, listCases, recordReview } from "./api";
+import {
+  getCase,
+  listCases,
+  recordReview,
+  REVIEW_CONNECTION_LOST,
+  reviewActionFailure,
+} from "./api";
+
+test("an offline review failure names the lost connection", () => {
+  for (const failure of [
+    new TypeError("Failed to fetch"),
+    { code: "network_error", message: "Synthetic offline" },
+  ]) {
+    const mapped = reviewActionFailure(failure);
+    assert.equal(mapped.message, REVIEW_CONNECTION_LOST);
+    assert.match(mapped.message, /connection was lost/i);
+  }
+});
+
+test("a review server refusal remains a generic review failure", () => {
+  const failure = reviewActionFailure({ message: "Not authorised" });
+  assert.equal(failure.message, "The review action could not be recorded.");
+  assert.doesNotMatch(failure.message, /connection/i);
+});
 
 test("preview mode refuses stale decisions and replays the same review request", async () => {
   const page = await listCases();
