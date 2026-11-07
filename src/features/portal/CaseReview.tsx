@@ -200,7 +200,13 @@ export function CaseReview({
     setBusy(action);
     setError(null);
     try {
-      await recordReview(record.reference, action, actionNote, record.status);
+      await recordReview(
+        record.reference,
+        action,
+        actionNote,
+        record.status,
+        record.reviewRevision,
+      );
       setClarifyOpen(false);
       setNote("");
       await onRefresh();

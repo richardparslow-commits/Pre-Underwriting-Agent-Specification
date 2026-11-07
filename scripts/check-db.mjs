@@ -172,6 +172,16 @@ async function claims(aal, id = reviewer, email = "reviewer@example.com") {
   await exec(`select set_config('request.jwt.claims', '${JSON.stringify({ sub: id, email, aal })}', false);`);
 }
 
+async function revisionOf(reference) {
+  await exec("reset role;");
+  const [row] = await query(
+    "select review_revision from public.cases where reference = $1",
+    [reference],
+  );
+  await exec("set role authenticated;");
+  return Number(row.review_revision);
+}
+
 await pass(
   "RLS enabled on sensitive tables",
   () =>
@@ -351,7 +361,54 @@ await pass(
   (rows) => rows[0].status === "reviewed",
 );
 
+// Heal s13-stale-page-review-after-status-round-trip: matching status is not
+// enough when the page missed a status round-trip or a correction.
+const roundTripRevision = await revisionOf("LPP-2026-TEST01");
+await pass(
+  "reviewer can request clarification with the revision the page showed",
+  () => query(
+    "select public.record_case_review('LPP-2026-TEST01','requested_clarification','Round-trip request','reviewed',$1)",
+    [roundTripRevision],
+  ),
+  () => true,
+);
+const returnRevision = await revisionOf("LPP-2026-TEST01");
+await pass(
+  "reviewer can return the status with the new revision",
+  () => query(
+    "select public.record_case_review('LPP-2026-TEST01','marked_reviewed','Round-trip return','needs_clarification',$1)",
+    [returnRevision],
+  ),
+  () => true,
+);
+await expectError(
+  "a decision from before a status round-trip is refused even when the status matches",
+  () => query(
+    "select public.record_case_review('LPP-2026-TEST01','marked_reviewed','Stale round trip','reviewed',$1)",
+    [roundTripRevision],
+  ),
+  "changed since you opened",
+);
+
+const correctionRevision = await revisionOf("LPP-2026-TEST01");
+await pass(
+  "reviewer can record a correction after the page opened",
+  () => query(
+    "select public.record_case_correction('LPP-2026-TEST01','Correction after page open','66666666-6666-4666-8666-666666666666'::uuid)",
+  ),
+  () => true,
+);
+await expectError(
+  "a decision from before a correction is refused even when the status matches",
+  () => query(
+    "select public.record_case_review('LPP-2026-TEST01','marked_reviewed','Stale correction decision','reviewed',$1)",
+    [correctionRevision],
+  ),
+  "changed since you opened",
+);
+
 // Heal s6-signed-out-session-still-reads-queue: the token's session must exist.
+await exec("reset role;");
 await exec(
   "create table if not exists auth.sessions (id uuid primary key, user_id uuid not null)",
 );
