@@ -87,6 +87,7 @@ for (let round = 1; round <= 2; round += 1) {
 const reviewer = "11111111-1111-4111-8111-111111111111";
 const other = "22222222-2222-4222-8222-222222222222";
 const caseId = "33333333-3333-4333-8333-333333333333";
+const caseIdHigh = "44444444-4444-4444-8444-444444444444";
 
 const payload = {
   reference: "LPP-2026-TEST01",
@@ -139,6 +140,21 @@ await query(
     "2026-10-27T12:00:00.000Z",
     JSON.stringify({ ...payload, reference: "LPP-2026-BURIED" }),
   ],
+);
+await query(
+  `insert into public.cases
+    (id, reference, submitted_at, server_received_at, idempotency_key, questionnaire_version, status, crisis_disclosure, residence_state, payload)
+   values ($1,'LPP-2026-HIGHLG',$2,$2,'idem-key-highlog','2026.10-draft.9','submitted',false,'TX',$3::jsonb)`,
+  [
+    caseIdHigh,
+    "2026-10-27T12:00:00.000Z",
+    JSON.stringify({ ...payload, reference: "LPP-2026-HIGHLG" }),
+  ],
+);
+await query(
+  `insert into public.case_review_log (case_id, action, actor, note, created_at)
+   values ($1,'requested_clarification','reviewer@example.com','Recent clarification note', now() - interval '1 minute')`,
+  [caseIdHigh],
 );
 await query(
   `insert into public.case_review_log (case_id, action, actor, note, created_at)
@@ -237,7 +253,33 @@ for (const [name, sql] of [
 }
 await pass("aal2 reviewer opens a case through the audited RPC", () => query("select public.open_case_for_review('LPP-2026-TEST01') result"), (rows) => rows[0].result?.case?.reference === "LPP-2026-TEST01" && rows[0].result?.review_log?.[0]?.action === "opened");
 await pass("missing case returns no payload", () => query("select public.open_case_for_review('LPP-2026-MISSING') result"), (rows) => rows[0].result === null);
-await pass("second open is also audited", () => query("select public.open_case_for_review('LPP-2026-TEST01') result"), (rows) => rows[0].result?.review_log?.filter((entry) => entry.action === "opened").length === 2);
+await pass(
+  "second recent open is coalesced in the bounded page while both opens remain audited",
+  async () => {
+    const [opened] = await query("select public.open_case_for_review('LPP-2026-TEST01') result");
+    await exec("reset role;");
+    const [raw] = await query(
+      "select count(*)::int n from public.case_review_log where case_id = $1 and action = 'opened' and actor = 'reviewer@example.com'",
+      [caseId],
+    );
+    await exec("set role authenticated;");
+    return opened.result?.review_log?.filter((entry) => entry.action === "opened").length === 1 && raw.n === 2;
+  },
+  (found) => found === true,
+);
+await pass(
+  "twenty recent opens do not bury the clarification note that prompted them",
+  async () => {
+    let latest;
+    for (let index = 0; index < 20; index += 1) {
+      const [opened] = await query("select public.open_case_for_review('LPP-2026-HIGHLG') result");
+      latest = opened.result;
+    }
+    return latest?.review_log?.some((entry) => entry.note === "Recent clarification note") &&
+      latest.review_log.filter((entry) => entry.action === "opened").length === 1;
+  },
+  (found) => found === true,
+);
 await pass(
   "a consequential action remains accessible beyond the first history page",
   async () => {
