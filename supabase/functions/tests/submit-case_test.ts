@@ -123,6 +123,150 @@ Deno.test("a saved case returns its receipt after an email timeout and an unchan
   }
 });
 
+Deno.test("a provider bounce during a send is reported as failed, not accepted", async () => {
+  const values = {
+    QUESTIONNAIRE_APPROVED: "true",
+    SUPABASE_URL: "http://database.test",
+    SUPABASE_SERVICE_ROLE_KEY: "synthetic-key",
+    RESEND_API_KEY: "synthetic-key",
+    RATE_LIMIT_SALT: "synthetic-salt",
+    REVIEWER_PORTAL_URL: "https://example.test/reviewer",
+  };
+  const saved = new Map(
+    Object.keys(values).map((key) => [key, Deno.env.get(key)]),
+  );
+  const originalFetch = globalThis.fetch;
+  let row: Record<string, unknown> | undefined;
+  let readBack = false;
+  let inserts = 0;
+  const json = (value: unknown) => Response.json(value);
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const request = new Request(input, init);
+    const url = new URL(request.url);
+    if (url.hostname === "api.resend.com") {
+      // The signed bounce wins the race with the provider's accepted send.
+      row!.notification_state = "failed";
+      row!.notification_detail = JSON.stringify({
+        provider: "resend",
+        messageId: null,
+        note: "Provider reported a bounce",
+      });
+      row!.notification_updated_at = new Date().toISOString();
+      return json({ id: "synthetic-bounced-message" });
+    }
+    if (url.pathname.endsWith("/consume_submission_rate")) return json(true);
+    if (url.pathname === "/rest/v1/cases" && request.method === "GET") {
+      if (url.searchParams.get("reference")?.startsWith("eq.")) readBack = true;
+      return json(row ? [row] : []);
+    }
+    if (url.pathname === "/rest/v1/cases" && request.method === "POST") {
+      row = await request.json();
+      inserts++;
+      return new Response(null, { status: 201 });
+    }
+    if (url.pathname.endsWith("/claim_case_notification")) {
+      return json([{ notification_attempts: 1 }]);
+    }
+    if (url.pathname.endsWith("/complete_case_notification")) {
+      const body = await request.json();
+      // 0017 keeps a provider failure authoritative over an accepted result.
+      if (row!.notification_state !== "failed") {
+        row!.notification_state = body.p_state;
+        row!.notification_detail = body.p_detail;
+      }
+      row!.notification_attempts = 1;
+      return json(null);
+    }
+    throw new Error(`Unexpected synthetic request: ${url.pathname}`);
+  }) as typeof fetch;
+  try {
+    for (const [key, value] of Object.entries(values)) Deno.env.set(key, value);
+    const response = await submit(buildValidDraft(), "bounce-during-send-0001");
+    const receipt = await response.json();
+
+    assertEquals(response.status, 201);
+    assertEquals(receipt.notification.state, "failed");
+    assertEquals(receipt.notification.detail, "Provider reported a bounce");
+    assertEquals(row!.notification_state, "failed");
+    assertEquals(readBack, true, "the receipt must use the stored state");
+    assertEquals(inserts, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [key, value] of saved) {
+      value === undefined ? Deno.env.delete(key) : Deno.env.set(key, value);
+    }
+  }
+});
+
+Deno.test("an unavailable notification read-back cannot claim provider acceptance", async () => {
+  const values = {
+    QUESTIONNAIRE_APPROVED: "true",
+    SUPABASE_URL: "http://database.test",
+    SUPABASE_SERVICE_ROLE_KEY: "synthetic-key",
+    RESEND_API_KEY: "synthetic-key",
+    RATE_LIMIT_SALT: "synthetic-salt",
+    REVIEWER_PORTAL_URL: "https://example.test/reviewer",
+  };
+  const saved = new Map(
+    Object.keys(values).map((key) => [key, Deno.env.get(key)]),
+  );
+  const originalFetch = globalThis.fetch;
+  let row: Record<string, unknown> | undefined;
+  let readBack = false;
+  const json = (value: unknown) => Response.json(value);
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const request = new Request(input, init);
+    const url = new URL(request.url);
+    if (url.hostname === "api.resend.com") {
+      return json({ id: "synthetic-accepted-message" });
+    }
+    if (url.pathname.endsWith("/consume_submission_rate")) return json(true);
+    if (url.pathname === "/rest/v1/cases" && request.method === "GET") {
+      if (url.searchParams.get("reference")?.startsWith("eq.")) {
+        readBack = true;
+        return new Response(JSON.stringify({ message: "synthetic read failure" }), {
+          status: 500,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return json(row ? [row] : []);
+    }
+    if (url.pathname === "/rest/v1/cases" && request.method === "POST") {
+      row = await request.json();
+      return new Response(null, { status: 201 });
+    }
+    if (url.pathname.endsWith("/claim_case_notification")) {
+      return json([{ notification_attempts: 1 }]);
+    }
+    if (url.pathname.endsWith("/complete_case_notification")) {
+      const body = await request.json();
+      row!.notification_state = body.p_state;
+      row!.notification_detail = body.p_detail;
+      row!.notification_attempts = 1;
+      return json(null);
+    }
+    throw new Error(`Unexpected synthetic request: ${url.pathname}`);
+  }) as typeof fetch;
+  try {
+    for (const [key, value] of Object.entries(values)) Deno.env.set(key, value);
+    const response = await submit(buildValidDraft(), "unconfirmed-readback-0001");
+    const receipt = await response.json();
+
+    assertEquals(response.status, 201);
+    assertEquals(receipt.notification.state, "failed");
+    assertEquals(
+      receipt.notification.detail,
+      "Notification status could not be confirmed after sending",
+    );
+    assertEquals(readBack, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [key, value] of saved) {
+      value === undefined ? Deno.env.delete(key) : Deno.env.set(key, value);
+    }
+  }
+});
+
 Deno.test("allows the idempotency header in the CORS preflight", async () => {
   if (!handler) throw new Error("submit-case handler was not captured");
   const response = await handler(
