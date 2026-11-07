@@ -12,6 +12,7 @@ import { QUESTIONNAIRE_VERSION, SERVER_BANK } from "./bank.generated.ts";
 import { CONSENT_POLICY } from "./policy.generated.ts";
 import { leadTextErrors } from "./lead-validation.ts";
 import { answerConsistencyFlags } from "./answer-consistency.ts";
+import { US_STATE_TIME_ZONES } from "./marketing-policy.ts";
 
 // -----------------------------------------------------------------------------
 // CORS
@@ -358,14 +359,49 @@ function stateCode(value: string): string | null {
   return US_STATE_NAMES[trimmed.toLowerCase()] ?? null;
 }
 
-/** Age in whole years on a specific date, computed in UTC. */
+/** Age in whole years on a date-only calendar day. */
 function ageOn(dateOfBirth: string, onDate: string): number {
   const birth = new Date(`${dateOfBirth}T00:00:00.000Z`);
-  const on = new Date(onDate);
+  const on = new Date(`${onDate}T00:00:00.000Z`);
   let age = on.getUTCFullYear() - birth.getUTCFullYear();
   const month = on.getUTCMonth() - birth.getUTCMonth();
   if (month < 0 || (month === 0 && on.getUTCDate() < birth.getUTCDate())) age -= 1;
   return age;
+}
+
+/**
+ * The earliest calendar date in the lead's state at this instant. A state can
+ * span time zones; the earliest date is the conservative choice because the
+ * lead does not collect a time zone. A submission is only old enough when the
+ * 18th birthday has begun everywhere in the state.
+ */
+function stateLocalDate(state: string, instant: string): string | null {
+  const zones = US_STATE_TIME_ZONES[state.toUpperCase()];
+  if (!zones || zones.length === 0) return null;
+
+  let earliest: string | null = null;
+  for (const zone of zones) {
+    let date: string | null = null;
+    try {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: zone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(new Date(instant));
+      const value = (type: "year" | "month" | "day") =>
+        parts.find((part) => part.type === type)?.value;
+      const year = value("year");
+      const month = value("month");
+      const day = value("day");
+      if (year && month && day) date = `${year}-${month}-${day}`;
+    } catch {
+      return null;
+    }
+    if (!date) return null;
+    if (earliest === null || date < earliest) earliest = date;
+  }
+  return earliest;
 }
 
 function stateText(state: AnswerStateValue): string {
@@ -650,7 +686,10 @@ export function validateDraft(body: unknown): ValidationResult {
   if (!email || !looksLikeEmail(email)) return { ok: false, reason: "Invalid email address" };
   if (!dateOfBirth) return { ok: false, reason: "A valid date of birth is required" };
 
-  const age = ageOn(dateOfBirth, completedAt);
+  const localDate = stateLocalDate(state, completedAt);
+  if (!localDate) return { ok: false, reason: "State of residence is not supported" };
+
+  const age = ageOn(dateOfBirth, localDate);
   if (age < 18) {
     return { ok: false, reason: "This interview is only available to adults aged 18 or over" };
   }

@@ -29,6 +29,35 @@ function accepted(body: unknown) {
   return result.draft;
 }
 
+function boundaryDraft(completedAt: string, dateOfBirth: string) {
+  const startedAt = new Date(Date.parse(completedAt) - 30 * 60_000).toISOString();
+  const consents = buildConsents().map((record) => ({ ...record, grantedAt: startedAt }));
+  return buildValidDraft({
+    startedAt,
+    completedAt,
+    lead: {
+      firstName: "Test",
+      lastName: "Boundary",
+      state: "TX",
+      email: "boundary@example.com",
+      preferredContact: "email",
+      dateOfBirth,
+    },
+    consents,
+    acknowledgements: [
+      {
+        id: "submission_requested",
+        text: TEST_CONSENT.submissionAcknowledgementText,
+        textVersion: TEST_CONSENT.consentVersion,
+        timestamp: startedAt,
+      },
+    ],
+    answers: buildAnswers({
+      "ID-01": { disposition: "answered", answerText: dateOfBirth },
+    }),
+  });
+}
+
 Deno.test("accepts a complete canonical draft and rebuilds source rows", () => {
   const draft = accepted(buildValidDraft());
 
@@ -239,6 +268,24 @@ Deno.test("rejects a 17-year-old applicant", () => {
     rejected(body),
     "This interview is only available to adults aged 18 or over",
   );
+});
+
+Deno.test("rejects a 17-year-old before their local 18th birthday", () => {
+  // 22:30 on January 1 in Texas, while UTC has already reached January 2.
+  const body = boundaryDraft("2026-01-02T04:30:00.000Z", "2008-01-02");
+
+  assertEquals(
+    rejected(body),
+    "This interview is only available to adults aged 18 or over",
+  );
+});
+
+Deno.test("accepts an 18-year-old once their local birthday begins", () => {
+  // 01:30 on January 2 in Chicago and 00:30 in Denver: both Texas zones
+  // have crossed the local birthday boundary.
+  const body = boundaryDraft("2026-01-02T07:30:00.000Z", "2008-01-02");
+
+  assert(accepted(body));
 });
 
 Deno.test("rejects a non-US or invented state code", () => {
