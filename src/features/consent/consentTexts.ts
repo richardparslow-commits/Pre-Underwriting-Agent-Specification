@@ -1,4 +1,4 @@
-import { FEATURES, MARKETING, SITE } from "@/config/site";
+import { FEATURES, MARKETING, MARKETING_ENABLED, SITE } from "@/config/site";
 import {
   buildConsentRecords as buildConsentRecordsFrom,
   buildMarketingDisclosure,
@@ -59,6 +59,12 @@ const CONSENT_CONTEXT: ConsentContext = {
  * which is also when no marketing consent controls are rendered.
  */
 export const MARKETING_DISCLOSURE_TEXT = buildMarketingDisclosure(CONSENT_CONTEXT);
+
+/** Channels the generated server policy is allowed to validate. */
+export const MARKETING_CONSENT_CHANNELS = {
+  calls: MARKETING_ENABLED && MARKETING.calls,
+  texts: MARKETING_ENABLED && MARKETING.texts,
+} as const;
 
 export const SUBMISSION_ACKNOWLEDGEMENT_TEXT = `I have reviewed the answers shown on this page and they are complete and accurate to the best of my knowledge. I understand this is a preliminary review request, not a carrier application, an offer of insurance, or an approval, and that ${SITE.owner} may contact me to clarify anything I have marked uncertain or declined.`;
 

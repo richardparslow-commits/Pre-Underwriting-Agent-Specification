@@ -209,6 +209,22 @@ export interface ServerDraft {
   serverReceivedAt?: string;
 }
 
+export interface ConsentPolicy {
+  readonly consentVersion: string;
+  readonly disclosureVersion: string;
+  readonly privacyVersion: string;
+  readonly intakePermissionText: string;
+  readonly privacyAcknowledgementText: string;
+  readonly marketingCallLabel: string;
+  readonly marketingTextLabel: string;
+  readonly marketingDisclosure: string;
+  readonly submissionAcknowledgementText: string;
+  readonly marketingChannels: {
+    readonly calls: boolean;
+    readonly texts: boolean;
+  };
+}
+
 export type ValidationResult =
   | { ok: true; draft: ServerDraft }
   | { ok: false; reason: string };
@@ -629,7 +645,10 @@ function derivedFlags(answers: ServerAnswer[]): ServerFlag[] {
  * timeframe, review status, disposition and derived flag comes from the
  * server-side bank; none of it is trusted from the caller.
  */
-export function validateDraft(body: unknown): ValidationResult {
+export function validateDraft(
+  body: unknown,
+  policy: ConsentPolicy = CONSENT_POLICY,
+): ValidationResult {
   if (!isRecord(body)) return { ok: false, reason: "Invalid submission" };
 
   if (body.relationship !== "self" || body.adultAttested !== true) {
@@ -729,13 +748,13 @@ export function validateDraft(body: unknown): ValidationResult {
   > = {
     intake_permission: {
       label: "Preliminary intake and submission",
-      text: CONSENT_POLICY.intakePermissionText,
-      version: CONSENT_POLICY.consentVersion,
+      text: policy.intakePermissionText,
+      version: policy.consentVersion,
     },
     privacy_acknowledgement: {
       label: "Privacy practices acknowledgement",
-      text: CONSENT_POLICY.privacyAcknowledgementText,
-      version: CONSENT_POLICY.privacyVersion,
+      text: policy.privacyAcknowledgementText,
+      version: policy.privacyVersion,
     },
   };
 
@@ -747,16 +766,92 @@ export function validateDraft(body: unknown): ValidationResult {
 
     const id = text(raw.id, 64);
     if (!id) return { ok: false, reason: "Incomplete consent evidence" };
-    if (id.startsWith("marketing_")) {
-      return {
-        ok: false,
-        reason: "Marketing consent is not enabled for this deployment",
-      };
+    if (seenConsents.has(id)) return { ok: false, reason: "Duplicate consent record" };
+
+    if (id === "marketing_call" || id === "marketing_text") {
+      const enabled =
+        id === "marketing_call"
+          ? policy.marketingChannels.calls
+          : policy.marketingChannels.texts;
+      if (raw.granted !== true && raw.granted !== false) {
+        return { ok: false, reason: "Invalid consent record" };
+      }
+      if (raw.granted === true && !enabled) {
+        return {
+          ok: false,
+          reason: "Marketing consent is not enabled for this deployment",
+        };
+      }
+
+      const expectedLabel =
+        id === "marketing_call" ? policy.marketingCallLabel : policy.marketingTextLabel;
+      const label = text(raw.label, 200);
+      const textVersion = text(raw.textVersion, 64);
+      const consentText = text(raw.text, MAX_TEXT);
+      if (
+        label !== expectedLabel ||
+        textVersion !== policy.consentVersion ||
+        !consentText ||
+        hasControlChars(consentText)
+      ) {
+        return { ok: false, reason: "Consent evidence does not match the displayed wording" };
+      }
+      // A client may have offered the channel while this server policy does
+      // not. A declined record grants nothing, so keep the evidence instead
+      // of failing the whole case. If the channel is enabled, the disclosure
+      // must match the server's exact wording.
+      if (enabled && consentText !== policy.marketingDisclosure) {
+        return { ok: false, reason: "Consent evidence does not match the displayed wording" };
+      }
+
+      if (raw.granted === false) {
+        if (raw.grantedAt != null || raw.numberAuthorized != null) {
+          return { ok: false, reason: "Invalid consent record" };
+        }
+        seenConsents.add(id);
+        consents.push({
+          id,
+          label,
+          granted: false,
+          grantedAt: null,
+          textVersion,
+          text: consentText,
+        });
+        continue;
+      }
+
+      const grantedAt = isoish(raw.grantedAt);
+      if (!grantedAt) return { ok: false, reason: "Missing consent timestamp" };
+      const grantedMs = Date.parse(grantedAt);
+      if (
+        grantedMs < startedMs - CLOCK_SKEW_MS ||
+        grantedMs > completedMs + CLOCK_SKEW_MS ||
+        grantedMs > now + CLOCK_SKEW_MS
+      ) {
+        return { ok: false, reason: "Consent timestamp is inconsistent with the submission" };
+      }
+
+      const authorized = optionalText(raw.numberAuthorized, 40);
+      const normalizedNumber = authorized ? normalisePhone(authorized) : null;
+      if (!normalizedNumber || !phone || normalizedNumber !== phone) {
+        return { ok: false, reason: "Consent evidence does not match the displayed wording" };
+      }
+      seenConsents.add(id);
+      consents.push({
+        id,
+        label,
+        granted: true,
+        grantedAt,
+        textVersion,
+        text: consentText,
+        numberAuthorized: normalizedNumber,
+      });
+      continue;
     }
+
     if (id !== "intake_permission" && id !== "privacy_acknowledgement") {
       return { ok: false, reason: "Unknown consent record" };
     }
-    if (seenConsents.has(id)) return { ok: false, reason: "Duplicate consent record" };
     seenConsents.add(id);
 
     const expected = canonicalConsents[id];
@@ -825,8 +920,8 @@ export function validateDraft(body: unknown): ValidationResult {
 
   if (
     rawAcknowledgement.id !== "submission_requested" ||
-    acknowledgementText !== CONSENT_POLICY.submissionAcknowledgementText ||
-    acknowledgementVersion !== CONSENT_POLICY.consentVersion ||
+    acknowledgementText !== policy.submissionAcknowledgementText ||
+    acknowledgementVersion !== policy.consentVersion ||
     !acknowledgementAt
   ) {
     return { ok: false, reason: "Submission acknowledgement is not current" };

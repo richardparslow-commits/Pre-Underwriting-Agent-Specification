@@ -14,8 +14,10 @@ import { submissionEndpoint } from "./submissionEndpoint";
  * module importable by the Node scripts that generate the server-side policy
  * and question bank, where a bundler is not present.
  */
+const NODE_ENV: Record<string, string | undefined> =
+  typeof process !== "undefined" ? process.env : {};
 const ENV: Record<string, string | undefined> =
-  (import.meta as { env?: Record<string, string | undefined> }).env ?? {};
+  (import.meta as { env?: Record<string, string | undefined> }).env ?? NODE_ENV;
 
 /**
  * The actual legal operating entity. Supplied at build time so no placeholder

@@ -104,7 +104,7 @@ provider confirmation, which this repository cannot supply.
 
 ## Marketing revocation and suppression
 
-Marketing calls and texts are **disabled** in the current build and `submit-case` rejects any marketing consent record. No outbound marketing is authorised.
+Marketing calls and texts are **disabled** in the current build and `submit-case` rejects any granted marketing consent record. A declined channel record is retained as evidence but grants nothing, so a client that offered the box cannot strand an otherwise complete case. No outbound marketing is authorised.
 
 ### Customer path
 

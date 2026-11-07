@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label, Select } from "@/components/ui/form";
 import { Alert, Badge, Checkbox } from "@/components/ui/surface";
 import { MARKETING, MARKETING_ENABLED, SITE } from "@/config/site";
+import { CONSENT_POLICY } from "../../../supabase/functions/_shared/policy.generated";
 import {
   CONTACT_PREFERENCES,
   MARKETING_CALL_LABEL,
@@ -76,6 +77,10 @@ export function LeadForm({
       : MARKETING.calls
         ? "Marketing calls are optional"
         : "Marketing texts are optional";
+  const serverMarketing = CONSENT_POLICY.marketingChannels;
+  const missingServerChannel =
+    (MARKETING.calls && !serverMarketing.calls) ||
+    (MARKETING.texts && !serverMarketing.texts);
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -445,6 +450,11 @@ export function LeadForm({
               Leaving any box unchecked does not stop your review and does not change how quickly
               you hear back. You can submit with every box off.
             </p>
+            {missingServerChannel ? (
+              <p className="field-help">
+                Some marketing choices are not available in this deployment yet.
+              </p>
+            ) : null}
 
             <div className="mt-3 space-y-2.5">
               {MARKETING.calls ? (
@@ -452,7 +462,7 @@ export function LeadForm({
                   <Checkbox
                     checked={consent.marketingCall}
                     onChange={(event) => onConsent("marketingCall", event.target.checked)}
-                    disabled={!needsPhone}
+                    disabled={!needsPhone || !serverMarketing.calls}
                   />
                   <span>
                     {MARKETING_CALL_LABEL}
@@ -469,7 +479,7 @@ export function LeadForm({
                   <Checkbox
                     checked={consent.marketingText}
                     onChange={(event) => onConsent("marketingText", event.target.checked)}
-                    disabled={!needsPhone}
+                    disabled={!needsPhone || !serverMarketing.texts}
                   />
                   <span>
                     {MARKETING_TEXT_LABEL}
