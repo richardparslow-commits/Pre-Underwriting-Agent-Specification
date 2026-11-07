@@ -57,9 +57,13 @@ export function LeadForm({
   }, [showValidation]);
 
   const latestAdultBirthDate = (() => {
+    // The date control's ceiling is the local calendar date: a UTC ceiling
+    // moves a day ahead during US evenings and accepts a 17-year-old.
     const date = new Date();
-    date.setUTCFullYear(date.getUTCFullYear() - 18);
-    return date.toISOString().slice(0, 10);
+    date.setFullYear(date.getFullYear() - 18);
+    const month = `${date.getMonth() + 1}`.padStart(2, "0");
+    const day = `${date.getDate()}`.padStart(2, "0");
+    return `${date.getFullYear()}-${month}-${day}`;
   })();
 
   const needsPhone = lead.preferredContact === "phone" || lead.preferredContact === "text";
@@ -454,7 +458,7 @@ export function LeadForm({
                     {MARKETING_CALL_LABEL}
                     {!needsPhone ? (
                       <span className="mt-0.5 block text-xs text-muted-foreground">
-                        Add a telephone number above to make this available.
+                        Choose Phone call or Text message as your contact method to make this available.
                       </span>
                     ) : null}
                   </span>
@@ -471,7 +475,7 @@ export function LeadForm({
                     {MARKETING_TEXT_LABEL}
                     {!needsPhone ? (
                       <span className="mt-0.5 block text-xs text-muted-foreground">
-                        Add a telephone number above to make this available.
+                        Choose Phone call or Text message as your contact method to make this available.
                       </span>
                     ) : null}
                   </span>

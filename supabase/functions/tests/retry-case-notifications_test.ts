@@ -63,6 +63,11 @@ async function withFixture(
     const url = new URL(request.url);
     requests.push(url);
     if (url.pathname === "/rest/v1/cases") {
+      // The worker re-reads one case after completion to count the stored state.
+      const referenceOnly = url.searchParams.get("reference");
+      if (referenceOnly && !url.searchParams.has("submitted_at")) {
+        return json(rows.filter((row) => row.reference === referenceOnly.slice(3)));
+      }
       const ors = url.searchParams.getAll("or");
       // Apply each independent PostgREST OR clause before the requested limit.
       const matches = rows.filter((row) => {
@@ -123,6 +128,17 @@ async function withFixture(
       );
     }
     if (url.pathname === "/rest/v1/rpc/complete_case_notification") {
+      // Model migration 0019: a provider-reported failure stays authoritative
+      // over a later in-flight send result.
+      const body = await request.json();
+      const row = rows.find((item) => item.reference === body.p_reference);
+      if (row) {
+        if (row.notification_provider_state === "failed") {
+          row.notification_state = "failed";
+        } else if (row.notification_state !== "delivered") {
+          row.notification_state = body.p_state;
+        }
+      }
       return json(null);
     }
     if (url.hostname === "api.resend.com") {

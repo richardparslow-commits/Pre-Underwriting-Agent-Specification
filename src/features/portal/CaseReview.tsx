@@ -200,14 +200,17 @@ export function CaseReview({
     setBusy(action);
     setError(null);
     try {
-      await recordReview(record.reference, action, actionNote);
+      await recordReview(record.reference, action, actionNote, record.status);
       setClarifyOpen(false);
       setNote("");
       await onRefresh();
     } catch (actionError) {
-      setError(
-        actionError instanceof Error ? actionError.message : "The review action was not recorded.",
-      );
+      const message =
+        actionError instanceof Error ? actionError.message : "The review action was not recorded.";
+      setError(message);
+      // A conflict means another tab or reviewer changed the case while this
+      // page was open; show its current status instead of the stale one.
+      if (/changed since you opened/i.test(message)) await onRefresh();
     } finally {
       setBusy(false);
     }

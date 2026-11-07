@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Check, Copy, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,18 +16,31 @@ export function ConfirmationScreen({
   onStartOver: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const referenceRef = useRef<HTMLParagraphElement>(null);
   const notificationSent = ["queued", "accepted", "delivered"].includes(
     receipt.notification.state,
   );
   const notificationFailed = receipt.notification.state === "failed";
 
   async function copyReference() {
+    setCopyError(null);
     try {
       await navigator.clipboard.writeText(receipt.reference);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       setCopied(false);
+      setCopyError("The reference could not be copied. Select it above and copy it manually.");
+      // Leave the prospect a usable path when the clipboard is denied.
+      const node = referenceRef.current;
+      if (node && typeof window.getSelection === "function") {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      }
     }
   }
 
@@ -53,15 +66,24 @@ export function ConfirmationScreen({
       <section className="panel flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="eyebrow">Case reference</p>
-          <p className="mt-1 font-mono text-2xl tracking-tight">{receipt.reference}</p>
+          <p ref={referenceRef} className="mt-1 font-mono text-2xl tracking-tight">
+            {receipt.reference}
+          </p>
           <p className="mt-1 text-xs text-muted-foreground">
             Keep this. Quote it in any follow-up about this review.
           </p>
         </div>
-        <Button type="button" variant="outline" onClick={copyReference}>
-          {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
-          {copied ? "Copied" : "Copy reference"}
-        </Button>
+        <div>
+          <Button type="button" variant="outline" onClick={copyReference}>
+            {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+            {copied ? "Copied" : "Copy reference"}
+          </Button>
+          {copyError ? (
+            <p role="alert" className="mt-2 max-w-xs text-xs text-danger">
+              {copyError}
+            </p>
+          ) : null}
+        </div>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">

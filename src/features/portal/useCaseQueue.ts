@@ -8,12 +8,14 @@ export function useCaseQueue(
   sessionKey: string | null,
 ) {
   const [cases, setCases] = useState<CaseListItem[] | null>(null);
-  const [total, setTotal] = useState(0);
+  // Null means the total is unknown because the first page could not be read.
+  const [total, setTotal] = useState<number | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [queueChanged, setQueueChanged] = useState(false);
   const loaded = useRef<CaseListItem[]>([]);
   const baseline = useRef<{ total: number; headCursor?: string | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [appendError, setAppendError] = useState<string | null>(null);
   const [loading, setLoading] = useState(active);
   const [loadingMore, setLoadingMore] = useState(false);
   const generation = useRef(0);
@@ -28,9 +30,13 @@ export function useCaseQueue(
     inFlight.current = true;
     const requestGeneration = generation.current;
     const appending = Boolean(cursor);
-    if (appending) setLoadingMore(true);
-    else setLoading(true);
-    setError(null);
+    if (appending) {
+      setLoadingMore(true);
+      setAppendError(null);
+    } else {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const page = await loadPage(cursor);
       if (requestGeneration !== generation.current) return;
@@ -61,7 +67,15 @@ export function useCaseQueue(
       setNextCursor(page.nextCursor);
     } catch (failure) {
       if (requestGeneration === generation.current) {
-        setError(failure instanceof Error ? failure.message : "Cases could not be loaded.");
+        const message = failure instanceof Error ? failure.message : "Cases could not be loaded.";
+        // An appending failure belongs at the pager, not in a banner above the
+        // list the reviewer has already scrolled past.
+        if (appending) {
+          setAppendError(message);
+        } else {
+          setError(message);
+          setTotal(null);
+        }
       }
     } finally {
       if (requestGeneration === generation.current) {
@@ -81,9 +95,10 @@ export function useCaseQueue(
     baseline.current = null;
     setQueueChanged(false);
     setCases(null);
-    setTotal(0);
+    setTotal(null);
     setNextCursor(null);
     setError(null);
+    setAppendError(null);
     setLoading(false);
     setLoadingMore(false);
     if (active) void load();
@@ -94,5 +109,5 @@ export function useCaseQueue(
     };
   }, [active, sessionKey, load]);
 
-  return { cases, total, nextCursor, queueChanged, error, loading, loadingMore, load };
+  return { cases, total, nextCursor, queueChanged, error, appendError, loading, loadingMore, load };
 }

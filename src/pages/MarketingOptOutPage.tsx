@@ -11,7 +11,9 @@ import {
   type MarketingRevocationResult,
 } from "@/lib/marketing";
 
-const REFERENCE_PATTERN = /^LPP-\d{4}-[0-9A-Z]{6,12}$/;
+// Must match the server's six-character suffix: a longer suffix has to be
+// flagged on the field instead of being sent and refused generically.
+const REFERENCE_PATTERN = /^LPP-\d{4}-[0-9A-Z]{6}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 interface FormErrors {

@@ -18,6 +18,7 @@ export function IntakeSessionProvider({
   const navigation = useRouterIntakeHistory();
   const interview = useInterview(navigation);
   const [submitting, setSubmitting] = useState(false);
+  const [navigationBlocked, setNavigationBlocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const currentInterview = useRef(interview);
   useLayoutEffect(() => { currentInterview.current = interview; }, [interview]);
@@ -29,6 +30,28 @@ export function IntakeSessionProvider({
       alive.current = false;
     };
   }, []);
+
+  // A pending submission must not be abandoned by a link click: the provider
+  // unmounts outside the intake scope, which would drop the receipt that holds
+  // the only reference the prospect can quote. Warn instead of navigating.
+  useEffect(() => {
+    if (!submitting || typeof document === "undefined") {
+      setNavigationBlocked(false);
+      return;
+    }
+    const blockNavigation = (event: MouseEvent) => {
+      const target = event.target;
+      const anchor = target instanceof Element ? target.closest("a[href]") : null;
+      if (!anchor) return;
+      const href = anchor.getAttribute("href") ?? "";
+      if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setNavigationBlocked(true);
+    };
+    document.addEventListener("click", blockNavigation, true);
+    return () => document.removeEventListener("click", blockNavigation, true);
+  }, [submitting]);
 
   async function submit() {
     if (!alive.current || inFlight.current || interview.receipt) return;
@@ -66,13 +89,23 @@ export function IntakeSessionProvider({
       if (!inFlight.current) action(...args);
     };
   }
+  // An edit invalidates the previous refusal along with the review
+  // confirmation: an old "Submission needs attention" must not sit on a review
+  // the prospect has since corrected.
+  function edit<Args extends unknown[]>(action: (...args: Args) => void) {
+    return (...args: Args) => {
+      if (inFlight.current) return;
+      setError(null);
+      action(...args);
+    };
+  }
   const protectedInterview: InterviewHook = {
     ...interview,
     step: submitting ? "review" : interview.step,
-    setLeadField: guard(interview.setLeadField),
-    setAdultAttested: guard(interview.setAdultAttested),
-    setConsent: guard(interview.setConsent),
-    setAnswer: guard(interview.setAnswer),
+    setLeadField: edit(interview.setLeadField),
+    setAdultAttested: edit(interview.setAdultAttested),
+    setConsent: edit(interview.setConsent),
+    setAnswer: edit(interview.setAnswer),
     confirmReview: guard(interview.confirmReview),
     begin: guard(interview.begin),
     givePermission: guard(interview.givePermission),
@@ -82,14 +115,14 @@ export function IntakeSessionProvider({
     previousQuestion: guard(interview.previousQuestion),
     finishInterview: guard(interview.finishInterview),
     markSubmitted: guard(interview.markSubmitted),
-    startOver: guard(interview.startOver),
+    startOver: edit(interview.startOver),
   };
   return (
     <IntakeSessionContext.Provider
       value={{
         interview: protectedInterview,
         historyEntry: { ...navigation.historyEntry, step: protectedInterview.step },
-        submitting, error, submit,
+        submitting, navigationBlocked, error, submit,
       }}
     >
       {children}

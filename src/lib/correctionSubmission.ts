@@ -7,6 +7,21 @@ export interface CorrectionWriter {
     error: { code?: string; message?: string } | null;
   }>;
 }
+const CONNECTION_LOST =
+  "The correction was not saved because the connection was lost. Reconnect and save it again.";
+const UNCONFIRMED =
+  "The correction save could not be confirmed. Retry the unchanged correction to check the same save safely.";
+
+function networkFailure(error: unknown): boolean {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
+  const name = error instanceof Error ? error.name : "";
+  const message =
+    error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  return /failed to fetch|networkerror|network request failed|load failed|authretryablefetch/i.test(
+    `${name} ${message}`,
+  );
+}
+
 export function correctionInput(detail: string, requestId: string) {
   const trimmed = detail.trim();
   if (!trimmed) throw new Error("Enter the correction before saving it.");
@@ -34,10 +49,8 @@ export async function writeCorrection(
       p_detail: trimmed,
       p_request_id: requestId,
     });
-  } catch {
-    throw new Error(
-      "The correction save could not be confirmed. Retry the unchanged correction to check the same save safely.",
-    );
+  } catch (error) {
+    throw new Error(networkFailure(error) ? CONNECTION_LOST : UNCONFIRMED);
   }
   if (result.error) {
     if (result.error.code === "PGRST202")
@@ -48,9 +61,17 @@ export async function writeCorrection(
       throw new Error(
         "This save request was already used for different correction text. Refresh the case before recording another correction.",
       );
-    throw new Error(
-      "The correction save could not be confirmed. Retry the unchanged correction to check the same save safely.",
-    );
+    // Definitive answers from the server are final: inviting a retry of the
+    // unchanged correction would loop forever on a deleted case.
+    if (/case not found/i.test(result.error.message ?? ""))
+      throw new Error("This case no longer exists. The correction was not saved.");
+    if (/not authorised|not authorized/i.test(result.error.message ?? ""))
+      throw new Error(
+        "You are not authorised to record a correction on this case. Sign in again with an authorised reviewer account.",
+      );
+    if (networkFailure(result.error))
+      throw new Error(CONNECTION_LOST);
+    throw new Error(UNCONFIRMED);
   }
   const receipt = result.data as {
     recorded?: unknown;
@@ -61,8 +82,6 @@ export async function writeCorrection(
     typeof receipt.correction_id !== "string" ||
     !/^[1-9][0-9]*$/.test(receipt.correction_id)
   ) {
-    throw new Error(
-      "The correction save could not be confirmed. Retry the unchanged correction to check the same save safely.",
-    );
+    throw new Error(UNCONFIRMED);
   }
 }

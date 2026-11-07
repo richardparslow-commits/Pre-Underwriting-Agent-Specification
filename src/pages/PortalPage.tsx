@@ -118,7 +118,7 @@ function SignInCard({ auth }: { auth: ReturnType<typeof useReviewerAuth> }) {
 export default function PortalPage() {
   const auth = useReviewerAuth();
   const [safetyRefresh, setSafetyRefresh] = useState(0);
-  const { cases, total, nextCursor, queueChanged, error, loading, loadingMore, load } = useCaseQueue(
+  const { cases, total, nextCursor, queueChanged, error, appendError, loading, loadingMore, load } = useCaseQueue(
     auth.signedIn && !auth.loading,
     listCases,
     auth.email,
@@ -183,8 +183,14 @@ export default function PortalPage() {
           <p className="eyebrow">Reviewer portal</p>
           <h1 className="mt-2 text-3xl leading-tight sm:text-4xl">Case queue</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Signed in as {auth.email ?? "reviewer"} · showing {cases?.length ?? 0} of {total} case
-            {total === 1 ? "" : "s"}
+            Signed in as {auth.email ?? "reviewer"} ·{" "}
+            {total === null ? (
+              "case count unavailable"
+            ) : (
+              <>
+                showing {cases?.length ?? 0} of {total} case{total === 1 ? "" : "s"}
+              </>
+            )}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -221,9 +227,11 @@ export default function PortalPage() {
       </Alert> : null}
 
       {error ? (
-        <Alert tone="danger" className="mt-6">
-          {error}
-        </Alert>
+        <div role="alert">
+          <Alert tone="danger" className="mt-6">
+            {error}
+          </Alert>
+        </div>
       ) : null}
 
       <div className="mt-8 space-y-3">
@@ -277,6 +285,13 @@ export default function PortalPage() {
 
         {nextCursor ? (
           <div className="pt-2 text-center">
+            {appendError ? (
+              <div role="alert" className="mb-3 text-left">
+                <Alert tone="danger">
+                  Older cases could not be loaded. {appendError}
+                </Alert>
+              </div>
+            ) : null}
             <Button
               variant="outline"
               onClick={() => void load(nextCursor)}
@@ -286,12 +301,13 @@ export default function PortalPage() {
               Load more cases
             </Button>
             <p className="mt-2 text-xs text-muted-foreground">
-              Showing {cases?.length ?? 0} of {total}. Older cases load next.
+              Showing {cases?.length ?? 0} of {total ?? "an unknown number of"} cases. Older cases
+              load next.
             </p>
           </div>
         ) : cases && cases.length > 0 ? (
           <p className="pt-2 text-center text-xs text-muted-foreground">
-            Showing {cases.length} of {total} case{total === 1 ? "" : "s"} from this load. {queueChanged ? "Refresh for the latest cases." : "No older cases remain in this load."}
+            Showing {cases.length} of {total ?? "an unknown number of"} case{total === 1 ? "" : "s"} from this load. {queueChanged ? "Refresh for the latest cases." : "No older cases remain in this load."}
           </p>
         ) : null}
       </div>

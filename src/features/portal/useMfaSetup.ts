@@ -59,6 +59,35 @@ const START_ERROR =
   "Multifactor authentication could not be started. Check setup again or sign out and try again.";
 const SETUP_ERROR =
   "Authenticator setup could not be checked. Try a fresh code, or check setup again.";
+const CONNECTION_ERROR =
+  "Authenticator setup could not start because the connection was lost. Reconnect and try again.";
+const isNetworkFailure = (error: unknown) =>
+  (typeof navigator !== "undefined" && navigator.onLine === false) ||
+  (error instanceof Error &&
+    /failed to fetch|networkerror|network request failed|load failed|authretryablefetch/i.test(
+      `${error.name} ${error.message}`,
+    ));
+
+interface LockManagerLike {
+  request<T>(name: string, callback: () => Promise<T>): Promise<T>;
+}
+
+/**
+ * Serialise enrollment across tabs of the same browser. The auth service's
+ * one-factor limit is checked before insert, so two simultaneous enrolments can
+ * both pass it; one lock makes the second tab list the factor the first created.
+ */
+async function withSetupLock(run: () => Promise<void>): Promise<void> {
+  const locks =
+    typeof navigator === "undefined"
+      ? undefined
+      : (navigator as Navigator & { locks?: LockManagerLike }).locks;
+  if (!locks) {
+    await run();
+    return;
+  }
+  await locks.request("lpp-reviewer-authenticator-setup", run);
+}
 const errorCode = (error: unknown) =>
   error && typeof error === "object" && "code" in error ? error.code : null;
 const existingFactor = (factors: MfaFactor[]) =>
@@ -128,61 +157,69 @@ export function useMfaSetup(mfa: MfaSetupApi | null, onVerified: () => void) {
       error: null,
       busy: true,
     }));
-    try {
+    const api = mfa;
+    // Bind the non-null client to a parameter so the locked callback keeps its
+    // type while still using the supported SDK enroll path explicitly.
+    const enroll = async (mfa: MfaSetupApi) => {
       const listed = await mfa.listFactors();
-      if (!active.current) return;
-      if (listed.error || !Array.isArray(listed.data?.all))
-        throw new Error(START_ERROR);
-      const existing = existingFactor(listed.data.all);
-      if (existing) {
-        showFactor(existing);
-        return;
-      }
-
-      // A successful list confirmed the old factor is absent. Its old key must
-      // not survive into a new enrollment (including a lost/raced response).
-      setState({ ...EMPTY, busy: true });
-      ownedAttempt.current = `Reviewer setup ${crypto.randomUUID()}`;
-      const enrolled = await mfa.enroll({
-        factorType: "totp",
-        friendlyName: ownedAttempt.current,
-      });
-      if (!active.current) return;
-      if (enrolled.error) {
-        // A second tab may have filled the single factor slot after our read.
-        // Re-read once; never delete the other tab's setup to make room.
-        const raced = await mfa.listFactors();
         if (!active.current) return;
-        if (!raced.error && Array.isArray(raced.data?.all)) {
-          const existing = existingFactor(raced.data.all);
-          if (existing) {
-            showFactor(existing);
-            return;
-          }
+        if (listed.error || !Array.isArray(listed.data?.all))
+          throw new Error(START_ERROR);
+        const existing = existingFactor(listed.data.all);
+        if (existing) {
+          showFactor(existing);
+          return;
         }
-        throw new Error(START_ERROR);
-      }
-      const enrolledFactor = enrolled.data;
-      if (
-        !enrolledFactor?.id ||
-        !enrolledFactor.totp?.qr_code ||
-        !enrolledFactor.totp.secret
-      )
-        throw new Error(START_ERROR);
-      setState({
-        ...EMPTY,
-        phase: "enrolling",
-        factorId: enrolledFactor.id,
-        qrCode: enrolledFactor.totp.qr_code,
-        secret: enrolledFactor.totp.secret,
-      });
-    } catch {
-      if (active.current)
+
+        // A successful list confirmed the old factor is absent. Its old key must
+        // not survive into a new enrollment (including a lost/raced response).
+        setState({ ...EMPTY, busy: true });
+        ownedAttempt.current = `Reviewer setup ${crypto.randomUUID()}`;
+        const enrolled = await mfa.enroll({
+          factorType: "totp",
+          friendlyName: ownedAttempt.current,
+        });
+        if (!active.current) return;
+        if (enrolled.error) {
+          // A second tab may have filled the single factor slot after our read.
+          // Re-read once; never delete the other tab's setup to make room.
+          const raced = await mfa.listFactors();
+          if (!active.current) return;
+          if (!raced.error && Array.isArray(raced.data?.all)) {
+            const existing = existingFactor(raced.data.all);
+            if (existing) {
+              showFactor(existing);
+              return;
+            }
+          }
+          throw new Error(START_ERROR);
+        }
+        const enrolledFactor = enrolled.data;
+        if (
+          !enrolledFactor?.id ||
+          !enrolledFactor.totp?.qr_code ||
+          !enrolledFactor.totp.secret
+        )
+          throw new Error(START_ERROR);
+        setState({
+          ...EMPTY,
+          phase: "enrolling",
+          factorId: enrolledFactor.id,
+          qrCode: enrolledFactor.totp.qr_code,
+          secret: enrolledFactor.totp.secret,
+        });
+    };
+    try {
+      await withSetupLock(() => enroll(api));
+    } catch (error) {
+      if (active.current) {
+        const message = isNetworkFailure(error) ? CONNECTION_ERROR : START_ERROR;
         setState((current) =>
           current.factorId
-            ? { ...current, code: "", error: START_ERROR, busy: false }
-            : { ...EMPTY, phase: "error", error: START_ERROR },
+            ? { ...current, code: "", error: message, busy: false }
+            : { ...EMPTY, phase: "error", error: message },
         );
+      }
     } finally {
       inFlight.current = false;
       if (active.current) setState((current) => ({ ...current, busy: false }));
@@ -247,12 +284,12 @@ export function useMfaSetup(mfa: MfaSetupApi | null, onVerified: () => void) {
       setState({ ...EMPTY });
       inFlight.current = false;
       await begin(); // re-list: another tab may have enrolled in the meantime
-    } catch {
+    } catch (error) {
       if (active.current)
         setState((current) => ({
           ...current,
           code: "",
-          error: START_ERROR,
+          error: isNetworkFailure(error) ? CONNECTION_ERROR : START_ERROR,
           busy: false,
         }));
     } finally {
