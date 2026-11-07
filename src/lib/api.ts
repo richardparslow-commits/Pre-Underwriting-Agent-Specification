@@ -592,6 +592,13 @@ export async function recordReview(
   if (PREVIEW_MODE) {
     const record = previewCases.get(reference);
     if (!record) throw new Error("This case could not be found.");
+    // Match the live RPC: a decision taken on a page whose status has moved on
+    // must not overwrite a clarification request in the in-memory preview.
+    if (action !== "opened" && expectedStatus && record.status !== expectedStatus) {
+      throw new Error(
+        "This case changed since you opened it. Refresh before recording a review decision.",
+      );
+    }
     record.reviewLog = [
       { action, actor: SITE.reviewerEmail, at: new Date().toISOString(), note },
       ...record.reviewLog,

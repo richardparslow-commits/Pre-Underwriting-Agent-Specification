@@ -64,7 +64,8 @@ intake, marketing or MFA.
   an optional expected status and locks the case row. A decision taken on a page
   still showing `submitted` is refused after another reviewer requests
   clarification; the portal passes the displayed status and refreshes on
-  conflict. Three-argument calls keep working through the default.
+  conflict. The in-memory preview backend applies the same expected-status
+  guard. Three-argument calls keep working through the default.
 - **s5-load-more-failure-out-of-view**: an append-page failure is rendered at
   the pager with `role="alert"`, where the reviewer clicked, instead of above
   the fold.
@@ -88,7 +89,7 @@ Run from the repository root:
   status still allows it, and that a deleted `auth.sessions` row stops
   `is_reviewer()` and the queue read.
 - `npm run test:validation` (16), `npm run test:submission-ui` (64),
-  `npm run test:reviewer-visibility` (107), `npm run test:consent`,
+  `npm run test:reviewer-visibility` (108), `npm run test:consent`,
   `npm run test:engine`.
 - `npm run check:portal`, `check:docs`, `check:bank`, `check:server-bank`,
   `check:server-policy`, `check:marketing`, `check:bundle`.
