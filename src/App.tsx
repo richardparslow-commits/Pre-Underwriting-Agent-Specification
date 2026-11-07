@@ -1,5 +1,6 @@
 import { IntakeSessionProvider } from "@/features/interview/IntakeSession";
 import { MarketingOptOutDraftProvider } from "@/features/marketing/MarketingOptOutDraft";
+import { ClarificationDraftProvider } from "@/features/portal/ClarificationDraft";
 import { submitCase } from "@/lib/api";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import { SiteLayout } from "@/components/site/SiteChrome";
@@ -16,26 +17,28 @@ export default function App() {
   return (
     <BrowserRouter>
       <MarketingOptOutDraftProvider>
-        <Routes>
-          <Route element={<SiteLayout />}>
-            <Route index element={<LandingPage />} />
-            <Route
-              element={
-                <IntakeSessionProvider send={submitCase}>
-                  <Outlet />
-                </IntakeSessionProvider>
-              }
-            >
-              <Route path="start" element={<IntakePage />} />
-              <Route path="privacy" element={<PrivacyPage />} />
-              <Route path="messaging-terms" element={<MessagingTermsPage />} />
+        <ClarificationDraftProvider>
+          <Routes>
+            <Route element={<SiteLayout />}>
+              <Route index element={<LandingPage />} />
+              <Route
+                element={
+                  <IntakeSessionProvider send={submitCase}>
+                    <Outlet />
+                  </IntakeSessionProvider>
+                }
+              >
+                <Route path="start" element={<IntakePage />} />
+                <Route path="privacy" element={<PrivacyPage />} />
+                <Route path="messaging-terms" element={<MessagingTermsPage />} />
+              </Route>
+              <Route path="marketing-opt-out" element={<MarketingOptOutPage />} />
+              <Route path="portal" element={<PortalPage />} />
+              <Route path="portal/:reference" element={<PortalCasePage />} />
+              <Route path="*" element={<NotFoundPage />} />
             </Route>
-            <Route path="marketing-opt-out" element={<MarketingOptOutPage />} />
-            <Route path="portal" element={<PortalPage />} />
-            <Route path="portal/:reference" element={<PortalCasePage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Route>
-        </Routes>
+          </Routes>
+        </ClarificationDraftProvider>
       </MarketingOptOutDraftProvider>
     </BrowserRouter>
   );

@@ -5,6 +5,7 @@ import { StaticRouter } from "react-router-dom";
 import { buildDraftSummary, toSubmittedAnswers } from "@/features/interview/engine";
 import type { CaseRecord } from "@/features/interview/types";
 import { CaseReview } from "./CaseReview";
+import { ClarificationDraftProvider } from "./ClarificationDraft";
 
 test("reviewers can reach flagged and summary answers from a filtered question record", async () => {
   const at = "2026-01-01T00:00:00Z";
@@ -39,7 +40,9 @@ test("reviewers can reach flagged and summary answers from a filtered question r
   let view!: ReactTestRenderer;
   await act(async () => {
     view = create(<StaticRouter location="/portal/LPP-2026-TEST01">
-      <CaseReview record={record} onRefresh={() => {}} />
+      <ClarificationDraftProvider>
+        <CaseReview record={record} onRefresh={() => {}} />
+      </ClarificationDraftProvider>
     </StaticRouter>);
   });
   try {

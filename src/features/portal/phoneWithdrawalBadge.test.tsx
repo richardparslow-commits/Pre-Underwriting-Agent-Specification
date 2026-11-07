@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { StaticRouter } from "react-router-dom";
 import { CaseReview } from "./CaseReview";
+import { ClarificationDraftProvider } from "./ClarificationDraft";
 import type { CaseRecord, MarketingRevocationRecord } from "@/features/interview/types";
 const at = "2026-01-01T00:00:00Z";
 const phone: MarketingRevocationRecord = { channel: "phone", reason: "Synthetic old phone withdrawal", source: "customer_web", recordedBy: "customer", recordedAt: at };
@@ -20,7 +21,7 @@ function fixture(latest?: MarketingRevocationRecord | null, entries: MarketingRe
 const text = (v: ReactTestRenderer) => JSON.stringify(v.toJSON());
 async function render(record: CaseRecord, check: (view: ReactTestRenderer)=>void) {
   let view!: ReactTestRenderer;
-  await act(async()=>{view=create(<StaticRouter location="/portal/LPP-2026-WITH01"><CaseReview record={record} onRefresh={()=>{}} /></StaticRouter>);});
+  await act(async()=>{view=create(<StaticRouter location="/portal/LPP-2026-WITH01"><ClarificationDraftProvider><CaseReview record={record} onRefresh={()=>{}} /></ClarificationDraftProvider></StaticRouter>);});
   try { check(view); } finally {act(()=>view.unmount());}
 }
 test("phone withdrawal stays visible and both consent badges stay Revoked after 20 newer email events", async()=>{
