@@ -1,14 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { sendSignInLink } from "./api";
+import { SIGN_IN_CONNECTION_LOST, sendSignInLink } from "./api";
 
 // The function is browser-only; give it just enough origin to build its redirect.
 (globalThis as { window?: { location: { origin: string } } }).window = {
   location: { origin: "https://example.test" },
 };
 
-function fakeClient(error: { code?: string; message?: string } | null = null) {
+function fakeClient(
+  error: { code?: string; name?: string; message?: string } | null = null,
+) {
   const calls: Array<Record<string, unknown>> = [];
   const client = {
     auth: {
@@ -21,12 +23,42 @@ function fakeClient(error: { code?: string; message?: string } | null = null) {
   return { client, calls };
 }
 
+function throwingClient(error: unknown) {
+  return {
+    auth: {
+      signInWithOtp: async () => {
+        throw error;
+      },
+    },
+  } as unknown as SupabaseClient;
+}
+
 for (const code of ["otp_disabled", "user_not_found", "signup_disabled"]) {
   test(`an unknown address refusal (${code}) looks like a sent link`, async () => {
     const { client } = fakeClient({ code, message: "Synthetic refusal" });
     await assert.doesNotReject(sendSignInLink("unknown@example.test", client));
   });
 }
+
+test("a lost connection is named instead of a generic send failure", async () => {
+  const { client } = fakeClient({
+    name: "AuthRetryableFetchError",
+    message: "Failed to fetch",
+  });
+  await assert.rejects(sendSignInLink("reviewer@example.test", client), (failure: Error) => {
+    assert.equal(failure.message, SIGN_IN_CONNECTION_LOST);
+    assert.match(failure.message, /connection was lost/i);
+    assert.doesNotMatch(failure.message, /Failed to fetch|AuthRetryable/i);
+    return true;
+  });
+});
+
+test("a thrown lost connection is named instead of a generic send failure", async () => {
+  await assert.rejects(
+    sendSignInLink("reviewer@example.test", throwingClient(new TypeError("Failed to fetch"))),
+    { message: SIGN_IN_CONNECTION_LOST },
+  );
+});
 
 test("a successful request keeps the no-signup options and the portal redirect", async () => {
   const { client, calls } = fakeClient();

@@ -668,26 +668,60 @@ export async function recordReview(
 // Authentication
 // ---------------------------------------------------------------------------
 
+const SIGN_IN_LINK_FAILURE = "The sign-in link could not be sent.";
+export const SIGN_IN_CONNECTION_LOST =
+  "The sign-in link could not be sent because the connection was lost. Try again once you are back online.";
+
+function isLostConnection(error: unknown): boolean {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
+  const record =
+    error && typeof error === "object"
+      ? (error as { code?: unknown; name?: unknown; message?: unknown })
+      : null;
+  const code = typeof record?.code === "string" ? record.code : "";
+  const name = typeof record?.name === "string" ? record.name : "";
+  const message =
+    typeof record?.message === "string"
+      ? record.message
+      : typeof error === "string"
+        ? error
+        : "";
+  return /failed to fetch|networkerror|network request failed|load failed|authretryablefetch|network_error/i.test(
+    `${code} ${name} ${message}`,
+  );
+}
+
+function signInLinkFailure(error: unknown): Error {
+  return new Error(
+    isLostConnection(error) ? SIGN_IN_CONNECTION_LOST : SIGN_IN_LINK_FAILURE,
+  );
+}
+
 export async function sendSignInLink(
   email: string,
   client: SupabaseClient | null = supabase,
 ): Promise<void> {
   if (!client) throw new Error("Sign-in is not configured.");
-  const { error } = await client.auth.signInWithOtp({
-    email,
-    options: {
-      // A reviewer address must already exist. Without this, any address gets
-      // an account created on first sign-in, which defeats the allowlist even
-      // though RLS still blocks case data.
-      shouldCreateUser: false,
-      emailRedirectTo: `${window.location.origin}/portal`,
-    },
-  });
+  let error: { code?: string; name?: string; message?: string } | null = null;
+  try {
+    ({ error } = await client.auth.signInWithOtp({
+      email,
+      options: {
+        // A reviewer address must already exist. Without this, any address gets
+        // an account created on first sign-in, which defeats the allowlist even
+        // though RLS still blocks case data.
+        shouldCreateUser: false,
+        emailRedirectTo: `${window.location.origin}/portal`,
+      },
+    }));
+  } catch (failure) {
+    throw signInLinkFailure(failure);
+  }
   // An unknown address is refused before any email is attempted. Answer it
   // exactly like a known address so the screen cannot be used to enumerate
   // reviewer accounts; every other failure still surfaces honestly.
   if (error && !isUnknownReviewerAddress(error)) {
-    throw new Error("The sign-in link could not be sent.");
+    throw signInLinkFailure(error);
   }
 }
 
