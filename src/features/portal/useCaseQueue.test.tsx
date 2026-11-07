@@ -73,6 +73,40 @@ test("failed refresh retains known rows/cursor and a fresh retry can recover", (
   });
 });
 
+test("a successful refresh clears a stale pager error", () => {
+  return queue(async cursor => {
+    if (cursor) throw new Error("Synthetic paging failure");
+    return page(1);
+  }, async read => {
+    assert.deepEqual(refs(read()), expected(1));
+    await act(async () => read().load("c25"));
+    assert.equal(read().appendError, "Synthetic paging failure");
+
+    await act(async () => read().load());
+    assert.equal(read().appendError, null);
+    assert.equal(read().error, null);
+    assert.deepEqual(refs(read()), expected(1));
+  });
+});
+
+test("a successful append clears a stale refresh error", () => {
+  let heads = 0;
+  return queue(async cursor => {
+    if (cursor) return page(26);
+    heads++;
+    if (heads === 2) throw new Error("Synthetic refresh failure");
+    return page(1);
+  }, async read => {
+    await act(async () => read().load());
+    assert.equal(read().error, "Synthetic refresh failure");
+
+    await act(async () => read().load("c25"));
+    assert.equal(read().error, null);
+    assert.equal(read().appendError, null);
+    assert.deepEqual(refs(read()), expected(1, 50));
+  });
+});
+
 test("a cursor captured before refresh cannot append after the refresh completes", () => {
   const calls: (string | undefined)[] = [];
   return queue(async cursor => { calls.push(cursor); return cursor ? page(26) : page(1); }, async read => {
