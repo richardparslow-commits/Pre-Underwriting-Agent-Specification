@@ -652,6 +652,26 @@ await query(
           ('LPP-2026-RACE','v','queued','{}'::jsonb)`,
 );
 await query("update public.cases set provider_message_id='msg_direct' where reference='LPP-2026-DIRECT'");
+await pass(
+  "delivery-event case lookup is backed by the provider-message index",
+  async () => {
+    const [index] = await query(
+      "select indexdef from pg_indexes where schemaname='public' and tablename='cases' and indexname='cases_provider_message_id_idx'",
+    );
+    await exec("set enable_seqscan=off");
+    try {
+      const plan = await query(
+        "explain (format json) select id from public.cases where provider_message_id='msg_direct'",
+      );
+      return { index: index?.indexdef ?? null, plan: JSON.stringify(plan) };
+    } finally {
+      await exec("reset enable_seqscan");
+    }
+  },
+  (value) =>
+    value.index?.includes("provider_message_id") &&
+    value.plan.includes("cases_provider_message_id_idx"),
+);
 
 await pass("accepted event applies to a queued case", () => query("select public.apply_email_event('evt_1','email.sent','LPP-2026-EVENT1','msg_abc','accepted')"), (rows) => rows[0].apply_email_event === "applied");
 await pass("duplicate event is ignored by id", () => query("select public.apply_email_event('evt_1','email.sent','LPP-2026-EVENT1','msg_abc','accepted')"), (rows) => rows[0].apply_email_event === "duplicate");
