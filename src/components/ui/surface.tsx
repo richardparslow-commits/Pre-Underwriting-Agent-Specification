@@ -36,7 +36,7 @@ const badgeVariants = cva(
         ok: "border-ok/25 bg-ok/10 text-ok",
         warn: "border-warn/30 bg-warn/10 text-warn",
         danger: "border-danger/25 bg-danger/10 text-danger",
-        accent: "border-accent/25 bg-accent/10 text-accent",
+        accent: "border-accent/25 bg-accent/10 text-accent-strong",
       },
     },
     defaultVariants: { tone: "neutral" },
