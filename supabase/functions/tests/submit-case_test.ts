@@ -76,7 +76,7 @@ Deno.test("a saved case returns its receipt after an email timeout and an unchan
       assertEquals(inserts, 1, "the case must be saved before notification");
       return held.fetch(input, init);
     }
-    if (url.pathname.endsWith("/consume_submission_rate")) return json(true);
+    if (url.pathname.endsWith("/consume_submission_rate_for_key")) return json(true);
     if (url.pathname === "/rest/v1/cases" && request.method === "GET") {
       return json(row ? [row] : []);
     }
@@ -154,7 +154,7 @@ Deno.test("a provider bounce during a send is reported as failed, not accepted",
       row!.notification_updated_at = new Date().toISOString();
       return json({ id: "synthetic-bounced-message" });
     }
-    if (url.pathname.endsWith("/consume_submission_rate")) return json(true);
+    if (url.pathname.endsWith("/consume_submission_rate_for_key")) return json(true);
     if (url.pathname === "/rest/v1/cases" && request.method === "GET") {
       if (url.searchParams.get("reference")?.startsWith("eq.")) readBack = true;
       return json(row ? [row] : []);
@@ -220,7 +220,7 @@ Deno.test("an unavailable notification read-back cannot claim provider acceptanc
     if (url.hostname === "api.resend.com") {
       return json({ id: "synthetic-accepted-message" });
     }
-    if (url.pathname.endsWith("/consume_submission_rate")) return json(true);
+    if (url.pathname.endsWith("/consume_submission_rate_for_key")) return json(true);
     if (url.pathname === "/rest/v1/cases" && request.method === "GET") {
       if (url.searchParams.get("reference")?.startsWith("eq.")) {
         readBack = true;

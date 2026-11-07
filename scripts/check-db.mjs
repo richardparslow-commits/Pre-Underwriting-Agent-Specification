@@ -186,9 +186,9 @@ await pass(
   "RLS enabled on sensitive tables",
   () =>
     query(
-      "select relname, relrowsecurity from pg_class where relname in ('cases','case_review_log','email_events','case_deletions','marketing_revocations','marketing_suppression_sync','submission_rate_limits','app_settings') order by relname",
+      "select relname, relrowsecurity from pg_class where relname in ('cases','case_review_log','email_events','case_deletions','marketing_revocations','marketing_suppression_sync','submission_rate_limits','submission_rate_claims','app_settings') order by relname",
     ),
-  (rows) => rows.length === 8 && rows.every((row) => row.relrowsecurity === true),
+  (rows) => rows.length === 9 && rows.every((row) => row.relrowsecurity === true),
 );
 
 // ------------------------------------------------------------------ AAL2
@@ -862,6 +862,54 @@ await pass("rate limit allows the first two", async () => {
   return [a[0].allowed, b[0].allowed];
 }, (rows) => rows[0] === true && rows[1] === true);
 await pass("rate limit rejects the third", () => query("select public.consume_submission_rate('rate-key-00000001',2,600) allowed"), (rows) => rows[0].allowed === false);
+
+// Heal s9-in-flight-retry-spends-submit-limit: a retry that misses the saved-
+// case lookup while the first request is still inserting used to consume a
+// second allowance, then lose the unique idempotency insert and replay. The
+// durable claim makes both requests share one allowance.
+await pass(
+  "an in-flight same-key retry consumes one allowance, not two",
+  async () => {
+    const first = await query("select public.consume_submission_rate_for_key('claim-key-00000001','inflight-key-0001',2,600) allowed");
+    const retry = await query("select public.consume_submission_rate_for_key('claim-key-00000001','inflight-key-0001',2,600) allowed");
+    const [row] = await query("select count from public.submission_rate_limits where key_hash='claim-key-00000001'");
+    const [claims] = await query("select count(*)::int n from public.submission_rate_claims where idempotency_key='inflight-key-0001'");
+    return { first: first[0].allowed, retry: retry[0].allowed, count: Number(row.count), claims: claims.n };
+  },
+  (value) =>
+    value.first === true && value.retry === true &&
+    value.count === 1 && value.claims === 1,
+);
+await pass(
+  "a distinct submission still spends the next allowance",
+  async () => {
+    const allowed = await query("select public.consume_submission_rate_for_key('claim-key-00000001','inflight-key-0002',2,600) allowed");
+    const [row] = await query("select count from public.submission_rate_limits where key_hash='claim-key-00000001'");
+    return { allowed: allowed[0].allowed, count: Number(row.count) };
+  },
+  (value) => value.allowed === true && value.count === 2,
+);
+await pass(
+  "a retry is still served after the allowance is spent",
+  async () => {
+    const blocked = await query("select public.consume_submission_rate_for_key('claim-key-00000001','inflight-key-0003',2,600) allowed");
+    const retry = await query("select public.consume_submission_rate_for_key('claim-key-00000001','inflight-key-0001',2,600) allowed");
+    return { blocked: blocked[0].allowed, retry: retry[0].allowed };
+  },
+  (value) => value.blocked === false && value.retry === true,
+);
+await pass(
+  "a refused submission leaves no claim that would bypass the limit",
+  () => query("select count(*)::int n from public.submission_rate_claims where idempotency_key in ('inflight-key-0001','inflight-key-0003')"),
+  (rows) => rows[0].n === 1,
+);
+await exec("set role authenticated;");
+await expectError(
+  "an authenticated caller cannot consume a submission allowance directly",
+  () => query("select public.consume_submission_rate_for_key('claim-key-00000002','inflight-key-0004',2,600)"),
+  "permission denied",
+);
+await exec("reset role;");
 
 // ---------------------------------------------------------- marketing stop
 await pass("reviewer records a phone revocation", () => query("select public.record_marketing_revocation('LPP-2026-TEST01','phone','Customer asked to stop')"), () => true);
