@@ -195,7 +195,7 @@ Rows stay `pending` or `failed` until the worker records success. Do not enable 
 
 The detailed, window-by-window procedure for migrations `0006`–`0010`, including the audited case read and marketing withdrawal exercises, is in the [staging deployment runbook](STAGING-RUNBOOK.md). The list below is the summary version.
 
-- [ ] Apply migrations 0001–0026 in order and record the applied versions. **Staging:** 0001–0005 were verified on 28 Oct 2026; verify the current status and evidence for 0006–0026 before proceeding. **Production:** not verified. Deploy the matching portal code and migrations together; verify AAL1/AAL2, non-reviewer and direct REST denial, and logging failure with labelled data.
+- [ ] Apply migrations 0001–0027 in order and record the applied versions. **Staging:** 0001–0005 were verified on 28 Oct 2026; verify the current status and evidence for 0006–0027 before proceeding. **Production:** not verified. Deploy the matching portal code and migrations together; verify AAL1/AAL2, non-reviewer and direct REST denial, and logging failure with labelled data.
 - [ ] Keep `QUESTIONNAIRE_APPROVED=false` until 0/92 rows become 92/92 signed off.
 - [ ] Set `RATE_LIMIT_SALT` to a random value and confirm the durable limiter is active; without it production returns 503 (fail closed). Only `ENVIRONMENT=test` uses the in-memory guard.
 - [ ] Store `project_url` and `cron_secret` in Vault, apply `supabase/ops/retry-schedule.sql`, and verify one scheduler tick.
@@ -237,3 +237,7 @@ Replay identity is scoped to a case, the authenticated reviewer UUID and a clien
 The editor retains an operation ID in memory through uncertain responses and cancel/reopen while that case remains mounted. It blocks edits/cancellation during a save, prevents overlapping clicks, and distinguishes a confirmed save from a history-refresh failure. It does not persist correction text/IDs in browser storage. After a reload or leaving the case, inspect the audited history before recording an uncertain correction again; cross-session retry continuity is not claimed.
 
 Run `node --test scripts/check-correction-replay.mjs` for isolated legacy/fixed replay, payload conflict, permissions, identity scoping and migration-replay checks. Run `supabase/ops/correction-replay-checks.sql` read-only after a separately authorized hosted migration. Keep QUESTIONNAIRE_APPROVED=false and do not publish the site as part of migration verification.
+
+### Delivery-event case lookup (0027)
+
+Apply `0027_delivery_event_case_lookup.sql` with the delivery webhook deploy. It adds an index on `cases.provider_message_id` and replaces `apply_email_event` so reference and provider-message lookups are indexable instead of scanning every case. This repair prepares code and migration only and does not claim the migration is hosted.
