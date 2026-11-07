@@ -195,7 +195,7 @@ Rows stay `pending` or `failed` until the worker records success. Do not enable 
 
 The detailed, window-by-window procedure for migrations `0006`–`0010`, including the audited case read and marketing withdrawal exercises, is in the [staging deployment runbook](STAGING-RUNBOOK.md). The list below is the summary version.
 
-- [ ] Apply migrations 0001–0027 in order and record the applied versions. **Staging:** 0001–0005 were verified on 28 Oct 2026; verify the current status and evidence for 0006–0027 before proceeding. **Production:** not verified. Deploy the matching portal code and migrations together; verify AAL1/AAL2, non-reviewer and direct REST denial, and logging failure with labelled data.
+- [ ] Apply migrations 0001–0028 in order and record the applied versions. **Staging:** 0001–0005 were verified on 28 Oct 2026; verify the current status and evidence for 0006–0028 before proceeding. **Production:** not verified. Deploy the matching portal code and migrations together; verify AAL1/AAL2, non-reviewer and direct REST denial, and logging failure with labelled data.
 - [ ] Keep `QUESTIONNAIRE_APPROVED=false` until 0/92 rows become 92/92 signed off.
 - [ ] Set `RATE_LIMIT_SALT` to a random value and confirm the durable limiter is active; without it production returns 503 (fail closed). Only `ENVIRONMENT=test` uses the in-memory guard.
 - [ ] Store `project_url` and `cron_secret` in Vault, apply `supabase/ops/retry-schedule.sql`, and verify one scheduler tick.
@@ -241,3 +241,7 @@ Run `node --test scripts/check-correction-replay.mjs` for isolated legacy/fixed 
 ### Delivery-event case lookup (0027)
 
 Apply `0027_delivery_event_case_lookup.sql` with the delivery webhook deploy. It adds an index on `cases.provider_message_id` and replaces `apply_email_event` so reference and provider-message lookups are indexable instead of scanning every case. This repair prepares code and migration only and does not claim the migration is hosted.
+
+### In-flight submission rate claim (0028)
+
+Apply `0028_inflight_submit_rate_claim.sql` with the `submit-case` deploy. It adds a durable claim per submission idempotency key and a submit-specific `consume_submission_rate_for_key` RPC, so a retry that arrives while the first request is still inserting shares one allowance instead of spending a second. The claim is removed when the request is refused. `revoke-marketing` keeps the existing `consume_submission_rate` RPC. This repair prepares code and migration only and does not claim the migration is hosted.
