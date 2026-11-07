@@ -60,6 +60,9 @@ export function useCaseQueue(
         // Once observed, a change remains visible until a successful head refresh.
         setQueueChanged(current => current || changed);
       }
+      // A successful page replaces the failed view, whichever load produced it.
+      setError(null);
+      setAppendError(null);
       loaded.current = items;
       setCases(items);
       setTotal(page.total);
