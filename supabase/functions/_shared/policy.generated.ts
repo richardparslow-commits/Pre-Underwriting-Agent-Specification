@@ -12,5 +12,9 @@ export const CONSENT_POLICY = {
   "marketingCallLabel": "I agree to receive marketing telephone calls as described below.",
   "marketingTextLabel": "I agree to receive marketing text messages as described below.",
   "marketingDisclosure": "",
+  "marketingChannels": {
+    "calls": false,
+    "texts": false
+  },
   "submissionAcknowledgementText": "I have reviewed the answers shown on this page and they are complete and accurate to the best of my knowledge. I understand this is a preliminary review request, not a carrier application, an offer of insurance, or an approval, and that Richard Parslow may contact me to clarify anything I have marked uncertain or declined."
 } as const;

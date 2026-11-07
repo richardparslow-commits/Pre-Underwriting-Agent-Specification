@@ -8,12 +8,17 @@
  */
 import { assert, assertEquals } from "jsr:@std/assert@1.0.6";
 import { SERVER_BANK } from "../_shared/bank.generated.ts";
-import { connectionRateKey, validateDraft } from "../_shared/case.ts";
+import {
+  connectionRateKey,
+  validateDraft,
+  type ConsentPolicy,
+} from "../_shared/case.ts";
 import {
   buildAnswers,
   buildConsents,
   buildValidDraft,
   TEST_CONSENT,
+  TEST_TIMES,
   TEST_VERSION,
 } from "./fixtures.ts";
 
@@ -28,6 +33,24 @@ function accepted(body: unknown) {
   if (!result.ok) throw new Error(`Expected acceptance, got: ${result.reason}`);
   return result.draft;
 }
+
+function acceptedWith(body: unknown, policy: ConsentPolicy) {
+  const result = validateDraft(body, policy);
+  if (!result.ok) throw new Error(`Expected acceptance, got: ${result.reason}`);
+  return result.draft;
+}
+
+function rejectedWith(body: unknown, policy: ConsentPolicy): string {
+  const result = validateDraft(body, policy);
+  if (result.ok) throw new Error("Expected the draft to be rejected");
+  return result.reason;
+}
+
+const ENABLED_MARKETING_POLICY: ConsentPolicy = {
+  ...TEST_CONSENT,
+  marketingChannels: { calls: true, texts: true },
+  marketingDisclosure: "Synthetic enabled marketing disclosure.",
+};
 
 function boundaryDraft(completedAt: string, dateOfBirth: string) {
   const startedAt = new Date(Date.parse(completedAt) - 30 * 60_000).toISOString();
@@ -211,6 +234,89 @@ Deno.test("ignores client-invented source wording and restores the canonical row
   assertEquals(row.sourceText, canonical.sourceText);
   assertEquals(row.customerText, canonical.customerText);
   assertEquals(row.timeframe, canonical.timeframe ?? undefined);
+});
+
+Deno.test("accepts declined marketing evidence when this deployment does not enable marketing", () => {
+  const consents = [
+    ...buildConsents(),
+    {
+      id: "marketing_call",
+      label: TEST_CONSENT.marketingCallLabel,
+      granted: false,
+      grantedAt: null,
+      textVersion: TEST_CONSENT.consentVersion,
+      text: "Marketing calls disclosure shown by the browser.",
+    },
+    {
+      id: "marketing_text",
+      label: TEST_CONSENT.marketingTextLabel,
+      granted: false,
+      grantedAt: null,
+      textVersion: TEST_CONSENT.consentVersion,
+      text: "Marketing texts disclosure shown by the browser.",
+    },
+  ];
+
+  const draft = accepted(buildValidDraft({ consents }));
+  const marketing = draft.consents.filter((record) => record.id.startsWith("marketing_"));
+  assertEquals(marketing.length, 2);
+  assertEquals(
+    marketing.every((record) => record.granted === false && record.grantedAt === null),
+    true,
+  );
+});
+
+Deno.test("validates granted marketing against the enabled server policy", () => {
+  const lead = {
+    firstName: "Test",
+    lastName: "Non-customer",
+    state: "TX",
+    email: "test-case@example.com",
+    preferredContact: "email",
+    dateOfBirth: "1980-01-01",
+    phone: "(512) 555-0134",
+  };
+  const consents = [
+    ...buildConsents(),
+    {
+      id: "marketing_call",
+      label: ENABLED_MARKETING_POLICY.marketingCallLabel,
+      granted: true,
+      grantedAt: TEST_TIMES.startedAt,
+      textVersion: ENABLED_MARKETING_POLICY.consentVersion,
+      text: ENABLED_MARKETING_POLICY.marketingDisclosure,
+      numberAuthorized: "(512) 555-0134",
+    },
+    {
+      id: "marketing_text",
+      label: ENABLED_MARKETING_POLICY.marketingTextLabel,
+      granted: false,
+      grantedAt: null,
+      textVersion: ENABLED_MARKETING_POLICY.consentVersion,
+      text: ENABLED_MARKETING_POLICY.marketingDisclosure,
+    },
+  ];
+
+  const draft = acceptedWith(
+    buildValidDraft({ lead, consents }),
+    ENABLED_MARKETING_POLICY,
+  );
+  const call = draft.consents.find((record) => record.id === "marketing_call");
+  assertEquals(call?.granted, true);
+  assertEquals(call?.numberAuthorized, "+15125550134");
+
+  const forged = consents.map((record) =>
+    record.id === "marketing_call"
+      ? { ...record, text: "Invented marketing disclosure" }
+      : record,
+  );
+  assertEquals(
+    rejectedWith(
+      buildValidDraft({ lead, consents: forged }),
+      ENABLED_MARKETING_POLICY,
+    ),
+    "Consent evidence does not match the displayed wording",
+  );
 });
 
 Deno.test("rejects marketing consent when the server has no enabled channel", () => {

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label, Select } from "@/components/ui/form";
 import { Alert, Badge, Checkbox } from "@/components/ui/surface";
 import { MARKETING, MARKETING_ENABLED, SITE } from "@/config/site";
+import { CONSENT_POLICY } from "../../../supabase/functions/_shared/policy.generated";
 import {
   CONTACT_PREFERENCES,
   MARKETING_CALL_LABEL,
@@ -76,6 +77,8 @@ export function LeadForm({
       : MARKETING.calls
         ? "Marketing calls are optional"
         : "Marketing texts are optional";
+  const serverMarketingEnabled =
+    CONSENT_POLICY.marketingChannels.calls || CONSENT_POLICY.marketingChannels.texts;
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -445,6 +448,11 @@ export function LeadForm({
               Leaving any box unchecked does not stop your review and does not change how quickly
               you hear back. You can submit with every box off.
             </p>
+            {!serverMarketingEnabled ? (
+              <p className="field-help">
+                Marketing consent is not available in this deployment yet.
+              </p>
+            ) : null}
 
             <div className="mt-3 space-y-2.5">
               {MARKETING.calls ? (
@@ -452,7 +460,7 @@ export function LeadForm({
                   <Checkbox
                     checked={consent.marketingCall}
                     onChange={(event) => onConsent("marketingCall", event.target.checked)}
-                    disabled={!needsPhone}
+                    disabled={!needsPhone || !serverMarketingEnabled}
                   />
                   <span>
                     {MARKETING_CALL_LABEL}
@@ -469,7 +477,7 @@ export function LeadForm({
                   <Checkbox
                     checked={consent.marketingText}
                     onChange={(event) => onConsent("marketingText", event.target.checked)}
-                    disabled={!needsPhone}
+                    disabled={!needsPhone || !serverMarketingEnabled}
                   />
                   <span>
                     {MARKETING_TEXT_LABEL}
