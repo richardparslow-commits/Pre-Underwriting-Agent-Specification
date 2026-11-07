@@ -592,17 +592,18 @@ test("browser Back to the original unmarked lead entry keeps its original meanin
   );
 });
 
-test("a header click is refused while a submission is pending", async () => {
+test("a header click is refused while a submission is pending, but intake links remain usable", async () => {
   const originalDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
   const originalElement = Object.getOwnPropertyDescriptor(globalThis, "Element");
   const listeners = new Map<string, EventListener>();
 
   class FakeElement {
+    href = "/";
     closest() {
       return this;
     }
     getAttribute() {
-      return "/";
+      return this.href;
     }
   }
 
@@ -650,9 +651,27 @@ test("a header click is refused while a submission is pending", async () => {
           } as unknown as MouseEvent);
         });
 
-        assert.equal(prevented, true, "the header link default is cancelled");
+        assert.equal(prevented, true, "the outside link default is cancelled");
         assert.equal(stopped, true, "the click cannot reach the router");
         assert.equal(f.read().navigationBlocked, true);
+
+        const inScope = new FakeElement();
+        inScope.href = "/start";
+        prevented = false;
+        stopped = false;
+        await act(async () => {
+          block({
+            target: inScope,
+            preventDefault: () => {
+              prevented = true;
+            },
+            stopPropagation: () => {
+              stopped = true;
+            },
+          } as unknown as MouseEvent);
+        });
+        assert.equal(prevented, false, "the intake link stays usable");
+        assert.equal(stopped, false, "the click reaches the router");
 
         await act(async () => {
           pending.resolve(receipt);

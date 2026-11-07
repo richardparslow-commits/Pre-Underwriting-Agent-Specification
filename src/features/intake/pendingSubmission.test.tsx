@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
-import { MemoryRouter } from "react-router-dom";
+import { Link, MemoryRouter } from "react-router-dom";
 import IntakePage from "@/pages/IntakePage";
-import { useInterview, type IntakeStep } from "@/features/interview/useInterview";
+import { ResumeInterview } from "@/components/site/ResumeInterview";
+import { useInterview, type IntakeStep, type InterviewHook } from "@/features/interview/useInterview";
 import { IntakeSessionContext } from "@/features/interview/intakeSessionContext";
 import { ReviewScreen } from "./ReviewScreen";
 const text=(node:ReactTestInstance|string):string=>typeof node==='string'?node:node.children.map(text).join('');
@@ -26,6 +27,17 @@ test('pending intake replaces every history-selected form with an accessible wai
    assert.equal(view.root.findAllByType('button').length,0);
   }
  } finally {await act(async()=>view.unmount());if(!originalWindow)Reflect.deleteProperty(globalThis,'window');}
+});
+
+test('policy pages explain that a submission is still pending',async()=>{
+ let view!:ReactTestRenderer;
+ await act(async()=>{view=create(<MemoryRouter><IntakeSessionContext.Provider value={{interview:{} as InterviewHook,submitting:true,navigationBlocked:false,error:null,submit:async()=>{},historyEntry:{session:'synthetic',step:'review'}}}><ResumeInterview/></IntakeSessionContext.Provider></MemoryRouter>);});
+ try {
+  const notice=view.root.findAll(node=>node.props.role==='status');
+  assert.equal(notice.length,1);
+  assert.match(text(notice[0]!),/still being submitted/i);
+  assert.equal(view.root.findByType(Link).props.to,'/start');
+ } finally {await act(async()=>view.unmount());}
 });
 
 test('all review edit paths are disabled during submission',async()=>{

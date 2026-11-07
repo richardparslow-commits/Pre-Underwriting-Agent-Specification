@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { useInterview, type InterviewHook } from "./useInterview";
 import { useRouterIntakeHistory } from "./useRouterIntakeHistory";
 import type { CaseDraft, SubmissionReceipt } from "./types";
+import { isIntakeSessionPath } from "./intakeSessionScope";
 
 export type IntakeSender = (draft: CaseDraft, key: string) => Promise<SubmissionReceipt>;
 
@@ -33,9 +34,11 @@ export function IntakeSessionProvider({
 
   // A pending submission must not be abandoned by a link click: the provider
   // unmounts outside the intake scope, which would drop the receipt that holds
-  // the only reference the prospect can quote. Warn instead of navigating.
-  // Install this in the same commit as the submitting screen, before paint, so
-  // a fast header click cannot slip through the gap before a passive effect.
+  // the only reference the prospect can quote. Navigation within the mounted
+  // scope is safe and stays usable; only links that would unmount it are
+  // refused. Install this in the same commit as the submitting screen, before
+  // paint, so a fast header click cannot slip through the gap before a passive
+  // effect.
   useLayoutEffect(() => {
     if (!submitting || typeof document === "undefined") {
       setNavigationBlocked(false);
@@ -47,6 +50,8 @@ export function IntakeSessionProvider({
       if (!anchor) return;
       const href = anchor.getAttribute("href") ?? "";
       if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return;
+      const pathname = href.split(/[?#]/, 1)[0] ?? "";
+      if (isIntakeSessionPath(pathname)) return;
       event.preventDefault();
       event.stopPropagation();
       setNavigationBlocked(true);
