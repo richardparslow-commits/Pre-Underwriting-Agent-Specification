@@ -30,6 +30,7 @@ import { CorrectionEditor } from "./CorrectionEditor";
 import { WithdrawalHistory } from "./WithdrawalHistory";
 import { phoneWithdrawal } from "@/lib/withdrawalHistory";
 import { StatusTimeline } from "@/features/intake/StatusTimeline";
+import { useClarificationDraft } from "./ClarificationDraft";
 
 const DISPOSITION: Record<Disposition, { label: string; tone: "ok" | "warn" | "danger" | "neutral" | "outline" }> = {
   answered: { label: "Answered", tone: "ok" },
@@ -145,7 +146,7 @@ export function CaseReview({
   const [busy, setBusy] = useState<false | ReviewLogEntry["action"]>(false);
   const [error, setError] = useState<string | null>(null);
   const [clarifyOpen, setClarifyOpen] = useState(false);
-  const [note, setNote] = useState("");
+  const { note, setNote, clearDraft } = useClarificationDraft(record.reference);
   const reviewRequest = useRef<{
     action: ReviewLogEntry["action"];
     note: string;
@@ -231,7 +232,7 @@ export function CaseReview({
       await onRefresh();
       reviewRequest.current = null;
       setClarifyOpen(false);
-      setNote("");
+      clearDraft();
     } catch (actionError) {
       const message =
         actionError instanceof Error ? actionError.message : "The review action was not recorded.";
