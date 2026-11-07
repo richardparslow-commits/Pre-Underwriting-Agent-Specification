@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { getCase, listCases, recordReview } from "./api";
 
-test("preview mode refuses a decision taken on a stale case status", async () => {
+test("preview mode refuses stale decisions and replays the same review request", async () => {
   const page = await listCases();
   const reference = page.items[0]?.reference;
   assert.ok(reference, "preview mode exposes a seeded case");
@@ -11,7 +12,7 @@ test("preview mode refuses a decision taken on a stale case status", async () =>
   const staleStatus = before.status === "submitted" ? "needs_clarification" : "submitted";
 
   await assert.rejects(
-    () => recordReview(reference, "marked_reviewed", undefined, staleStatus),
+    () => recordReview(reference, "marked_reviewed", randomUUID(), undefined, staleStatus),
     /changed since you opened/,
   );
 
@@ -19,6 +20,19 @@ test("preview mode refuses a decision taken on a stale case status", async () =>
   assert.equal(unchanged?.status, before.status);
   assert.equal(unchanged?.reviewLog.length, before.reviewLog.length);
 
-  await recordReview(reference, "marked_reviewed", undefined, before.status);
-  assert.equal((await getCase(reference))?.status, "reviewed");
+  const requestId = randomUUID();
+  await recordReview(reference, "marked_reviewed", requestId, undefined, before.status);
+  const after = await getCase(reference);
+  assert.equal(after?.status, "reviewed");
+
+  await recordReview(reference, "marked_reviewed", requestId, undefined, before.status);
+  const replayed = await getCase(reference);
+  assert.equal(replayed?.status, "reviewed");
+  assert.equal(replayed?.reviewLog.length, after?.reviewLog.length);
+  assert.equal(replayed?.reviewRevision, after?.reviewRevision);
+
+  await assert.rejects(
+    () => recordReview(reference, "requested_clarification", requestId, "Different decision"),
+    /already used for a different decision/,
+  );
 });

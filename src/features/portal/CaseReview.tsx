@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
   AlertTriangle,
@@ -146,6 +146,11 @@ export function CaseReview({
   const [error, setError] = useState<string | null>(null);
   const [clarifyOpen, setClarifyOpen] = useState(false);
   const [note, setNote] = useState("");
+  const reviewRequest = useRef<{
+    action: ReviewLogEntry["action"];
+    note: string;
+    id: string;
+  } | null>(null);
 
 
   const flaggedQuestionIds = new Set(record.flags
@@ -197,19 +202,36 @@ export function CaseReview({
   }));
 
   async function runAction(action: ReviewLogEntry["action"], actionNote?: string) {
+    const requestNote = actionNote ?? "";
+    if (
+      reviewRequest.current?.action !== action ||
+      reviewRequest.current.note !== requestNote
+    ) {
+      reviewRequest.current = {
+        action,
+        note: requestNote,
+        id: crypto.randomUUID(),
+      };
+    }
+    const requestId = reviewRequest.current.id;
     setBusy(action);
     setError(null);
     try {
       await recordReview(
         record.reference,
         action,
+        requestId,
         actionNote,
         record.status,
         record.reviewRevision,
       );
+      // Keep the request ID and note until the refreshed record is visible. If
+      // the refresh fails after the commit, a retry still replays this request
+      // instead of recording the same decision twice.
+      await onRefresh();
+      reviewRequest.current = null;
       setClarifyOpen(false);
       setNote("");
-      await onRefresh();
     } catch (actionError) {
       const message =
         actionError instanceof Error ? actionError.message : "The review action was not recorded.";
