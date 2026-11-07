@@ -558,6 +558,10 @@ export async function getCase(reference: string): Promise<CaseRecord | null> {
 }
 
 const previewCorrectionRequests = new Map<string, string>();
+const previewReviewRequests = new Map<
+  string,
+  { action: ReviewLogEntry["action"]; note: string | null }
+>();
 export async function recordCorrection(reference: string, detail: string, requestId: string): Promise<void> {
   const trimmed = correctionInput(detail, requestId);
 
@@ -592,6 +596,7 @@ export async function recordCorrection(reference: string, detail: string, reques
 export async function recordReview(
   reference: string,
   action: ReviewLogEntry["action"],
+  requestId: string,
   note?: string,
   expectedStatus?: CaseStatus,
   expectedRevision?: number,
@@ -599,6 +604,14 @@ export async function recordReview(
   if (PREVIEW_MODE) {
     const record = previewCases.get(reference);
     if (!record) throw new Error("This case could not be found.");
+    const requestKey = `${reference}:${requestId}`;
+    const prior = previewReviewRequests.get(requestKey);
+    if (prior) {
+      if (prior.action !== action || prior.note !== (note ?? null)) {
+        throw new Error("Review request already used for a different decision");
+      }
+      return;
+    }
     // Match the live RPC: a decision taken on a page whose status has moved on
     // must not overwrite a clarification request in the in-memory preview.
     if (
@@ -611,6 +624,7 @@ export async function recordReview(
         "This case changed since you opened it. Refresh before recording a review decision.",
       );
     }
+    previewReviewRequests.set(requestKey, { action, note: note ?? null });
     record.reviewLog = [
       { action, actor: SITE.reviewerEmail, at: new Date().toISOString(), note },
       ...record.reviewLog,
@@ -634,11 +648,16 @@ export async function recordReview(
     // request or correction.
     p_expected_status: expectedStatus ?? null,
     p_expected_revision: expectedRevision ?? null,
+    p_request_id: requestId,
   });
 
   if (error) {
     const message = error.message ?? "";
     if (/changed since you opened/i.test(message)) throw new Error(message);
+    if (/already used for a different decision/i.test(message))
+      throw new Error(
+        "This review retry was already used for a different decision. Refresh the case before recording another.",
+      );
     throw new Error("The review action could not be recorded.");
   }
 }

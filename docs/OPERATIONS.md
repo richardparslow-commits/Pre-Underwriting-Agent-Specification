@@ -195,7 +195,7 @@ Rows stay `pending` or `failed` until the worker records success. Do not enable 
 
 The detailed, window-by-window procedure for migrations `0006`–`0010`, including the audited case read and marketing withdrawal exercises, is in the [staging deployment runbook](STAGING-RUNBOOK.md). The list below is the summary version.
 
-- [ ] Apply migrations 0001–0025 in order and record the applied versions. **Staging:** 0001–0005 were verified on 28 Oct 2026; verify the current status and evidence for 0006–0025 before proceeding. **Production:** not verified. Deploy the matching portal code and migrations together; verify AAL1/AAL2, non-reviewer and direct REST denial, and logging failure with labelled data.
+- [ ] Apply migrations 0001–0026 in order and record the applied versions. **Staging:** 0001–0005 were verified on 28 Oct 2026; verify the current status and evidence for 0006–0026 before proceeding. **Production:** not verified. Deploy the matching portal code and migrations together; verify AAL1/AAL2, non-reviewer and direct REST denial, and logging failure with labelled data.
 - [ ] Keep `QUESTIONNAIRE_APPROVED=false` until 0/92 rows become 92/92 signed off.
 - [ ] Set `RATE_LIMIT_SALT` to a random value and confirm the durable limiter is active; without it production returns 503 (fail closed). Only `ENVIRONMENT=test` uses the in-memory guard.
 - [ ] Store `project_url` and `cron_secret` in Vault, apply `supabase/ops/retry-schedule.sql`, and verify one scheduler tick.
@@ -227,6 +227,10 @@ Apply `0024_review_log_open_dedupe.sql` with the matching portal deploy. It repl
 ### Review revision guard (0025)
 
 Apply `0025_review_revision_guard.sql` with the matching portal deploy. It adds a monotonic case revision, returns it with the audited case payload, advances it on review decisions and correction inserts, and makes `record_case_review` refuse a decision whose displayed status or revision is stale. Existing three- and four-argument calls keep their defaults; the portal sends both values. This repair prepares code and migration only and does not claim the migration is hosted.
+
+### Review request idempotency (0026)
+
+Apply `0026_review_request_idempotency.sql` with the matching portal deploy. It adds a request ID to review-log rows and makes `record_case_review` replay the original result for the same case, reviewer and request ID before checking status or revision. Reusing a request ID for different content fails closed. The portal retains the request ID while a failed action is retried. Decisions without a request ID are refused; older callers fail closed rather than writing duplicates. This repair prepares code and migration only and does not claim the migration is hosted.
 
 Replay identity is scoped to a case, the authenticated reviewer UUID and a client-generated operation UUID. An unchanged retry returns the original exact correction ID; changed text with the same ID is rejected. Distinct intentional saves remain separate entries. Existing corrections and original case snapshots are untouched. Replays still check the allowlist and AAL2. No request metadata is added to case-history responses.
 

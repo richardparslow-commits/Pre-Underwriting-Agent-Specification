@@ -328,7 +328,7 @@ await exec("set role authenticated;");
 
 await pass(
   "reviewer can still mark reviewed through the RPC",
-  () => query("select public.record_case_review('LPP-2026-TEST01','marked_reviewed','Reviewed the full record')"),
+  () => query("select public.record_case_review('LPP-2026-TEST01','marked_reviewed','Reviewed the full record',null,null,gen_random_uuid())"),
   () => true,
 );
 await exec("reset role;");
@@ -342,17 +342,17 @@ await pass(
 // page that still shows SUBMITTED must not overwrite a clarification request.
 await pass(
   "reviewer can request clarification with the status the page showed",
-  () => query("select public.record_case_review('LPP-2026-BURIED','requested_clarification','Need the procedure date','submitted')"),
+  () => query("select public.record_case_review('LPP-2026-BURIED','requested_clarification','Need the procedure date','submitted',null,gen_random_uuid())"),
   () => true,
 );
 await expectError(
   "a stale review decision is refused instead of overriding the change",
-  () => query("select public.record_case_review('LPP-2026-BURIED','marked_reviewed','Stale decision','submitted')"),
+  () => query("select public.record_case_review('LPP-2026-BURIED','marked_reviewed','Stale decision','submitted',null,gen_random_uuid())"),
   "changed since you opened",
 );
 await pass(
   "the current status allows the same decision",
-  () => query("select public.record_case_review('LPP-2026-BURIED','marked_reviewed','Fresh decision','needs_clarification')"),
+  () => query("select public.record_case_review('LPP-2026-BURIED','marked_reviewed','Fresh decision','needs_clarification',null,gen_random_uuid())"),
   () => true,
 );
 await pass(
@@ -361,13 +361,65 @@ await pass(
   (rows) => rows[0].status === "reviewed",
 );
 
+// Heal s13-lost-answer-followup-clarification-logged-twice: a committed
+// decision whose answer was lost must replay once, not add a second log row.
+const retryRevision = await revisionOf("LPP-2026-BURIED");
+const retryRequest = "77777777-7777-4777-8777-777777777777";
+await pass(
+  "reviewer can request clarification with a request ID",
+  () => query(
+    "select public.record_case_review('LPP-2026-BURIED','requested_clarification','Follow-up note','reviewed',$1,$2)",
+    [retryRevision, retryRequest],
+  ),
+  () => true,
+);
+await pass(
+  "a retry after a lost acknowledgement is applied once",
+  async () => {
+    await query(
+      "select public.record_case_review('LPP-2026-BURIED','requested_clarification','Follow-up note','reviewed',$1,$2)",
+      [retryRevision, retryRequest],
+    );
+    await exec("reset role;");
+    try {
+      const [row] = await query(
+        "select c.status, c.review_revision, count(l.id)::int n from public.cases c left join public.case_review_log l on l.case_id = c.id and l.request_id = $2 where c.reference = $1 group by c.status, c.review_revision",
+        ["LPP-2026-BURIED", retryRequest],
+      );
+      return row;
+    } finally {
+      await exec("set role authenticated;");
+    }
+  },
+  (row) =>
+    row.status === "needs_clarification" &&
+    row.review_revision === retryRevision + 1 &&
+    row.n === 1,
+);
+await expectError(
+  "a review request ID cannot be replayed with a different decision",
+  () => query(
+    "select public.record_case_review('LPP-2026-BURIED','marked_reviewed','Different decision','needs_clarification',$1,$2)",
+    [retryRevision, retryRequest],
+  ),
+  "already used for a different decision",
+);
+await expectError(
+  "a review decision without a request ID is refused",
+  () => query(
+    "select public.record_case_review('LPP-2026-BURIED','marked_reviewed','No request ID','needs_clarification',$1)",
+    [retryRevision + 1],
+  ),
+  "request ID is required",
+);
+
 // Heal s13-stale-page-review-after-status-round-trip: matching status is not
 // enough when the page missed a status round-trip or a correction.
 const roundTripRevision = await revisionOf("LPP-2026-TEST01");
 await pass(
   "reviewer can request clarification with the revision the page showed",
   () => query(
-    "select public.record_case_review('LPP-2026-TEST01','requested_clarification','Round-trip request','reviewed',$1)",
+    "select public.record_case_review('LPP-2026-TEST01','requested_clarification','Round-trip request','reviewed',$1,gen_random_uuid())",
     [roundTripRevision],
   ),
   () => true,
@@ -376,7 +428,7 @@ const returnRevision = await revisionOf("LPP-2026-TEST01");
 await pass(
   "reviewer can return the status with the new revision",
   () => query(
-    "select public.record_case_review('LPP-2026-TEST01','marked_reviewed','Round-trip return','needs_clarification',$1)",
+    "select public.record_case_review('LPP-2026-TEST01','marked_reviewed','Round-trip return','needs_clarification',$1,gen_random_uuid())",
     [returnRevision],
   ),
   () => true,
@@ -384,7 +436,7 @@ await pass(
 await expectError(
   "a decision from before a status round-trip is refused even when the status matches",
   () => query(
-    "select public.record_case_review('LPP-2026-TEST01','marked_reviewed','Stale round trip','reviewed',$1)",
+    "select public.record_case_review('LPP-2026-TEST01','marked_reviewed','Stale round trip','reviewed',$1,gen_random_uuid())",
     [roundTripRevision],
   ),
   "changed since you opened",
@@ -401,7 +453,7 @@ await pass(
 await expectError(
   "a decision from before a correction is refused even when the status matches",
   () => query(
-    "select public.record_case_review('LPP-2026-TEST01','marked_reviewed','Stale correction decision','reviewed',$1)",
+    "select public.record_case_review('LPP-2026-TEST01','marked_reviewed','Stale correction decision','reviewed',$1,gen_random_uuid())",
     [correctionRevision],
   ),
   "changed since you opened",
@@ -461,7 +513,7 @@ await expectError(
 );
 await expectError(
   "a signed-out session cannot record a review decision",
-  () => query("select public.record_case_review('LPP-2026-TEST01','marked_reviewed','Signed-out decision')"),
+  () => query("select public.record_case_review('LPP-2026-TEST01','marked_reviewed','Signed-out decision',null,null,gen_random_uuid())"),
   "Not authorised",
 );
 await exec("reset role;");
