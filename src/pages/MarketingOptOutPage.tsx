@@ -6,6 +6,7 @@ import { FieldError, Input, Label, Textarea } from "@/components/ui/form";
 import { Alert, Badge } from "@/components/ui/surface";
 import { MARKETING_ENABLED, SITE } from "@/config/site";
 import { normaliseUsPhone } from "@/features/intake/validation";
+import { useMarketingOptOutDraft } from "@/features/marketing/MarketingOptOutDraft";
 import {
   requestMarketingRevocation,
   type MarketingRevocationResult,
@@ -25,10 +26,8 @@ interface FormErrors {
 }
 
 export default function MarketingOptOutPage() {
-  const [reference, setReference] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [reason, setReason] = useState("");
+  const { draft, setField, clearDraft } = useMarketingOptOutDraft();
+  const { reference, phone, email, reason } = draft;
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,6 +100,8 @@ export default function MarketingOptOutPage() {
         idempotencyKey: idempotencyKey.current,
       });
       setResult(response);
+      // The request is recorded; do not keep its contact details in memory.
+      clearDraft();
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -113,10 +114,7 @@ export default function MarketingOptOutPage() {
   }
 
   function reset() {
-    setReference("");
-    setPhone("");
-    setEmail("");
-    setReason("");
+    clearDraft();
     setErrors({});
     setError(null);
     setResult(null);
@@ -226,7 +224,9 @@ export default function MarketingOptOutPage() {
               id="reference"
               name="reference"
               value={reference}
-              onChange={(event) => setReference(event.target.value.toUpperCase())}
+              onChange={(event) =>
+                setField("reference", event.target.value.toUpperCase())
+              }
               placeholder="LPP-2026-7K3M9Q"
               autoComplete="off"
               autoCapitalize="characters"
@@ -245,7 +245,7 @@ export default function MarketingOptOutPage() {
                 name="email"
                 type="email"
                 value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                onChange={(event) => setField("email", event.target.value)}
                 autoComplete="email"
                 aria-invalid={Boolean(errors.email || errors.contact)}
                 className="mt-1.5"
@@ -260,7 +260,7 @@ export default function MarketingOptOutPage() {
                 type="tel"
                 inputMode="tel"
                 value={phone}
-                onChange={(event) => setPhone(event.target.value)}
+                onChange={(event) => setField("phone", event.target.value)}
                 autoComplete="tel"
                 aria-invalid={Boolean(errors.phone || errors.contact)}
                 className="mt-1.5"
@@ -276,7 +276,7 @@ export default function MarketingOptOutPage() {
               id="reason"
               name="reason"
               value={reason}
-              onChange={(event) => setReason(event.target.value)}
+              onChange={(event) => setField("reason", event.target.value)}
               maxLength={500}
               aria-invalid={Boolean(errors.reason)}
               className="mt-1.5"
