@@ -7,6 +7,8 @@ export interface CorrectionWriter {
     error: { code?: string; message?: string } | null;
   }>;
 }
+export const CASE_GONE =
+  "This case no longer exists. The correction was not saved.";
 const CONNECTION_LOST =
   "The correction was not saved because the connection was lost. Reconnect and save it again.";
 const UNCONFIRMED =
@@ -62,9 +64,13 @@ export async function writeCorrection(
         "This save request was already used for different correction text. Refresh the case before recording another correction.",
       );
     // Definitive answers from the server are final: inviting a retry of the
-    // unchanged correction would loop forever on a deleted case.
-    if (/case not found/i.test(result.error.message ?? ""))
-      throw new Error("This case no longer exists. The correction was not saved.");
+    // unchanged correction would loop forever on a deleted case. A delete can
+    // also win the race after the RPC's lookup, leaving a foreign-key failure.
+    if (
+      result.error.code === "23503" ||
+      /case not found|case could not be found/i.test(result.error.message ?? "")
+    )
+      throw new Error(CASE_GONE);
     if (/not authorised|not authorized/i.test(result.error.message ?? ""))
       throw new Error(
         "You are not authorised to record a correction on this case. Sign in again with an authorised reviewer account.",
