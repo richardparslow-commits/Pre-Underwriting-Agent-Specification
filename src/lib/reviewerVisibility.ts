@@ -103,6 +103,27 @@ export function isSafetyAccessDenied(error: unknown): boolean {
   return error instanceof Error && error.message === SAFETY_ACCESS_DENIED;
 }
 
+export const CASE_ACCESS_DENIED =
+  "You do not have permission to read this case. Sign in with an authorised reviewer account.";
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    return typeof message === "string" ? message : "";
+  }
+  return "";
+}
+
+/** Keep an allowlist refusal distinct from a transient case-read failure. */
+export function caseReadFailure(error: unknown): Error {
+  return new Error(
+    /not authoris|not authoriz|permission denied/i.test(errorMessage(error))
+      ? CASE_ACCESS_DENIED
+      : "This case could not be loaded.",
+  );
+}
+
 export async function readSafetyDisclosures(
   client: RpcReader,
   cursor?: SafetyCursor,
