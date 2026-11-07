@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 function Wordmark() {
   return (
-    <Link to="/" className="group flex items-center gap-2.5" aria-label={`${SITE.brand} home`}>
+    <Link to="/" className="group flex items-center gap-2.5">
       <span
         className="flex h-8 w-8 items-center justify-center rounded-md bg-primary font-display text-sm text-primary-foreground"
         aria-hidden
