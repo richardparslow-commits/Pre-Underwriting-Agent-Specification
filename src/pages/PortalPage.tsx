@@ -16,6 +16,7 @@ import { SITE } from "@/config/site";
 import { SafetyDisclosures } from "@/features/portal/SafetyDisclosures";
 import { MfaGate } from "@/features/portal/MfaGate";
 import { useReviewerAuth } from "@/features/portal/useReviewerAuth";
+import { SessionCheckCard } from "@/features/portal/SessionCheckCard";
 import { listCases } from "@/lib/api";
 import { useCaseQueue } from "@/features/portal/useCaseQueue";
 import type { CaseStatus, NotificationState } from "@/features/interview/types";
@@ -119,7 +120,7 @@ export default function PortalPage() {
   const auth = useReviewerAuth();
   const [safetyRefresh, setSafetyRefresh] = useState(0);
   const { cases, total, nextCursor, queueChanged, error, appendError, loading, loadingMore, load } = useCaseQueue(
-    auth.signedIn && !auth.loading,
+    auth.signedIn && !auth.loading && !auth.sessionError,
     listCases,
     auth.email,
   );
@@ -137,6 +138,15 @@ export default function PortalPage() {
           Checking your session…
         </p>
       </div>
+    );
+  }
+
+  if (auth.sessionError) {
+    return (
+      <SessionCheckCard
+        message={auth.sessionError}
+        onRetry={auth.retrySession}
+      />
     );
   }
 

@@ -6,6 +6,7 @@ import { Alert, Badge } from "@/components/ui/surface";
 import { SITE } from "@/config/site";
 import { CaseReview } from "@/features/portal/CaseReview";
 import { useReviewerAuth } from "@/features/portal/useReviewerAuth";
+import { SessionCheckCard } from "@/features/portal/SessionCheckCard";
 import { getCase } from "@/lib/api";
 import type { CaseRecord } from "@/features/interview/types";
 
@@ -32,8 +33,8 @@ export default function PortalCasePage() {
   }, [reference]);
 
   useEffect(() => {
-    if (auth.signedIn) void load();
-  }, [auth.signedIn, load]);
+    if (auth.signedIn && !auth.sessionError) void load();
+  }, [auth.signedIn, auth.sessionError, load]);
 
   if (auth.loading) {
     return (
@@ -43,6 +44,15 @@ export default function PortalCasePage() {
           Checking your session…
         </p>
       </div>
+    );
+  }
+
+  if (auth.sessionError) {
+    return (
+      <SessionCheckCard
+        message={auth.sessionError}
+        onRetry={auth.retrySession}
+      />
     );
   }
 
