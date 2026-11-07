@@ -77,8 +77,10 @@ export function LeadForm({
       : MARKETING.calls
         ? "Marketing calls are optional"
         : "Marketing texts are optional";
-  const serverMarketingEnabled =
-    CONSENT_POLICY.marketingChannels.calls || CONSENT_POLICY.marketingChannels.texts;
+  const serverMarketing = CONSENT_POLICY.marketingChannels;
+  const missingServerChannel =
+    (MARKETING.calls && !serverMarketing.calls) ||
+    (MARKETING.texts && !serverMarketing.texts);
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -448,9 +450,9 @@ export function LeadForm({
               Leaving any box unchecked does not stop your review and does not change how quickly
               you hear back. You can submit with every box off.
             </p>
-            {!serverMarketingEnabled ? (
+            {missingServerChannel ? (
               <p className="field-help">
-                Marketing consent is not available in this deployment yet.
+                Some marketing choices are not available in this deployment yet.
               </p>
             ) : null}
 
@@ -460,7 +462,7 @@ export function LeadForm({
                   <Checkbox
                     checked={consent.marketingCall}
                     onChange={(event) => onConsent("marketingCall", event.target.checked)}
-                    disabled={!needsPhone || !serverMarketingEnabled}
+                    disabled={!needsPhone || !serverMarketing.calls}
                   />
                   <span>
                     {MARKETING_CALL_LABEL}
@@ -477,7 +479,7 @@ export function LeadForm({
                   <Checkbox
                     checked={consent.marketingText}
                     onChange={(event) => onConsent("marketingText", event.target.checked)}
-                    disabled={!needsPhone || !serverMarketingEnabled}
+                    disabled={!needsPhone || !serverMarketing.texts}
                   />
                   <span>
                     {MARKETING_TEXT_LABEL}
