@@ -22,8 +22,10 @@ intake, marketing or MFA.
   and distinguishes a lost connection ("the case may not be saved; check before
   retrying") from a request whose outcome is unconfirmed ("retry the unchanged
   submission to check the same request").
-- **s3-offline-submit-raw-error**: a browser offline/fetch failure now maps to
-  the connection-lost message instead of a raw transport error.
+- **s3-offline-submit-raw-error**: an offline browser now gets the
+  connection-lost message instead of a raw transport error. A connection reset
+  while online remains unconfirmed, because the request may already have
+  reached the server and the same key must be retried unchanged.
 - **s8-copy-reference-fails-silently**: a denied clipboard now shows an alert
   and selects the reference so it can be copied manually.
 - **s7-receipt-jumps-privacy-page-to-top**: marking a case submitted no longer

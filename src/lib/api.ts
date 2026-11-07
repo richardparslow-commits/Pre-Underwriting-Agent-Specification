@@ -379,13 +379,16 @@ async function submitLive(draft: CaseDraft, submissionKey: string): Promise<Subm
     });
     body = await response.json().catch(() => null);
   } catch (error) {
-    // A timeout is uncertain: the case may already be saved, so retrying the
-    // same key is safe. A lost connection is named as such so the prospect
-    // knows to reconnect instead of reading it as a server rejection.
+    // A timeout or a connection reset can happen after the server saved the
+    // case, so retrying the same key is the safe guidance. Only an offline
+    // browser proves the request never left; do not claim "not saved" otherwise.
     if (error instanceof DOMException && error.name === "AbortError") {
       throw new Error(UNCONFIRMED_SUBMISSION);
     }
-    throw new Error(CONNECTION_LOST);
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      throw new Error(CONNECTION_LOST);
+    }
+    throw new Error(UNCONFIRMED_SUBMISSION);
   } finally {
     clearTimeout(timer);
   }
