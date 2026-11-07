@@ -524,9 +524,12 @@ Deno.serve(async (req: Request, info?: Deno.ServeHandlerInfo<Deno.NetAddr>) => {
       notification_updated_at: (stored.data.notification_updated_at as string | null) ?? null,
     })
     : {
-      state: result.state,
+      // Without a read-back the stored outcome is unknown. Never promote the
+      // in-memory provider result to accepted: a signed bounce may have won the
+      // race and changed the case after this request read it.
+      state: "failed",
       updatedAt: new Date().toISOString(),
-      detail: result.detail,
+      detail: "Notification status could not be confirmed after sending",
       attempts,
     };
 
