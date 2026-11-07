@@ -6,6 +6,8 @@ export interface IntakeSession {
   interview: InterviewHook;
   historyEntry: IntakeHistoryEntry;
   submitting: boolean;
+  /** A link click was refused because the submission is still in flight. */
+  navigationBlocked: boolean;
   error: string | null;
   submit: () => Promise<void>;
 }

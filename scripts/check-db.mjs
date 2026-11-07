@@ -286,6 +286,63 @@ await pass(
   (rows) => rows[0].status === "reviewed" && rows[0].n === 1,
 );
 
+// Heal s12-stale-page-review-overrides-clarification: a decision taken on a
+// page that still shows SUBMITTED must not overwrite a clarification request.
+await pass(
+  "reviewer can request clarification with the status the page showed",
+  () => query("select public.record_case_review('LPP-2026-BURIED','requested_clarification','Need the procedure date','submitted')"),
+  () => true,
+);
+await expectError(
+  "a stale review decision is refused instead of overriding the change",
+  () => query("select public.record_case_review('LPP-2026-BURIED','marked_reviewed','Stale decision','submitted')"),
+  "changed since you opened",
+);
+await pass(
+  "the current status allows the same decision",
+  () => query("select public.record_case_review('LPP-2026-BURIED','marked_reviewed','Fresh decision','needs_clarification')"),
+  () => true,
+);
+await pass(
+  "the refused decision left no status change behind",
+  () => query("select status from public.cases where reference = 'LPP-2026-BURIED'"),
+  (rows) => rows[0].status === "reviewed",
+);
+
+// Heal s6-signed-out-session-still-reads-queue: the token's session must exist.
+await exec(
+  "create table if not exists auth.sessions (id uuid primary key, user_id uuid not null)",
+);
+const signedOutSession = "33333333-3333-4333-8333-333333333333";
+await query("insert into auth.sessions (id, user_id) values ($1, $2)", [
+  signedOutSession,
+  reviewer,
+]);
+await exec(
+  `select set_config('request.jwt.claims', '${JSON.stringify({ sub: reviewer, email: "reviewer@example.com", aal: "aal2", session_id: signedOutSession })}', false);`,
+);
+await exec("set role authenticated;");
+await pass(
+  "an existing reviewer session is accepted",
+  () => query("select public.is_reviewer() ok"),
+  (rows) => rows[0].ok === true,
+);
+await exec("reset role;");
+await query("delete from auth.sessions where id = $1", [signedOutSession]);
+await exec("set role authenticated;");
+await pass(
+  "a signed-out reviewer session is refused at once",
+  () => query("select public.is_reviewer() ok"),
+  (rows) => rows[0].ok === false,
+);
+await expectError(
+  "a signed-out session cannot read the queue",
+  () => query("select public.get_case_queue_page() result"),
+  "Not authorised",
+);
+await exec("reset role;");
+await claims("aal2");
+
 await claims("aal2", other, "other@example.com");
 await exec("set role authenticated;");
 await pass("non-reviewer sees no summaries", () => query("select count(*)::int n from public.case_summaries"), (rows) => rows[0].n === 0);

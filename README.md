@@ -607,3 +607,5 @@ Bounded payload selection and queue summaries: [Heal queue scaling repair](docs/
 Explicit recovery of this tab's lost MFA enrollment response: [Heal owned MFA recovery](docs/HEAL-OWNED-MFA-RECOVERY.md). Unknown or closed-tab setups remain operator recovery cases.
 
 Policy-page header/footer returns preserve the active interview position: [Heal policy return repair](docs/HEAL-POLICY-RETURN.md). Browser history, reset and private-test boundaries remain intact.
+
+Twenty defects from the [6 November Heal run](https://app.heal.dev/fa38cc97-45dd-4b98-8550-5fde5c59913c/runs/6ea79c42-0a99-4cdd-b92c-496e15b2137b?tab=defects) are covered by [submission, intake, reviewer and integrity repairs](docs/HEAL-2026-11-06-REPAIRS.md). Forward migration `0023` is required for the stale-review and signed-out-session fixes; the code is not deployed or hosted by this batch.

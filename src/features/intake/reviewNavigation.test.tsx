@@ -35,7 +35,7 @@ async function fixture(run: (view: ReactTestRenderer, read: () => InterviewHook)
       <IntakeSessionContext.Provider value={{
         interview,
         historyEntry: { session: "synthetic-review-navigation", step: interview.step },
-        submitting: false, error: null,
+        submitting: false, navigationBlocked: false, error: null,
         submit: async () => { throw new Error("Navigation must never submit a case"); },
       }}>
         {interview.step === "interview" || interview.step === "review" ? <IntakePage /> : null}

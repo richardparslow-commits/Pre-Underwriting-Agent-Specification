@@ -25,8 +25,10 @@ test("impossible calendar dates are rejected rather than normalised", () => {
   assert.equal(errors({ dateOfBirth: "1980-02-29" }).dateOfBirth, undefined);
 });
 
-test("adult boundary uses the actual birthday in UTC", () => {
-  const on = new Date("2026-11-04T00:00:00Z");
+test("adult boundary uses the visitor's local calendar day", () => {
+  // Constructed in local time so the assertion does not depend on the test
+  // runner's zone. On the evening before the 18th birthday the answer is 17.
+  const on = new Date(2026, 10, 4, 23, 30);
   assert.equal(ageOn("2008-11-04", on), 18);
   assert.equal(ageOn("2008-11-05", on), 17);
   assert.ok(Number.isNaN(ageOn("1980-01-01", new Date("invalid"))));

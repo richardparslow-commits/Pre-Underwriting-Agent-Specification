@@ -223,7 +223,20 @@ Deno.serve(async (req: Request) => {
       continue;
     }
 
-    if (result.state === "failed" || result.state === "not_sent") failed += 1;
+    // A signed bounce can land while this send is in flight; the database keeps
+    // failed in that case, so count what is stored rather than what was sent.
+    const stored = await supabase
+      .from("cases")
+      .select("notification_state")
+      .eq("reference", row.reference)
+      .maybeSingle();
+    if (stored.error) {
+      console.error("Notification read-back failed", stored.error.code);
+      failed += 1;
+      continue;
+    }
+    const finalState = String(stored.data?.notification_state ?? result.state);
+    if (finalState === "failed" || finalState === "not_sent") failed += 1;
     else sent += 1;
   }
 

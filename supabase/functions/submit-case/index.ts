@@ -90,7 +90,16 @@ async function durableRateLimited(rateKey: string): Promise<boolean | null> {
   }
 }
 
-function receiptFromRow(row: ReceiptRow, replayed = false) {
+function notificationFromRow(
+  row: Pick<
+    ReceiptRow,
+    | "submitted_at"
+    | "notification_state"
+    | "notification_attempts"
+    | "notification_detail"
+    | "notification_updated_at"
+  >,
+) {
   let note: string | undefined;
   if (row.notification_detail) {
     try {
@@ -105,15 +114,19 @@ function receiptFromRow(row: ReceiptRow, replayed = false) {
   }
 
   return {
+    state: row.notification_state,
+    updatedAt: row.notification_updated_at ?? row.submitted_at,
+    detail: note,
+    attempts: row.notification_attempts,
+  };
+}
+
+function receiptFromRow(row: ReceiptRow, replayed = false) {
+  return {
     reference: row.reference,
     submittedAt: row.submitted_at,
     status: row.status,
-    notification: {
-      state: row.notification_state,
-      updatedAt: row.notification_updated_at ?? row.submitted_at,
-      detail: note,
-      attempts: row.notification_attempts,
-    },
+    notification: notificationFromRow(row),
     replayed,
   };
 }
@@ -231,34 +244,27 @@ Deno.serve(async (req: Request, info?: Deno.ServeHandlerInfo<Deno.NetAddr>) => {
       origin,
     );
   }
-  const durableLimited = await durableRateLimited(rateKey);
-  if (durableLimited === true) {
+  // Fail closed before touching the database when the durable limiter is not
+  // configured in production. A replay is only known after the body is parsed
+  // and looked up below, so configuration is checked here and consumption is
+  // deferred until the request is known to be a new submission.
+  if (
+    Deno.env.get("ENVIRONMENT") !== "test" &&
+    !(
+      Deno.env.get("SUPABASE_URL") &&
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") &&
+      Deno.env.get("RATE_LIMIT_SALT")
+    )
+  ) {
+    console.error("Durable rate limiter is unavailable");
     return jsonResponse(
-      { error: "Too many submissions from this connection. Please try again shortly." },
-      429,
+      {
+        error:
+          "Submissions are temporarily unavailable. Nothing was saved and nothing was sent.",
+      },
+      503,
       origin,
     );
-  }
-  if (durableLimited === null) {
-    if (Deno.env.get("ENVIRONMENT") === "test") {
-      if (rateLimited(rateKey)) {
-        return jsonResponse(
-          { error: "Too many submissions from this connection. Please try again shortly." },
-          429,
-          origin,
-        );
-      }
-    } else {
-      console.error("Durable rate limiter is unavailable");
-      return jsonResponse(
-        {
-          error:
-            "Submissions are temporarily unavailable. Nothing was saved and nothing was sent.",
-        },
-        503,
-        origin,
-      );
-    }
   }
 
   // Content-Length can be absent or lie, so the byte budget is enforced while
@@ -308,6 +314,39 @@ Deno.serve(async (req: Request, info?: Deno.ServeHandlerInfo<Deno.NetAddr>) => {
 
   if (existing.data) {
     return replayResponse(existing.data, draft, origin);
+  }
+
+  // The allowance is consumed only for a new submission. A replay of an
+  // already-saved case has already been answered above, so retrying after an
+  // uncertain outcome never spends the prospect's remaining allowance.
+  const durableLimited = await durableRateLimited(rateKey);
+  if (durableLimited === true) {
+    return jsonResponse(
+      { error: "Too many submissions from this connection. Please try again shortly." },
+      429,
+      origin,
+    );
+  }
+  if (durableLimited === null) {
+    if (Deno.env.get("ENVIRONMENT") === "test") {
+      if (rateLimited(rateKey)) {
+        return jsonResponse(
+          { error: "Too many submissions from this connection. Please try again shortly." },
+          429,
+          origin,
+        );
+      }
+    } else {
+      console.error("Durable rate limiter is unavailable");
+      return jsonResponse(
+        {
+          error:
+            "Submissions are temporarily unavailable. Nothing was saved and nothing was sent.",
+        },
+        503,
+        origin,
+      );
+    }
   }
 
   // ---- Create the case first, before any notification is attempted --------
@@ -464,17 +503,39 @@ Deno.serve(async (req: Request, info?: Deno.ServeHandlerInfo<Deno.NetAddr>) => {
     console.error("Notification status update failed", completeError.code);
   }
 
+  // A provider event can land while the send is in flight. The receipt must
+  // report what the case actually stores (a bounce stays failed), not the
+  // sender's in-memory accepted result.
+  const stored = await supabase
+    .from("cases")
+    .select(
+      "submitted_at, notification_state, notification_attempts, notification_detail, notification_updated_at",
+    )
+    .eq("reference", reference)
+    .maybeSingle();
+  if (stored.error) console.error("Notification read-back failed", stored.error.code);
+
+  const notification = stored.data
+    ? notificationFromRow({
+      submitted_at: String(stored.data.submitted_at ?? submittedAt),
+      notification_state: String(stored.data.notification_state ?? result.state),
+      notification_attempts: Number(stored.data.notification_attempts ?? attempts),
+      notification_detail: (stored.data.notification_detail as string | null) ?? null,
+      notification_updated_at: (stored.data.notification_updated_at as string | null) ?? null,
+    })
+    : {
+      state: result.state,
+      updatedAt: new Date().toISOString(),
+      detail: result.detail,
+      attempts,
+    };
+
   return jsonResponse(
     {
       reference,
       submittedAt,
       status: "submitted",
-      notification: {
-        state: result.state,
-        updatedAt: new Date().toISOString(),
-        detail: result.detail,
-        attempts,
-      },
+      notification,
     },
     201,
     origin,

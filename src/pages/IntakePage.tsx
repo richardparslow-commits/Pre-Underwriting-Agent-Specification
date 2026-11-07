@@ -6,11 +6,13 @@ import { PermissionStep } from "@/features/intake/PermissionStep";
 import { InterviewScreen } from "@/features/intake/InterviewScreen";
 import { ReviewScreen } from "@/features/intake/ReviewScreen";
 import { ConfirmationScreen } from "@/features/intake/ConfirmationScreen";
+import { Alert } from "@/components/ui/surface";
 
 export default function IntakePage() {
   const {
     interview,
     submitting,
+    navigationBlocked,
     error,
     submit: handleSubmit,
   } = useIntakeSession();
@@ -28,6 +30,11 @@ export default function IntakePage() {
             Please wait for the result. Editing and starting over are paused so the receipt
             matches the answers you reviewed. This does not yet confirm that the case was saved.
           </p>
+          {navigationBlocked ? (
+            <Alert tone="warn">
+              Your case is still being submitted. Stay on this page until its reference appears.
+            </Alert>
+          ) : null}
         </section>
       </div>
     );

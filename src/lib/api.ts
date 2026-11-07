@@ -333,6 +333,11 @@ function ensurePreviewSeed(): void {
 
 const UNCONFIRMED_SUBMISSION =
   "We could not confirm whether this case was saved. Retry without changing your answers.";
+const CONNECTION_LOST =
+  "The connection was lost before the case was saved. Reconnect and submit again.";
+// The intake relay abandons a request after 15 seconds; the browser must not
+// keep the prospect on the waiting screen longer than that.
+const SUBMIT_TIMEOUT_MS = 15_000;
 
 function isSubmissionReceipt(value: unknown): value is SubmissionReceipt {
   if (!value || typeof value !== "object") return false;
@@ -356,20 +361,34 @@ async function submitLive(draft: CaseDraft, submissionKey: string): Promise<Subm
     throw new Error("The submission service is not configured.");
   }
 
-  const response = await fetch(SUBMIT_CASE_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      "Idempotency-Key": submissionKey,
-    },
-    body: JSON.stringify(draft),
-  }).catch(() => {
-    throw new Error(UNCONFIRMED_SUBMISSION);
-  });
-
-  const body: unknown = await response.json().catch(() => null);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SUBMIT_TIMEOUT_MS);
+  let response: Response;
+  let body: unknown;
+  try {
+    response = await fetch(SUBMIT_CASE_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "Idempotency-Key": submissionKey,
+      },
+      body: JSON.stringify(draft),
+      signal: controller.signal,
+    });
+    body = await response.json().catch(() => null);
+  } catch (error) {
+    // A timeout is uncertain: the case may already be saved, so retrying the
+    // same key is safe. A lost connection is named as such so the prospect
+    // knows to reconnect instead of reading it as a server rejection.
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error(UNCONFIRMED_SUBMISSION);
+    }
+    throw new Error(CONNECTION_LOST);
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!response.ok) {
     const message =
@@ -568,6 +587,7 @@ export async function recordReview(
   reference: string,
   action: ReviewLogEntry["action"],
   note?: string,
+  expectedStatus?: CaseStatus,
 ): Promise<void> {
   if (PREVIEW_MODE) {
     const record = previewCases.get(reference);
@@ -587,9 +607,16 @@ export async function recordReview(
     p_reference: reference,
     p_action: action,
     p_note: note ?? null,
+    // The database refuses a decision taken on a page whose status has moved
+    // on, instead of applying it over a clarification request or correction.
+    p_expected_status: expectedStatus ?? null,
   });
 
-  if (error) throw new Error("The review action could not be recorded.");
+  if (error) {
+    const message = error.message ?? "";
+    if (/changed since you opened/i.test(message)) throw new Error(message);
+    throw new Error("The review action could not be recorded.");
+  }
 }
 
 // ---------------------------------------------------------------------------

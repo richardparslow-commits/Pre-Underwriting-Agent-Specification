@@ -11,7 +11,7 @@ const text=(node:ReactTestInstance|string):string=>typeof node==='string'?node:n
 test('pending intake replaces every history-selected form with an accessible waiting state',async()=>{
  function Harness({step}:{step:IntakeStep}) {
   const interview=useInterview();
-  return <MemoryRouter><IntakeSessionContext.Provider value={{interview:{...interview,step},submitting:true,error:null,submit:async()=>{},historyEntry:{session:'synthetic',step}}}><IntakePage/></IntakeSessionContext.Provider></MemoryRouter>;
+  return <MemoryRouter><IntakeSessionContext.Provider value={{interview:{...interview,step},submitting:true,navigationBlocked:false,error:null,submit:async()=>{},historyEntry:{session:'synthetic',step}}}><IntakePage/></IntakeSessionContext.Provider></MemoryRouter>;
  }
  const originalWindow=Object.getOwnPropertyDescriptor(globalThis,'window');
  if(!originalWindow)Object.defineProperty(globalThis,'window',{configurable:true,value:{scrollTo(){}}});

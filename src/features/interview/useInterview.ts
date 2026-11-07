@@ -99,6 +99,8 @@ export function useInterview(navigation?: IntakeNavigation): InterviewHook {
     dateOfBirth: "",
     adultAttested: false,
   });
+  const leadRef = useRef(lead);
+  leadRef.current = lead;
   const [consent, setConsentState] = useState<ConsentState>(EMPTY_CONSENT);
   const [answers, setAnswers] = useState<Answers>({});
   const [acknowledgements, setAcknowledgements] = useState<
@@ -146,7 +148,26 @@ export function useInterview(navigation?: IntakeNavigation): InterviewHook {
 
   const setLeadField = useCallback(
     (field: keyof LeadDetails, value: string) => {
+      const previous = leadRef.current[field];
       setLead((current) => ({ ...current, [field]: value }));
+
+      // The lead form is the source for ID-03 (residence) and ID-01 (date of
+      // birth). Unless the customer has overridden that answer, follow the
+      // edited contact detail instead of leaving the contradiction that
+      // submit-case refuses. A different answer is never silently replaced.
+      const answerId = field === "state" ? "ID-03" : field === "dateOfBirth" ? "ID-01" : null;
+      const previousValue = typeof previous === "string" ? previous.trim() : "";
+      const valid = Boolean(value.trim()) && !validateLead({ ...leadRef.current, [field]: value })[field];
+      if (answerId && previousValue && previousValue !== value.trim() && valid) {
+        setAnswers((current) => {
+          const answer = current[answerId];
+          if (!answer || answer.value !== previousValue) return current;
+          return {
+            ...current,
+            [answerId]: { ...answer, value: value.trim(), updatedAt: new Date().toISOString() },
+          };
+        });
+      }
       invalidateReview();
     },
     [invalidateReview],
@@ -326,7 +347,9 @@ export function useInterview(navigation?: IntakeNavigation): InterviewHook {
   const markSubmitted = useCallback((next: SubmissionReceipt) => {
     setReceipt(next);
     setStep("submitted");
-    window.scrollTo({ top: 0, behavior: "auto" });
+    // No window scroll here: the intake session also spans the policy pages,
+    // and a receipt arriving while the visitor reads one must not jump it to
+    // the top. IntakePage scrolls when the step actually changes on /start.
   }, [setStep]);
 
   const startOver = useCallback(() => {

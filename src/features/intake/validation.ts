@@ -24,16 +24,19 @@ export function normaliseUsPhone(value: string): string | null {
   return null;
 }
 
-/** Age in whole years on a given date, computed in UTC. */
+/** Age in whole years on the visitor's local calendar date. */
 export function ageOn(dateOfBirth: string, onDate = new Date()): number {
   const birth = new Date(`${dateOfBirth}T00:00:00.000Z`);
   // Date normalises impossible calendar days (February 30 becomes March 1).
   // Match the server's strict date-only check instead of accepting that rollover.
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth) || Number.isNaN(birth.getTime()) ||
       birth.toISOString().slice(0, 10) !== dateOfBirth || Number.isNaN(onDate.getTime())) return Number.NaN;
-  let age = onDate.getUTCFullYear() - birth.getUTCFullYear();
-  const month = onDate.getUTCMonth() - birth.getUTCMonth();
-  if (month < 0 || (month === 0 && onDate.getUTCDate() < birth.getUTCDate())) age -= 1;
+  // The visitor's own calendar day decides whether they are 18 yet. Using the
+  // UTC day would admit a 17-year-old on the evening before their birthday in
+  // US time zones, where UTC has already rolled over.
+  let age = onDate.getFullYear() - birth.getUTCFullYear();
+  const month = onDate.getMonth() - birth.getUTCMonth();
+  if (month < 0 || (month === 0 && onDate.getDate() < birth.getUTCDate())) age -= 1;
   return age;
 }
 
