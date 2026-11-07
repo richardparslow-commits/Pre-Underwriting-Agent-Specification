@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -14,6 +14,7 @@ import { Input, Label } from "@/components/ui/form";
 import { Alert, Badge } from "@/components/ui/surface";
 import { SITE } from "@/config/site";
 import { SafetyDisclosures } from "@/features/portal/SafetyDisclosures";
+import { useReviewerSignInDraft } from "@/features/portal/ReviewerSignInDraft";
 import { MfaGate } from "@/features/portal/MfaGate";
 import { useReviewerAuth } from "@/features/portal/useReviewerAuth";
 import { SessionCheckCard } from "@/features/portal/SessionCheckCard";
@@ -45,8 +46,8 @@ const NOTIFICATION_LABEL: Record<NotificationState, string> = {
   failed: "Notification failed",
 };
 
-function SignInCard({ auth }: { auth: ReturnType<typeof useReviewerAuth> }) {
-  const [address, setAddress] = useState("");
+export function SignInCard({ auth }: { auth: ReturnType<typeof useReviewerAuth> }) {
+  const { address, setAddress } = useReviewerSignInDraft();
 
   return (
     <div className="mx-auto max-w-md">
@@ -119,7 +120,12 @@ function SignInCard({ auth }: { auth: ReturnType<typeof useReviewerAuth> }) {
 
 export default function PortalPage() {
   const auth = useReviewerAuth();
+  const { clear: clearSignInDraft } = useReviewerSignInDraft();
   const [safetyRefresh, setSafetyRefresh] = useState(0);
+
+  useEffect(() => {
+    if (auth.email) clearSignInDraft();
+  }, [auth.email, clearSignInDraft]);
   const { cases, total, nextCursor, queueChanged, error, appendError, loading, loadingMore, load } = useCaseQueue(
     auth.signedIn && !auth.loading && !auth.sessionError,
     listCases,
