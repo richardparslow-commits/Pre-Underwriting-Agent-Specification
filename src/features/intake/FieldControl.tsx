@@ -1,5 +1,6 @@
 import { Input, Select, Textarea } from "@/components/ui/form";
 import type { QuestionKind, QuestionOption } from "@/features/interview/types";
+import { MAX_ANSWER_TEXT_LENGTH } from "../../../supabase/functions/_shared/answer-limits";
 import { cn } from "@/lib/utils";
 
 export const MULTI_SEPARATOR = "|";
@@ -13,6 +14,7 @@ interface FieldControlProps {
   onChange: (value: string) => void;
   describedBy?: string;
   invalid?: boolean;
+  maxLength?: number;
 }
 
 export function FieldControl({
@@ -24,7 +26,13 @@ export function FieldControl({
   onChange,
   describedBy,
   invalid,
+  maxLength,
 }: FieldControlProps) {
+  const textMaxLength =
+    kind === "short_text" || kind === "long_text"
+      ? maxLength ?? MAX_ANSWER_TEXT_LENGTH
+      : undefined;
+
   if (kind === "long_text") {
     return (
       <Textarea
@@ -34,6 +42,7 @@ export function FieldControl({
         onChange={(event) => onChange(event.target.value)}
         aria-describedby={describedBy}
         aria-invalid={invalid}
+        maxLength={textMaxLength}
       />
     );
   }
@@ -153,6 +162,7 @@ export function FieldControl({
       aria-describedby={describedBy}
       aria-invalid={invalid}
       autoComplete="off"
+      maxLength={textMaxLength}
     />
   );
 }

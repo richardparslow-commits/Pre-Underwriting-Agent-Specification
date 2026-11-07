@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/surface";
 import { FieldControl, MULTI_SEPARATOR } from "./FieldControl";
 import { ANSWER_OPTIONS, type AnswerRecord, type AnswerState, type Question } from "@/features/interview/types";
+import { MAX_COMPOUND_FIELD_LENGTH } from "../../../supabase/functions/_shared/answer-limits";
 import { cn } from "@/lib/utils";
 
 interface QuestionCardProps {
@@ -150,6 +151,7 @@ export function QuestionCard({
                     onChange({ fields: { ...(answer?.fields ?? {}), [field.id]: value } })
                   }
                   describedBy={field.hint ? `${question.id}-${field.id}-hint` : undefined}
+                  maxLength={MAX_COMPOUND_FIELD_LENGTH}
                 />
               </div>
               {field.hint ? (

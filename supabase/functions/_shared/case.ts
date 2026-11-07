@@ -13,6 +13,7 @@ import { CONSENT_POLICY } from "./policy.generated.ts";
 import { leadTextErrors } from "./lead-validation.ts";
 import { answerConsistencyFlags } from "./answer-consistency.ts";
 import { US_STATE_TIME_ZONES } from "./marketing-policy.ts";
+import { MAX_ANSWER_TEXT_LENGTH, MAX_COMPOUND_FIELD_LENGTH } from "./answer-limits.ts";
 
 // -----------------------------------------------------------------------------
 // CORS
@@ -261,7 +262,7 @@ function normalisePhone(value: string): string | null {
 // -----------------------------------------------------------------------------
 
 const MAX_ANSWERS = SERVER_BANK.length;
-const MAX_TEXT = 4000;
+const MAX_TEXT = MAX_ANSWER_TEXT_LENGTH;
 const CLOCK_SKEW_MS = 5 * 60 * 1000;
 const MAX_SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -457,7 +458,7 @@ function parseFields(
   for (const raw of value) {
     if (!isRecord(raw)) return { ok: false, reason: "Invalid answer detail" };
     const id = text(raw.id, 64);
-    const fieldValue = text(raw.value, 500);
+    const fieldValue = text(raw.value, MAX_COMPOUND_FIELD_LENGTH);
     if (!id || !fieldValue || !allowed.has(id) || seen.has(id)) {
       return { ok: false, reason: "Invalid answer detail" };
     }
