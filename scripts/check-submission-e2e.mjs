@@ -72,9 +72,11 @@ async function handleDatabaseRequest(db, request, response) {
         from jsonb_populate_record(null::public.cases, $1::jsonb)
       `, [JSON.stringify(body)]);
       response.writeHead(201).end();
-    } else if (url.pathname === "/rest/v1/rpc/consume_submission_rate") {
-      const result = await db.query("select public.consume_submission_rate($1, $2, $3) as allowed",
-        [body.p_key_hash, body.p_limit, body.p_window_seconds]);
+    } else if (url.pathname === "/rest/v1/rpc/consume_submission_rate_for_key") {
+      const result = await db.query(
+        "select public.consume_submission_rate_for_key($1, $2, $3, $4) as allowed",
+        [body.p_key_hash, body.p_idempotency_key, body.p_limit, body.p_window_seconds],
+      );
       json(200, result.rows[0].allowed);
     } else if (url.pathname === "/rest/v1/rpc/complete_case_notification") {
       await db.query("select public.complete_case_notification($1, $2, $3, $4)",

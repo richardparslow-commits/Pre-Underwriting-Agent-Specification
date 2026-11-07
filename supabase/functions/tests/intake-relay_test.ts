@@ -252,7 +252,7 @@ Deno.test("real handler: two signed visitors behind one gateway get independent 
       new Response(JSON.stringify(data), {
         headers: { "content-type": "application/json" },
       });
-    if (path.endsWith("/rpc/consume_submission_rate")) {
+    if (path.endsWith("/rpc/consume_submission_rate_for_key")) {
       const p = await req.json();
       assertEquals(p.p_limit, 10);
       assertEquals(p.p_window_seconds, 600);

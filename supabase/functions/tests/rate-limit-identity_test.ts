@@ -62,10 +62,16 @@ for (
         (async (input: RequestInfo | URL, init?: RequestInit) => {
           const request = new Request(input, init);
           const url = new URL(request.url);
-          if (url.pathname.endsWith("/rpc/consume_submission_rate")) {
+          if (
+            url.pathname.endsWith("/rpc/consume_submission_rate") ||
+            url.pathname.endsWith("/rpc/consume_submission_rate_for_key")
+          ) {
             const params = await request.json();
             assertEquals(params.p_limit, limit);
             assertEquals(params.p_window_seconds, 600);
+            if (params.p_idempotency_key !== undefined) {
+              assertEquals(typeof params.p_idempotency_key, "string");
+            }
             const hits = (buckets.get(params.p_key_hash) ?? 0) + 1;
             buckets.set(params.p_key_hash, hits);
             return json(hits <= limit);

@@ -59,7 +59,10 @@ interface ReceiptRow {
   notification_updated_at: string | null;
 }
 
-async function durableRateLimited(rateKey: string): Promise<boolean | null> {
+async function durableRateLimited(
+  rateKey: string,
+  idempotencyKey: string,
+): Promise<boolean | null> {
   const url = Deno.env.get("SUPABASE_URL");
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const salt = Deno.env.get("RATE_LIMIT_SALT");
@@ -74,11 +77,15 @@ async function durableRateLimited(rateKey: string): Promise<boolean | null> {
       byte.toString(16).padStart(2, "0"),
     ).join("");
 
-    const { data, error } = await serviceClient().rpc("consume_submission_rate", {
-      p_key_hash: hash,
-      p_limit: 10,
-      p_window_seconds: 600,
-    });
+    const { data, error } = await serviceClient().rpc(
+      "consume_submission_rate_for_key",
+      {
+        p_key_hash: hash,
+        p_idempotency_key: idempotencyKey,
+        p_limit: 10,
+        p_window_seconds: 600,
+      },
+    );
 
     if (error) {
       console.error("Durable rate limit failed", error.code);
@@ -317,9 +324,10 @@ Deno.serve(async (req: Request, info?: Deno.ServeHandlerInfo<Deno.NetAddr>) => {
   }
 
   // The allowance is consumed only for a new submission. A replay of an
-  // already-saved case has already been answered above, so retrying after an
-  // uncertain outcome never spends the prospect's remaining allowance.
-  const durableLimited = await durableRateLimited(rateKey);
+  // already-saved case has already been answered above, and an in-flight retry
+  // shares the durable claim for the same idempotency key, so neither spends
+  // the prospect's remaining allowance.
+  const durableLimited = await durableRateLimited(rateKey, idempotencyKey);
   if (durableLimited === true) {
     return jsonResponse(
       { error: "Too many submissions from this connection. Please try again shortly." },

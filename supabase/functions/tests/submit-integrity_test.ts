@@ -49,7 +49,9 @@ async function databaseTest(
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = new Request(input, init);
     const url = new URL(request.url);
-    if (url.pathname.endsWith("/rpc/consume_submission_rate")) {
+    if (url.pathname.endsWith("/rpc/consume_submission_rate_for_key")) {
+      const params = await request.json();
+      assertEquals(params.p_idempotency_key, "same-operation-key");
       return json(true);
     }
     if (url.pathname.endsWith("/rpc/claim_case_notification")) return json([]);
