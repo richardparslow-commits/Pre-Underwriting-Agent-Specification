@@ -95,6 +95,50 @@ Deno.test("keeps private client metadata out of the canonical submission", () =>
   assertEquals(draft.answers.length, SERVER_BANK.length);
 });
 
+Deno.test("caps compound answer fields at the 500-character form limit", () => {
+  const question = SERVER_BANK.find((entry) => entry.id === "OCC-01");
+  assert(question);
+  const fields = question.fields.map((field) => ({
+    id: field.id,
+    label: field.label,
+    value: field.kind === "number" ? "40" : "x".repeat(500),
+  }));
+
+  const draft = accepted(
+    buildValidDraft({
+      answers: buildAnswers({
+        [question.id]: {
+          disposition: "answered",
+          answerText: "Details provided",
+          fields,
+        },
+      }),
+    }),
+  );
+  const answer = draft.answers.find((entry) => entry.questionId === question.id);
+  assert(answer);
+  assertEquals(answer.fields?.find((field) => field.id === "jobTitle")?.value.length, 500);
+  assertEquals(answer.fields?.find((field) => field.id === "duties")?.value.length, 500);
+
+  const tooLong = fields.map((field) =>
+    field.id === "jobTitle" ? { ...field, value: "x".repeat(501) } : field,
+  );
+  assertEquals(
+    rejected(
+      buildValidDraft({
+        answers: buildAnswers({
+          [question.id]: {
+            disposition: "answered",
+            answerText: "Details provided",
+            fields: tooLong,
+          },
+        }),
+      }),
+    ),
+    "Invalid answer detail",
+  );
+});
+
 Deno.test("a compound answer's prose is rebuilt, not trusted from the caller", () => {
   // Unbranched so the row is applicable in the default fixture.
   const compound = SERVER_BANK.find(
