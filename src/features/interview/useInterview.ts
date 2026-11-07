@@ -101,6 +101,7 @@ export function useInterview(navigation?: IntakeNavigation): InterviewHook {
   });
   const leadRef = useRef(lead);
   leadRef.current = lead;
+  const lastSyncedLead = useRef<Record<string, string>>({});
   const [consent, setConsentState] = useState<ConsentState>(EMPTY_CONSENT);
   const [answers, setAnswers] = useState<Answers>({});
   const [acknowledgements, setAcknowledgements] = useState<
@@ -162,15 +163,30 @@ export function useInterview(navigation?: IntakeNavigation): InterviewHook {
       // edited contact detail instead of leaving the contradiction that
       // submit-case refuses. A different answer is never silently replaced.
       const answerId = field === "state" ? "ID-03" : field === "dateOfBirth" ? "ID-01" : null;
-      const previousValue = typeof previous === "string" ? previous.trim() : "";
-      const valid = Boolean(value.trim()) && !validateLead({ ...leadRef.current, [field]: value })[field];
-      if (answerId && previousValue && previousValue !== value.trim() && valid) {
+      if (answerId) {
+        const previousValue = typeof previous === "string" ? previous.trim() : "";
+        const nextValue = value.trim();
+        // Empty is a deliberate clear; a non-empty value must pass validation
+        // before it replaces a valid answer (an underage date must not).
+        const syncable = nextValue === "" ||
+          !validateLead({ ...leadRef.current, [field]: value })[field];
         setAnswers((current) => {
           const answer = current[answerId];
-          if (!answer || answer.value !== previousValue) return current;
+          if (!answer) return current;
+          // Adopt the unchanged answer on the first edit, even if this
+          // intermediate value is not syncable. Comparing with the last value
+          // actually copied from the lead lets partial dates and clears
+          // recover; a customer-edited answer never matches and is preserved.
+          if (lastSyncedLead.current[field] === undefined) {
+            if (answer.value !== previousValue) return current;
+            lastSyncedLead.current[field] = previousValue;
+          }
+          if (!syncable || nextValue === previousValue ||
+            answer.value !== lastSyncedLead.current[field]) return current;
+          lastSyncedLead.current[field] = nextValue;
           return {
             ...current,
-            [answerId]: { ...answer, value: value.trim(), updatedAt: new Date().toISOString() },
+            [answerId]: { ...answer, value: nextValue, updatedAt: new Date().toISOString() },
           };
         });
       }
@@ -365,6 +381,7 @@ export function useInterview(navigation?: IntakeNavigation): InterviewHook {
   const startOver = useCallback(() => {
     if (navigation) navigation.reset();
     else setStep("lead");
+    lastSyncedLead.current = {};
     setLead({
       preferredContact: "email",
       state: "",

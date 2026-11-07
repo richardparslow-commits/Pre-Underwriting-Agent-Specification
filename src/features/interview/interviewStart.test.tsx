@@ -103,3 +103,82 @@ test("Start a new test interview clears the previous interview start time", asyn
     await fixture.unmount();
   }
 });
+
+test("a cleared and retyped birth date follows the lead into the submitted answer", async () => {
+  const fixture = await mount();
+  try {
+    await enterLead(fixture.read);
+    await act(async () => fixture.read().begin());
+    await act(async () => fixture.read().setConsent("intakePermission", true));
+    await act(async () => fixture.read().givePermission());
+    assert.equal(fixture.read().answers["ID-01"]?.value, "1980-01-01");
+
+    await act(async () => fixture.read().setLeadField("dateOfBirth", ""));
+    assert.equal(fixture.read().answers["ID-01"]?.value, "");
+
+    await act(async () => fixture.read().setLeadField("dateOfBirth", "1985-05-12"));
+    assert.equal(fixture.read().answers["ID-01"]?.value, "1985-05-12");
+    await act(async () => fixture.read().begin());
+
+    const draft = await finishDraft(fixture.read);
+    assert.equal(draft.lead.dateOfBirth, "1985-05-12");
+    assert.equal(
+      draft.answers.find((answer) => answer.questionId === "ID-01")?.answerText,
+      "1985-05-12",
+    );
+  } finally {
+    await fixture.unmount();
+  }
+});
+
+test("a birth date typed key by key follows the lead into the submitted answer", async () => {
+  const fixture = await mount();
+  try {
+    await enterLead(fixture.read);
+    await act(async () => fixture.read().begin());
+    await act(async () => fixture.read().setConsent("intakePermission", true));
+    await act(async () => fixture.read().givePermission());
+
+    for (const value of [
+      "1",
+      "19",
+      "198",
+      "1985",
+      "1985-",
+      "1985-0",
+      "1985-05",
+      "1985-05-",
+      "1985-05-1",
+      "1985-05-12",
+    ]) {
+      await act(async () => fixture.read().setLeadField("dateOfBirth", value));
+    }
+    assert.equal(fixture.read().answers["ID-01"]?.value, "1985-05-12");
+    await act(async () => fixture.read().begin());
+
+    const draft = await finishDraft(fixture.read);
+    assert.equal(
+      draft.answers.find((answer) => answer.questionId === "ID-01")?.answerText,
+      "1985-05-12",
+    );
+  } finally {
+    await fixture.unmount();
+  }
+});
+
+test("a customer-edited birth-date answer is not overwritten by a lead edit", async () => {
+  const fixture = await mount();
+  try {
+    await enterLead(fixture.read);
+    await act(async () => fixture.read().begin());
+    await act(async () => fixture.read().setConsent("intakePermission", true));
+    await act(async () => fixture.read().givePermission());
+
+    await act(async () => fixture.read().setAnswer("ID-01", { value: "1979-01-01" }));
+    await act(async () => fixture.read().setLeadField("dateOfBirth", "1985-05-12"));
+
+    assert.equal(fixture.read().answers["ID-01"]?.value, "1979-01-01");
+  } finally {
+    await fixture.unmount();
+  }
+});
