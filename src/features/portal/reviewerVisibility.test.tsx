@@ -8,6 +8,7 @@ import {
   initialReviewHistory,
   readReviewHistory,
   readSafetyDisclosures,
+  SAFETY_ACCESS_DENIED,
   type ReviewHistoryPage,
   type SafetyPage,
 } from "@/lib/reviewerVisibility";
@@ -243,6 +244,31 @@ test("failed initial safety check never looks like zero disclosures, and retry c
   }
 });
 
+test("a non-reviewer sees a permission refusal with no retry that cannot help", async () => {
+  const loadPage = () =>
+    readSafetyDisclosures({
+      rpc: async () => ({ data: null, error: { message: "Not authorised" } }),
+    });
+  let view!: ReactTestRenderer;
+  await act(async () => {
+    view = create(
+      <StaticRouter location="/portal">
+        <SafetyDisclosures refreshKey={0} loadPage={loadPage} />
+      </StaticRouter>,
+    );
+  });
+  try {
+    assert.match(output(view), /do not have permission to see safety disclosures/);
+    assert.doesNotMatch(output(view), /could not be checked/);
+    assert.doesNotMatch(output(view), /Please retry/);
+    assert.doesNotMatch(output(view), /Retry safety check/);
+    assert.doesNotMatch(output(view), /No recorded safety disclosures/);
+    assert.equal(view.root.findAllByType("button").length, 0);
+  } finally {
+    act(() => view.unmount());
+  }
+});
+
 test("refresh ignores a late safety response and checks again without depending on queue pagination", async () => {
   const pending = deferred<SafetyPage>();
   let calls = 0;
@@ -369,7 +395,7 @@ test("missing, malformed and failed safety responses never silently become zero"
       error: null,
     }, {
       data: { entries: [], total: 0, next_cursor: null },
-      error: { message: "Not authorised" },
+      error: { message: "connection reset" },
     }]
   ) {
     await assert.rejects(
@@ -377,6 +403,16 @@ test("missing, malformed and failed safety responses never silently become zero"
       /could not be checked/,
     );
   }
+});
+
+test("a non-reviewer refusal is a permission error, never a retryable check failure", async () => {
+  await assert.rejects(
+    readSafetyDisclosures({
+      rpc: async () => ({ data: null, error: { message: "Not authorised" } }),
+    }),
+    (cause: unknown) =>
+      cause instanceof Error && cause.message === SAFETY_ACCESS_DENIED,
+  );
 });
 
 test("initial audited case response preserves the history continuation; older deployments remain explicitly unknown", () => {

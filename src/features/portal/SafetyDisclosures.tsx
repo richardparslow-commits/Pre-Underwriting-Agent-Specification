@@ -3,10 +3,12 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/surface";
 import { listSafetyDisclosures } from "@/lib/api";
-import type {
-  SafetyCursor,
-  SafetyDisclosure,
-  SafetyPage,
+import {
+  isSafetyAccessDenied,
+  SAFETY_ACCESS_DENIED,
+  type SafetyCursor,
+  type SafetyDisclosure,
+  type SafetyPage,
 } from "@/lib/reviewerVisibility";
 
 export function SafetyDisclosures(
@@ -22,6 +24,7 @@ export function SafetyDisclosures(
   const [refreshing, setRefreshing] = useState(true);
   const [needsRefresh, setNeedsRefresh] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [denied, setDenied] = useState(false);
   const [retry, setRetry] = useState(0);
   const generation = useRef(0);
   const inFlight = useRef(false);
@@ -32,6 +35,7 @@ export function SafetyDisclosures(
     setBusy(true);
     setRefreshing(true);
     setError(null);
+    setDenied(false);
     // Preserve known links until a fresh head succeeds, including on failure.
     void loadPage().then((page) => {
       if (version !== generation.current) return;
@@ -39,13 +43,21 @@ export function SafetyDisclosures(
       setTotal(page.total);
       setNext(page.nextCursor);
       setNeedsRefresh(!page.nextCursor && page.items.length !== page.total);
-    }).catch(() => {
-      if (version === generation.current) {
-        setNeedsRefresh(true);
-        setError(
-          "Safety disclosures across the queue could not be checked. Cases with disclosures may not be shown here. Please retry.",
-        );
+    }).catch((cause: unknown) => {
+      if (version !== generation.current) return;
+      if (isSafetyAccessDenied(cause)) {
+        setDenied(true);
+        setError(SAFETY_ACCESS_DENIED);
+        setNeedsRefresh(false);
+        setItems([]);
+        setTotal(null);
+        setNext(null);
+        return;
       }
+      setNeedsRefresh(true);
+      setError(
+        "Safety disclosures across the queue could not be checked. Cases with disclosures may not be shown here. Please retry.",
+      );
     }).finally(() => {
       if (version === generation.current) {
         inFlight.current = false;
@@ -92,11 +104,20 @@ export function SafetyDisclosures(
       }
       setTotal(page.total);
       setNext(page.nextCursor);
-    } catch {
+    } catch (cause: unknown) {
       if (version === generation.current) {
-        setError(
-          "Older safety disclosures could not be loaded. The list below is incomplete. Please retry.",
-        );
+        if (isSafetyAccessDenied(cause)) {
+          setDenied(true);
+          setError(SAFETY_ACCESS_DENIED);
+          setNeedsRefresh(false);
+          setItems([]);
+          setTotal(null);
+          setNext(null);
+        } else {
+          setError(
+            "Older safety disclosures could not be loaded. The list below is incomplete. Please retry.",
+          );
+        }
       }
     } finally {
       if (version === generation.current) {
@@ -181,7 +202,7 @@ export function SafetyDisclosures(
             </>
           )
           : null}
-        {next
+        {next && !denied
           ? (
             <Button
               className="mt-3"
@@ -196,19 +217,21 @@ export function SafetyDisclosures(
             </Button>
           )
           : null}
-        <Button
-          className="mt-3"
-          size="sm"
-          variant="outline"
-          disabled={busy}
-          onClick={refresh}
-        >
-          {refreshing
-            ? "Refreshing safety disclosures…"
-            : error && total === null
-            ? "Retry safety check"
-            : "Refresh safety disclosures"}
-        </Button>
+        {denied ? null : (
+          <Button
+            className="mt-3"
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={refresh}
+          >
+            {refreshing
+              ? "Refreshing safety disclosures…"
+              : error && total === null
+              ? "Retry safety check"
+              : "Refresh safety disclosures"}
+          </Button>
+        )}
         <p className="mt-2">
           The site does not monitor emergencies. This is a list of recorded
           disclosures, not a live safety assessment.

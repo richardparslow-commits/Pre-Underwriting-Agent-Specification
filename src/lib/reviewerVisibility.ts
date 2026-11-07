@@ -95,6 +95,14 @@ export async function readReviewHistory(
     nextCursor: historyCursor(data.next_cursor),
   };
 }
+export const SAFETY_ACCESS_DENIED =
+  "You do not have permission to see safety disclosures. Sign in with an authorised reviewer account.";
+
+/** Keep a permission refusal distinct from a transient check failure. */
+export function isSafetyAccessDenied(error: unknown): boolean {
+  return error instanceof Error && error.message === SAFETY_ACCESS_DENIED;
+}
+
 export async function readSafetyDisclosures(
   client: RpcReader,
   cursor?: SafetyCursor,
@@ -103,6 +111,12 @@ export async function readSafetyDisclosures(
     p_before_at: cursor?.submittedAt ?? null,
     p_before_reference: cursor?.reference ?? null,
   });
+  const refusal = object(error) && typeof error.message === "string"
+    ? error.message
+    : "";
+  if (/not authoris|not authoriz|permission denied/i.test(refusal)) {
+    throw new Error(SAFETY_ACCESS_DENIED);
+  }
   if (
     error || !object(data) || !Array.isArray(data.entries) ||
     !Number.isSafeInteger(data.total) || Number(data.total) < 0
