@@ -8,7 +8,10 @@ This separate repair batch starts from main at `5eb0241`. It addresses:
 ## Behavior
 
 The audited case-open RPC still records an opening before returning sensitive
-case content. Its first history page now includes lossless text IDs and a
+case content, and every read remains in the audit table. The first page
+coalesces repeated opens by the same reviewer within eight hours, matching
+`record_case_review`; they cannot fill the bounded page and hide a clarification
+note. Its first history page still includes lossless text IDs and a
 continuation cursor. **Load older review history** retrieves further 20-event
 pages through a reviewer-authorized RPC. Ordering uses `(created_at, id)` so
 equal timestamps cannot skip or duplicate rows. Loading an older page is itself
