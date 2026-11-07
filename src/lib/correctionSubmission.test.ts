@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { writeCorrection, correctionInput } from "./correctionSubmission";
+import { CASE_GONE, writeCorrection, correctionInput } from "./correctionSubmission";
 const key = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 test("real correction adapter sends one immutable ID/payload and accepts exact bigint acknowledgements", async () => {
   let calls = 0;
@@ -80,6 +80,41 @@ test("old backend, malformed receipts and changed-content conflicts never fall b
     ),
     /different correction text/,
   );
+});
+test("a deleted case is terminal, including when deletion wins the insert race", async () => {
+  for (const error of [
+    { code: "P0001", message: "Case not found" },
+    {
+      code: "23503",
+      message:
+        'insert or update on table "case_corrections" violates foreign key constraint "case_corrections_case_id_fkey"',
+    },
+  ]) {
+    let calls = 0;
+    await assert.rejects(
+      writeCorrection(
+        {
+          rpc: async () => {
+            calls++;
+            return { data: null, error };
+          },
+        },
+        "LPP-2026-DELETED",
+        "Synthetic correction",
+        key,
+      ),
+      (failure: unknown) => {
+        assert(failure instanceof Error);
+        assert.equal(failure.message, CASE_GONE);
+        assert.doesNotMatch(
+          failure.message,
+          /retry|unchanged|could not be confirmed/i,
+        );
+        return true;
+      },
+    );
+    assert.equal(calls, 1);
+  }
 });
 test("invalid local correction details or IDs cannot make a request", () => {
   for (const [text, id] of [

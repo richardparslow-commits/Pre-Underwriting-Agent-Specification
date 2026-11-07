@@ -1,4 +1,4 @@
-import { correctionInput, writeCorrection } from "./correctionSubmission";
+import { CASE_GONE, correctionInput, writeCorrection } from "./correctionSubmission";
 import { initialWithdrawals, readWithdrawals, type WithdrawalPage } from "./withdrawalHistory";
 import { readCaseQueue } from "./queuePaging";
 import { initialCorrections, readCorrections, type CorrectionPage } from "./correctionHistory";
@@ -561,7 +561,7 @@ export async function recordCorrection(reference: string, detail: string, reques
   if (PREVIEW_MODE) {
     ensurePreviewSeed();
     const record = previewCases.get(reference);
-    if (!record) throw new Error("This case could not be found.");
+    if (!record) throw new Error(CASE_GONE);
     const requestKey = `${reference}:${requestId}`;
     const prior = previewCorrectionRequests.get(requestKey);
     if (prior !== undefined) {
