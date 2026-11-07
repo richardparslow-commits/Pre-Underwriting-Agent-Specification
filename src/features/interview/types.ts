@@ -333,6 +333,8 @@ export interface CaseRecord extends CaseDraft {
   reference: string;
   submittedAt: string;
   status: CaseStatus;
+  /** Monotonic case version; undefined for older backend responses. */
+  reviewRevision?: number;
   notification: NotificationRecord;
   reviewLog: ReviewLogEntry[];
   /** Undefined means an older server could not establish history completeness. */

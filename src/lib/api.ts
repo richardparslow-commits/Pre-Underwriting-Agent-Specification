@@ -73,6 +73,7 @@ interface CaseRow {
   notification_detail: string | null;
   notification_updated_at: string | null;
   crisis_disclosure: boolean;
+  review_revision?: number | string;
 }
 
 function notificationFromRow(
@@ -113,6 +114,8 @@ function fromRow(row: CaseRow): CaseRecord {
     reference: row.reference,
     submittedAt: row.submitted_at,
     status: row.status,
+    reviewRevision:
+      row.review_revision === undefined ? undefined : Number(row.review_revision),
     crisisDisclosure: row.crisis_disclosure,
     notification: notificationFromRow(row),
     reviewLog: row.payload?.reviewLog ?? [],
@@ -591,13 +594,19 @@ export async function recordReview(
   action: ReviewLogEntry["action"],
   note?: string,
   expectedStatus?: CaseStatus,
+  expectedRevision?: number,
 ): Promise<void> {
   if (PREVIEW_MODE) {
     const record = previewCases.get(reference);
     if (!record) throw new Error("This case could not be found.");
     // Match the live RPC: a decision taken on a page whose status has moved on
     // must not overwrite a clarification request in the in-memory preview.
-    if (action !== "opened" && expectedStatus && record.status !== expectedStatus) {
+    if (
+      action !== "opened" &&
+      ((expectedStatus && record.status !== expectedStatus) ||
+        (expectedRevision !== undefined &&
+          record.reviewRevision !== expectedRevision))
+    ) {
       throw new Error(
         "This case changed since you opened it. Refresh before recording a review decision.",
       );
@@ -608,6 +617,9 @@ export async function recordReview(
     ];
     if (action === "marked_reviewed") record.status = "reviewed";
     if (action === "requested_clarification") record.status = "needs_clarification";
+    if (action !== "opened") {
+      record.reviewRevision = (record.reviewRevision ?? 0) + 1;
+    }
     return;
   }
 
@@ -617,9 +629,11 @@ export async function recordReview(
     p_reference: reference,
     p_action: action,
     p_note: note ?? null,
-    // The database refuses a decision taken on a page whose status has moved
-    // on, instead of applying it over a clarification request or correction.
+    // The database refuses a decision taken on a page whose status or case
+    // revision has moved on, instead of applying it over a clarification
+    // request or correction.
     p_expected_status: expectedStatus ?? null,
+    p_expected_revision: expectedRevision ?? null,
   });
 
   if (error) {
