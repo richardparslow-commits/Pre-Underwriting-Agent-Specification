@@ -176,7 +176,7 @@ export function CaseReview({
       <a
         key={id}
         href={`#answer-${id}`}
-        className="ml-1 font-mono text-[0.65rem] text-accent underline decoration-accent/30 underline-offset-2"
+        className="ml-1 font-mono text-[0.65rem] text-accent-strong underline decoration-accent-strong/40 underline-offset-2"
         onClick={event => {
           if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
           if (filter !== "all" && !filtered.some(answer => answer.questionId === id)) {

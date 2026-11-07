@@ -58,6 +58,7 @@ test("reviewers can reach flagged and summary answers from a filtered question r
 
     const summaryLink = view.root.findAllByType("a").find(link => link.props.href === "#answer-NIC-02");
     assert.ok(summaryLink);
+    assert.match(summaryLink.props.className, /(^|\s)text-accent-strong(?:\s|$)/);
     await act(async () => summaryLink.props.onClick?.({ button: 0 }));
     assert.ok(view.root.findAllByType("li").some(row => row.props.id === "answer-NIC-02"));
 
