@@ -340,6 +340,31 @@ await expectError(
   () => query("select public.get_case_queue_page() result"),
   "Not authorised",
 );
+await pass(
+  "a signed-out session sees no case summaries",
+  () => query("select count(*)::int n from public.case_summaries"),
+  (rows) => rows[0].n === 0,
+);
+await expectError(
+  "a signed-out session cannot read queue-wide safety disclosures",
+  () => query("select public.get_queue_safety_disclosures() result"),
+  "Not authorised",
+);
+await expectError(
+  "a signed-out session cannot open a case",
+  () => query("select public.open_case_for_review('LPP-2026-TEST01') result"),
+  "Not authorised",
+);
+await expectError(
+  "a signed-out session cannot record a correction",
+  () => query("select public.record_case_correction('LPP-2026-TEST01','Signed-out correction','44444444-4444-4444-8444-444444444444'::uuid)"),
+  "Not authorised",
+);
+await expectError(
+  "a signed-out session cannot record a review decision",
+  () => query("select public.record_case_review('LPP-2026-TEST01','marked_reviewed','Signed-out decision')"),
+  "Not authorised",
+);
 await exec("reset role;");
 await claims("aal2");
 
