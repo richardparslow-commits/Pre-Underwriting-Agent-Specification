@@ -2,7 +2,7 @@ import { CASE_GONE, correctionInput, writeCorrection } from "./correctionSubmiss
 import { initialWithdrawals, readWithdrawals, type WithdrawalPage } from "./withdrawalHistory";
 import { readCaseQueue } from "./queuePaging";
 import { initialCorrections, readCorrections, type CorrectionPage } from "./correctionHistory";
-import { initialReviewHistory, readReviewHistory, readSafetyDisclosures } from "./reviewerVisibility";
+import { caseReadFailure, initialReviewHistory, readReviewHistory, readSafetyDisclosures } from "./reviewerVisibility";
 import { isUnknownReviewerAddress } from "./reviewerSignInFeedback";
 import type { ReviewHistoryPage, SafetyCursor, SafetyPage } from "./reviewerVisibility";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -538,7 +538,7 @@ export async function getCase(reference: string): Promise<CaseRecord | null> {
   const { data, error } = await supabase.rpc("open_case_for_review", {
     p_reference: reference,
   });
-  if (error) throw new Error("This case could not be loaded.");
+  if (error) throw caseReadFailure(error);
   if (!data) return null;
 
   const result = data as {

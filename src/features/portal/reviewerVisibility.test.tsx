@@ -5,6 +5,8 @@ import { StaticRouter } from "react-router-dom";
 import { ReviewHistory } from "./ReviewHistory";
 import { SafetyDisclosures } from "./SafetyDisclosures";
 import {
+  CASE_ACCESS_DENIED,
+  caseReadFailure,
   initialReviewHistory,
   readReviewHistory,
   readSafetyDisclosures,
@@ -413,6 +415,20 @@ test("a non-reviewer refusal is a permission error, never a retryable check fail
     (cause: unknown) =>
       cause instanceof Error && cause.message === SAFETY_ACCESS_DENIED,
   );
+});
+
+test("a non-reviewer case refusal is a permission message, never a load failure", () => {
+  for (const message of ["Not authorised", "Not authorized", "permission denied"]) {
+    const failure = caseReadFailure({ message });
+    assert.equal(failure.message, CASE_ACCESS_DENIED);
+    assert.match(failure.message, /do not have permission to read this case/i);
+    assert.doesNotMatch(failure.message, /could not be loaded/i);
+  }
+});
+
+test("other case-read failures remain generic", () => {
+  const failure = caseReadFailure({ message: "connection reset" });
+  assert.equal(failure.message, "This case could not be loaded.");
 });
 
 test("initial audited case response preserves the history continuation; older deployments remain explicitly unknown", () => {
