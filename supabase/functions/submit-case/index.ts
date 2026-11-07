@@ -204,7 +204,7 @@ Deno.serve(async (req: Request, info?: Deno.ServeHandlerInfo<Deno.NetAddr>) => {
   // A durable, salted counter is used when the project is configured. If it is
   // unavailable, production must fail closed: the in-memory limiter cannot
   // coordinate across instances and is reserved for the explicit test mode.
-  let rateKey = connectionRateKey(info);
+  let rateKey = connectionRateKey(req, info);
   let verifiedBody: Awaited<ReturnType<typeof readBodyWithLimit>> | undefined;
   if (Deno.env.get("INTAKE_RELAY_REQUIRED") === "true") {
     const secret = Deno.env.get("INTAKE_RELAY_SECRET") ?? "";

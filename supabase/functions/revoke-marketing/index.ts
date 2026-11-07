@@ -221,7 +221,7 @@ Deno.serve(async (req: Request, info?: Deno.ServeHandlerInfo<Deno.NetAddr>) => {
 
   // Validate before spending a rate-limit slot: a malformed request should not
   // let an attacker exhaust a real customer's revocation attempts.
-  const rateKey = connectionRateKey(info);
+  const rateKey = connectionRateKey(req, info);
   const durableLimited = await durableRateLimited(rateKey);
   if (durableLimited === true) {
     return jsonResponse(

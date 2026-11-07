@@ -1340,16 +1340,43 @@ const RATE_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMIT = 10;
 const hits = new Map<string, number[]>();
 
+/** Canonicalize an IPv4/IPv6 literal; reject lists, ports and arbitrary names. */
+function canonicalAddress(value: string): string | null {
+  if (!value || value.length > 255) return null;
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(value)) {
+    const parts = value.split(".");
+    if (parts.some((part) => Number(part) > 255 || String(Number(part)) !== part)) return null;
+    return parts.join(".");
+  }
+  if (!value.includes(":") || !/^[a-fA-F0-9:]+$/.test(value)) return null;
+  try {
+    return new URL(`https://[${value}]/`).hostname.slice(1, -1).toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Only the server's connection metadata can select a quota. Forwarded/real-IP
- * request headers are untrusted, even when they have a platform-looking name.
- * Behind a gateway, callers can share a peer quota. If the runtime omits the
- * peer, all requests share a conservative fallback; never invent a new identity
- * from headers, ports, idempotency keys, user agents or request content.
+ * The ingress gateway is the only route to the public functions and appends the
+ * caller's address as the final X-Forwarded-For entry. A caller can prepend
+ * arbitrary entries, but cannot change the entry the gateway appends. Trust only
+ * that final entry; never read CF-Connecting-IP, X-Real-IP, Forwarded, ports,
+ * idempotency keys, user agents or request content. If the gateway entry is
+ * missing or malformed, fall back to the runtime peer and then to a shared
+ * conservative quota. Deployments must not expose these functions outside the
+ * gateway, and a self-hosted gateway must append the client address last.
  */
-export function connectionRateKey(info?: {
-  remoteAddr?: { transport?: string; hostname?: string };
-}): string {
+export function connectionRateKey(
+  req: Pick<Request, "headers">,
+  info?: {
+    remoteAddr?: { transport?: string; hostname?: string };
+  },
+): string {
+  const forwarded = req.headers.get("x-forwarded-for") ?? "";
+  const last = forwarded.split(",").at(-1)?.trim() ?? "";
+  const client = canonicalAddress(last);
+  if (client) return `client:${client}`;
+
   const address = info?.remoteAddr;
   const hostname = address?.hostname?.trim().toLowerCase();
   if (address?.transport !== "tcp" || !hostname || hostname.length > 255 || /\s/.test(hostname)) {
