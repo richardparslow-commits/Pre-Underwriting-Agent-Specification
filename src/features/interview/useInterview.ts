@@ -135,7 +135,13 @@ export function useInterview(navigation?: IntakeNavigation): InterviewHook {
   const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(
     null,
   );
-  const [startedAt] = useState(() => new Date().toISOString());
+  const [startedAt, setStartedAt] = useState(() => new Date().toISOString());
+  const interviewStartRecorded = useRef(false);
+  const markInterviewStart = useCallback(() => {
+    if (interviewStartRecorded.current) return;
+    interviewStartRecorded.current = true;
+    setStartedAt(new Date().toISOString());
+  }, []);
 
   const progress = useMemo(() => progressFor(answers), [answers]);
   const visible = useMemo(() => visibleQuestions(answers), [answers]);
@@ -200,9 +206,11 @@ export function useInterview(navigation?: IntakeNavigation): InterviewHook {
     () => {
       if (!leadReady) { returnToLead(); return; }
       setShowLeadValidation(false);
-      setStep(consent.intakePermission ? "interview" : "permission");
+      const nextStep = consent.intakePermission ? "interview" : "permission";
+      if (nextStep === "interview") markInterviewStart();
+      setStep(nextStep);
     },
-    [leadReady, returnToLead, consent.intakePermission, setStep],
+    [leadReady, returnToLead, consent.intakePermission, setStep, markInterviewStart],
   );
 
   const givePermission = useCallback(() => {
@@ -234,6 +242,7 @@ export function useInterview(navigation?: IntakeNavigation): InterviewHook {
       setPrefilledIds(Object.keys(prefill));
     }
 
+    markInterviewStart();
     setStep("interview");
     setCurrentQuestionId((current) => current ?? visible[0]?.id ?? null);
   }, [
@@ -246,6 +255,7 @@ export function useInterview(navigation?: IntakeNavigation): InterviewHook {
     visible,
     invalidateReview,
     setStep,
+    markInterviewStart,
   ]);
 
   const backToLead = useCallback(() => setStep("lead"), [setStep]);
@@ -369,6 +379,8 @@ export function useInterview(navigation?: IntakeNavigation): InterviewHook {
     setReceipt(null);
     setSubmissionKey(crypto.randomUUID());
     setCurrentQuestionId(null);
+    interviewStartRecorded.current = false;
+    setStartedAt(new Date().toISOString());
   }, [invalidateReview, navigation, setStep]);
 
   // A question can disappear (a branch closes) or a held row can never appear.
