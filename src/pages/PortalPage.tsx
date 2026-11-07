@@ -19,6 +19,7 @@ import { useReviewerAuth } from "@/features/portal/useReviewerAuth";
 import { SessionCheckCard } from "@/features/portal/SessionCheckCard";
 import { listCases } from "@/lib/api";
 import { useCaseQueue } from "@/features/portal/useCaseQueue";
+import { queueCountSummary } from "@/features/portal/queueSummary";
 import type { CaseStatus, NotificationState } from "@/features/interview/types";
 import { formatDate } from "@/lib/utils";
 
@@ -195,13 +196,11 @@ export default function PortalPage() {
           <h1 className="mt-2 text-3xl leading-tight sm:text-4xl">Case queue</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Signed in as {auth.email ?? "reviewer"} ·{" "}
-            {total === null ? (
-              "case count unavailable"
-            ) : (
-              <>
-                showing {cases?.length ?? 0} of {total} case{total === 1 ? "" : "s"}
-              </>
-            )}
+            {queueCountSummary({
+              total,
+              displayed: cases?.length ?? 0,
+              loading,
+            })}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
