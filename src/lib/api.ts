@@ -3,6 +3,7 @@ import { initialWithdrawals, readWithdrawals, type WithdrawalPage } from "./with
 import { readCaseQueue } from "./queuePaging";
 import { initialCorrections, readCorrections, type CorrectionPage } from "./correctionHistory";
 import { initialReviewHistory, readReviewHistory, readSafetyDisclosures } from "./reviewerVisibility";
+import { isUnknownReviewerAddress } from "./reviewerSignInFeedback";
 import type { ReviewHistoryPage, SafetyCursor, SafetyPage } from "./reviewerVisibility";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PREVIEW_MODE, SUBMIT_CASE_URL, SUPABASE_ANON_KEY, SITE } from "@/config/site";
@@ -667,9 +668,12 @@ export async function recordReview(
 // Authentication
 // ---------------------------------------------------------------------------
 
-export async function sendSignInLink(email: string): Promise<void> {
-  if (!supabase) throw new Error("Sign-in is not configured.");
-  const { error } = await supabase.auth.signInWithOtp({
+export async function sendSignInLink(
+  email: string,
+  client: SupabaseClient | null = supabase,
+): Promise<void> {
+  if (!client) throw new Error("Sign-in is not configured.");
+  const { error } = await client.auth.signInWithOtp({
     email,
     options: {
       // A reviewer address must already exist. Without this, any address gets
@@ -679,7 +683,12 @@ export async function sendSignInLink(email: string): Promise<void> {
       emailRedirectTo: `${window.location.origin}/portal`,
     },
   });
-  if (error) throw new Error("The sign-in link could not be sent.");
+  // An unknown address is refused before any email is attempted. Answer it
+  // exactly like a known address so the screen cannot be used to enumerate
+  // reviewer accounts; every other failure still surfaces honestly.
+  if (error && !isUnknownReviewerAddress(error)) {
+    throw new Error("The sign-in link could not be sent.");
+  }
 }
 
 export const SIGN_OUT_FAILURE =
