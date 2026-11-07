@@ -2,10 +2,11 @@
 
 Heal Nov 1 report: [Distinct prospects share submit limit](https://app.heal.dev/fa38cc97-45dd-4b98-8550-5fde5c59913c/runs/fae088ee-8575-4656-8440-c5cbc58b432e/defects/s6-distinct-prospects-share-submit-limit-1).
 
-The conservative TCP-peer limiter fixed forwarded-header spoofing but combines
-visitors behind the Supabase gateway. This repair prepares a separate Cloudflare
-Worker that attests the visitor's edge connection before forwarding to the
-existing Supabase `submit-case` function. Prospects remain anonymous; reviewer
+The TCP-peer limiter fixed forwarded-header spoofing but combined visitors
+behind the Supabase gateway. The gateway-appended client entry now separates
+them. This repair prepares a separate Cloudflare Worker that additionally
+attests the visitor's edge connection before forwarding to the existing Supabase
+`submit-case` function. Prospects remain anonymous; reviewer
 sign-in, MFA, the database, notifications and marketing withdrawal are unchanged.
 
 ## Trust boundary
@@ -23,8 +24,9 @@ proof is returned to the browser. No raw IP, secret or submission is logged.
 When `INTAKE_RELAY_REQUIRED=true`, missing/invalid proofs fail closed before a
 counter or case write. A missing/short secret returns 503. A proof received while
 relay mode is disabled also returns 503, avoiding accidental partial-rollout
-fallback. Without activation the conservative original transport-peer quota
-remains: **this preparation does not fix hosted quota fairness yet**.
+fallback. Without activation, the functions use the ingress gateway's final
+`X-Forwarded-For` entry, falling back to the runtime peer if it is missing or
+malformed. The relay remains the stronger hosted submission path.
 
 The relay accepts only `/submit-case`, explicit Origins, and a fixed HTTPS
 `<project-ref>.supabase.co/functions/v1/submit-case` destination. It reconstructs
@@ -86,7 +88,8 @@ hosted ingress behavior.
 Quotas identify connections, not people. NAT/VPN users sharing a public IP still
 share a quota; an attacker with multiple IPs can obtain multiple quotas. Secret
 rotation changes bucket identities; perform it while locked and test both sides
-together. The withdrawal endpoint retains its prior conservative limiter.
+together. The withdrawal endpoint uses the same gateway client entry and retains
+its 5-per-600-second limit.
 
 ## Regression evidence
 
@@ -95,8 +98,9 @@ submit-case entrypoint with a synthetic database transport: independent visitors
 behind one gateway, rotating XFF/key variants, blocked direct/forged/expired
 calls, content/audience/origin/method binding, IPv6 canonicalization, ingress
 metadata and subrequest rejection, byte caps, lock/config failures, header
-stripping, no redirects and uncertain transport errors. Existing rate-limit
-identity tests continue covering unconfigured legacy mode and withdrawals.
+stripping, no redirects and uncertain transport errors. Rate-limit identity tests cover independent quotas for distinct
+gateway-forwarded clients, ignored caller-prepended entries, peer/shared
+fallbacks and withdrawals.
 `src/config/submissionEndpoint.test.ts` covers relay selection and invalid URL
 fail-closed behavior. Run `deno test --allow-env --lock=deno.lock
 supabase/functions/tests/` and the submission UI suite. All test credentials,

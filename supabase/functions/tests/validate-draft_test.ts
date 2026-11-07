@@ -189,9 +189,31 @@ Deno.test("a compound answer's prose is rebuilt, not trusted from the caller", (
   assertEquals(answer?.fields?.[0]?.value, "Test detail");
 });
 
-Deno.test("rate-limit identity uses a verified connection peer or a shared fallback", () => {
-  assertEquals(connectionRateKey({ remoteAddr: { transport: "tcp", hostname: "203.0.113.9" } }), "peer:203.0.113.9");
-  assertEquals(connectionRateKey(), "shared:unverified-peer");
+Deno.test("rate-limit identity trusts the gateway's final forwarded address and falls back to the peer", () => {
+  const request = (forwarded?: string) =>
+    new Request("https://example.test", {
+      headers: forwarded === undefined
+        ? {}
+        : { "x-forwarded-for": forwarded },
+    });
+  const info = {
+    remoteAddr: { transport: "tcp" as const, hostname: "192.0.2.45" },
+  };
+
+  assertEquals(
+    connectionRateKey(request("198.51.100.8, 203.0.113.9"), info),
+    "client:203.0.113.9",
+  );
+  assertEquals(
+    connectionRateKey(request("2001:0DB8::1"), info),
+    "client:2001:db8::1",
+  );
+  assertEquals(
+    connectionRateKey(request("not-an-ip"), info),
+    "peer:192.0.2.45",
+  );
+  assertEquals(connectionRateKey(request(), info), "peer:192.0.2.45");
+  assertEquals(connectionRateKey(request()), "shared:unverified-peer");
 });
 
 Deno.test("rejects a held HIV row presented as answered", () => {
