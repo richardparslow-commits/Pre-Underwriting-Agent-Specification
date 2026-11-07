@@ -591,3 +591,81 @@ test("browser Back to the original unmarked lead entry keeps its original meanin
     },
   );
 });
+
+test("a header click is refused while a submission is pending", async () => {
+  const originalDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
+  const originalElement = Object.getOwnPropertyDescriptor(globalThis, "Element");
+  const listeners = new Map<string, EventListener>();
+
+  class FakeElement {
+    closest() {
+      return this;
+    }
+    getAttribute() {
+      return "/";
+    }
+  }
+
+  Object.defineProperty(globalThis, "document", {
+    configurable: true,
+    value: {
+      addEventListener(type: string, listener: EventListener) {
+        listeners.set(type, listener);
+      },
+      removeEventListener(type: string, listener: EventListener) {
+        if (listeners.get(type) === listener) listeners.delete(type);
+      },
+    },
+  });
+  Object.defineProperty(globalThis, "Element", {
+    configurable: true,
+    value: FakeElement,
+  });
+
+  try {
+    const pending = deferred<SubmissionReceipt>();
+    await fixture(
+      async () => pending.promise,
+      async (f) => {
+        await seed(f.read, true);
+        let request!: Promise<void>;
+        await act(async () => {
+          request = f.read().submit();
+        });
+        assert.equal(f.read().submitting, true);
+
+        const block = listeners.get("click");
+        assert.ok(block, "the capture-phase navigation guard is installed");
+        let prevented = false;
+        let stopped = false;
+        await act(async () => {
+          block({
+            target: new FakeElement(),
+            preventDefault: () => {
+              prevented = true;
+            },
+            stopPropagation: () => {
+              stopped = true;
+            },
+          } as unknown as MouseEvent);
+        });
+
+        assert.equal(prevented, true, "the header link default is cancelled");
+        assert.equal(stopped, true, "the click cannot reach the router");
+        assert.equal(f.read().navigationBlocked, true);
+
+        await act(async () => {
+          pending.resolve(receipt);
+          await request;
+        });
+        assert.equal(f.read().submitting, false);
+        assert.deepEqual(f.read().interview.receipt, receipt);
+      },
+    );
+  } finally {
+    if (originalDocument) Object.defineProperty(globalThis, "document", originalDocument);
+    else Reflect.deleteProperty(globalThis, "document");
+    if (originalElement) Object.defineProperty(globalThis, "Element", originalElement);
+    else Reflect.deleteProperty(globalThis, "Element");
+  }
+});

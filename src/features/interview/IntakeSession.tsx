@@ -34,7 +34,9 @@ export function IntakeSessionProvider({
   // A pending submission must not be abandoned by a link click: the provider
   // unmounts outside the intake scope, which would drop the receipt that holds
   // the only reference the prospect can quote. Warn instead of navigating.
-  useEffect(() => {
+  // Install this in the same commit as the submitting screen, before paint, so
+  // a fast header click cannot slip through the gap before a passive effect.
+  useLayoutEffect(() => {
     if (!submitting || typeof document === "undefined") {
       setNavigationBlocked(false);
       return;
