@@ -11,6 +11,7 @@ import { unenrollPendingFactor } from "./pendingFactorRecovery";
 
 interface MfaGateProps {
   email: string | null;
+  leaveError?: string | null;
   onVerified: () => void;
   onLeave: () => void;
 }
@@ -27,7 +28,7 @@ export function MfaGate(props: MfaGateProps) {
   return <MfaSession key={props.email ?? "reviewer"} {...props} />;
 }
 
-function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
+function MfaSession({ email, leaveError, onVerified, onLeave }: MfaGateProps) {
   const [confirmRestart, setConfirmRestart] = useState<string | null>(null);
   const mfa = useMemo(() => {
     const client = supabase;
@@ -240,6 +241,14 @@ function MfaSession({ email, onVerified, onLeave }: MfaGateProps) {
           <div role="alert">
             <Alert tone="danger" className="mt-4">
               {error}
+            </Alert>
+          </div>
+        ) : null}
+
+        {leaveError ? (
+          <div role="alert">
+            <Alert tone="danger" className="mt-4">
+              {leaveError}
             </Alert>
           </div>
         ) : null}

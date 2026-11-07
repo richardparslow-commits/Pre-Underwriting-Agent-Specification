@@ -96,10 +96,10 @@ function SignInCard({ auth }: { auth: ReturnType<typeof useReviewerAuth> }) {
             the exact address you entered.
           </Alert>
         ) : null}
-        {auth.error ? (
+        {auth.leaveError || auth.error ? (
           <div role="alert">
             <Alert tone="danger" className="mt-4">
-              {auth.error}
+              {auth.leaveError ?? auth.error}
             </Alert>
           </div>
         ) : null}
@@ -144,6 +144,7 @@ export default function PortalPage() {
     return (
       <MfaGate
         email={auth.email}
+        leaveError={auth.leaveError}
         onVerified={() => void auth.refreshAssurance()}
         onLeave={() => void auth.leave()}
       />
@@ -215,6 +216,14 @@ export default function PortalPage() {
           Preview mode. Cases are held in this tab only and the email notification is not connected.
           The portal shows exactly what the reviewer would see.
         </Alert>
+      ) : null}
+
+      {auth.leaveError ? (
+        <div role="alert">
+          <Alert tone="danger" className="mt-6">
+            {auth.leaveError}
+          </Alert>
+        </div>
       ) : null}
 
       <SafetyDisclosures refreshKey={safetyRefresh} />

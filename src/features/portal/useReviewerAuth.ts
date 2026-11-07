@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { PREVIEW_MODE, SITE } from "@/config/site";
-import { sendSignInLink, signOut } from "@/lib/api";
+import { SIGN_OUT_FAILURE, sendSignInLink, signOut } from "@/lib/api";
 import { reviewerSignInFeedback, supabase } from "@/integrations/supabase/client";
 
 /** True when the session has not completed a second factor. */
@@ -17,12 +17,19 @@ async function sessionNeedsStepUp(): Promise<boolean> {
  * and no server, so it must never look like real authentication. In live mode
  * the session is a Supabase session and every row is still filtered by RLS.
  */
-export function useReviewerAuth() {
+interface ReviewerAuthOptions {
+  /** Test seam: replaces the network sign-out without changing the auth state contract. */
+  signOut?: () => Promise<void>;
+}
+
+export function useReviewerAuth(options: ReviewerAuthOptions = {}) {
+  const leaveSignOut = options.signOut ?? signOut;
   const [email, setEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(!PREVIEW_MODE);
   const [previewUnlocked, setPreviewUnlocked] = useState(false);
   const [linkSent, setLinkSent] = useState(false);
   const [error, setError] = useState<string | null>(() => reviewerSignInFeedback.read());
+  const [leaveError, setLeaveError] = useState<string | null>(null);
   const [needsMfa, setNeedsMfa] = useState(false);
 
   useEffect(() => {
@@ -69,6 +76,7 @@ export function useReviewerAuth() {
   const requestLink = useCallback(async (address: string) => {
     reviewerSignInFeedback.clear();
     setError(null);
+    setLeaveError(null);
     setLinkSent(false);
     try {
       await sendSignInLink(address);
@@ -81,11 +89,20 @@ export function useReviewerAuth() {
   }, []);
 
   const leave = useCallback(async () => {
-    await signOut();
+    setLeaveError(null);
+    try {
+      await leaveSignOut();
+    } catch {
+      // Keep the reviewer signed in locally: Supabase can fail to revoke the
+      // server session while dropping the local one, so clearing this state
+      // would present a failed sign-out as success.
+      setLeaveError(SIGN_OUT_FAILURE);
+      return;
+    }
     setEmail(null);
     setNeedsMfa(false);
     setPreviewUnlocked(false);
-  }, []);
+  }, [leaveSignOut]);
 
   const unlockPreview = useCallback(() => setPreviewUnlocked(true), []);
 
@@ -105,6 +122,7 @@ export function useReviewerAuth() {
     loading,
     linkSent,
     error,
+    leaveError,
     requestLink,
     leave,
     unlockPreview,

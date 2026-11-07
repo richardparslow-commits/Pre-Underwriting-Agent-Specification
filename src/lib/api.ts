@@ -4,6 +4,7 @@ import { readCaseQueue } from "./queuePaging";
 import { initialCorrections, readCorrections, type CorrectionPage } from "./correctionHistory";
 import { initialReviewHistory, readReviewHistory, readSafetyDisclosures } from "./reviewerVisibility";
 import type { ReviewHistoryPage, SafetyCursor, SafetyPage } from "./reviewerVisibility";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { PREVIEW_MODE, SUBMIT_CASE_URL, SUPABASE_ANON_KEY, SITE } from "@/config/site";
 import { supabase } from "@/integrations/supabase/client";
 import { buildConsentRecords, SUBMISSION_ACKNOWLEDGEMENT_TEXT, CONSENT_VERSION } from "@/features/consent/consentTexts";
@@ -681,9 +682,13 @@ export async function sendSignInLink(email: string): Promise<void> {
   if (error) throw new Error("The sign-in link could not be sent.");
 }
 
-export async function signOut(): Promise<void> {
-  if (!supabase) return;
-  await supabase.auth.signOut();
+export const SIGN_OUT_FAILURE =
+  "Sign-out did not finish. Your session may still be active. Try again, or close the browser and contact the operator.";
+
+export async function signOut(client: SupabaseClient | null = supabase): Promise<void> {
+  if (!client) return;
+  const { error } = await client.auth.signOut();
+  if (error) throw new Error(SIGN_OUT_FAILURE);
 }
 
 export async function currentEmail(): Promise<string | null> {
